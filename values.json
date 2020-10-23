@@ -1,0 +1,32 @@
+{
+	"units": {
+		"warrior" : 10,
+		"rider" : 15,
+		"archer" : 15,
+		"shield" : 15,
+		"cata" : 40,
+		"mindbender" : 25,
+		"swordpeople" : 25,
+		"knight" : 40,
+		"giant" : 10
+	},
+	"city": {
+		"caputre" : 100,
+		"level-2" : 40,
+		"level-3" : 35,
+		"level-4" : 30,
+		"level-5" : 25,
+		"population" : 5,
+		"monument" : 400
+	}, 
+	"techs": {
+		"tier-1" : 100,
+		"tier-2" : 200,
+		"tier-3" : 300
+	},
+	"tiles": {
+		"claimed" : 20,
+		"revealed" : 5,
+		"explorer" : 150
+	}
+}

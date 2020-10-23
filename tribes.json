@@ -1,0 +1,51 @@
+[
+	{
+		"name": "Xin-xi",
+		"tech": "climbing",
+		"unit": "warrior"
+	}, {
+		"name": "Imperius",
+		"tech": "organisation",
+		"unit": "warrior"
+	}, {
+		"name": "Bardur",
+		"tech": "hunting",
+		"unit": "warrior"
+	}, {
+		"name": "Oumaji",
+		"tech": "riding",
+		"unit": "rider"
+	}, {
+		"name": "Kickoo",
+		"tech": "fishing",
+		"unit": "warrior"
+	}, {
+		"name": "Hoodrick",
+		"tech": "archery",
+		"unit": "archer"
+	}, {
+		"name": "Luxidoor",
+		"tech": "",
+		"unit": "warrior"
+	}, {
+		"name": "Vengir",
+		"tech": "smithery",
+		"unit": "swordpeople"
+	}, {
+		"name": "Zebasi",
+		"tech": "farming",
+		"unit": "warrior"
+	}, {
+		"name": "Ai-mo",
+		"tech": "meditation",
+		"unit": "warrior"
+	}, {
+		"name": "Quetzali",
+		"tech": "shields",
+		"unit": "shield"
+	}, {
+		"name": "Yadakk",
+		"tech": "roads",
+		"unit": "warrior"
+	}
+]

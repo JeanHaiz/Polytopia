@@ -1,0 +1,151 @@
+[
+	{
+		"name" : "hunting",
+		"tier" : 1,
+		"units" : [],
+		"allows" : [
+			{
+				"name" : "forestry",
+				"cost" : 2,
+				"units" : [],
+				"allows" : [
+					{
+						"name" : "mathematics",
+						"cost" : 3,
+						"units" : ["cata"],
+						"allows" : []
+					}
+				]
+			}, {
+				"name" : "archery",
+				"cost" : 2,
+				"units" : ["archer"],
+				"allows" : [
+					{
+						"name" : "spiritualism",
+						"cost" : 3,
+						"units" : [],
+						"allows" : []
+					}
+				]
+			}
+		]
+	}, {
+		"name" : "fishing",
+		"cost" : 1,
+		"units" : [],
+		"allows" : [
+			{
+				"name" : "sailing",
+				"cost" : 2,
+				"units" : [],
+				"allows" : [
+					{
+						"name" : "navigation",
+						"cost" : 3,
+						"units" : [],
+						"allows" : []
+					}
+				]
+			}, { 
+				"name" : "whaling",
+				"cost" : 2,
+				"units" : [],
+				"allows" : [
+					{
+						"name" : "acquatism",
+						"cost" : 3,
+						"units" : [],
+						"allows" : []
+					}
+				]
+			}
+		]
+	}, {
+		"name" : "climbing",
+		"cost" : 1,
+		"units" : [],
+		"allows" : [
+			{
+				"name" : "meditation",
+				"cost" : 2,
+				"units" : [],
+				"allows" : [
+					{
+						"name" : "philosophy",
+						"cost" : 3,
+						"units" : ["mindbender"],
+						"allows": []
+					}
+				]
+			}, {
+				"name" : "mining",
+				"cost" : 2,
+				"units" : [],
+				"allows" : [
+					{
+						"name" : "smithery",
+						"cost" : 3,
+						"units" : ["swordpeople"],
+						"allows" : []
+					}
+				]
+			}
+		]
+	}, {
+		"name" : "organisation",
+		"cost" : 1,
+		"units" : [],
+		"allows" : [
+			{
+				"name" : "shields",
+				"cost" : 2,
+				"units" : ["shield"],
+				"allows" : []
+			}, {
+				"name" : "farming",
+				"cost" : 2,
+				"units" : [],
+				"allows" : [
+					{
+						"name" : "construction",
+						"cost" : 3,
+						"units" : [],
+						"allows" : []
+					}
+				]
+			}
+		]
+	}, {
+		"name" : "riding",
+		"cost" : 1,
+		"units" : ["rider"],
+		"allows" : [
+			{
+				"name" : "free spirit",
+				"cost" : 2,
+				"units" : [],
+				"allows" : [
+					{
+						"name" : "chivalry",
+						"cost" : 3,
+						"units" : ["knight"],
+						"allows": []
+					}
+				]
+			}, {
+				"name" : "roads",
+				"cost" : 2,
+				"units" : [],
+				"allows" : [
+					{
+						"name" : "trade",
+						"cost" : 3,
+						"units" : ["swordpeople"],
+						"allows" : []
+					}
+				]
+			}
+		]
+	}
+]
