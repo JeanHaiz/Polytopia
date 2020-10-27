@@ -410,6 +410,10 @@ def buildRuinLinkConstraints(model, turn, dictionnaries):
                 dictionnaries[past_turn]['symbols'][past_turn + "_" + "population"]
             )
         )
+        model.Add(
+            sum(dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + e['name']] for e in getRuins()[0]['output']) <=
+            sum(dictionnaries[past_turn]["symbols"][past_turn + "_" + e] for e in getValues()['units'])
+        )
     else:
         model.Add(
             dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + "tech"] <=
@@ -419,12 +423,12 @@ def buildRuinLinkConstraints(model, turn, dictionnaries):
             3 * dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + "population"] <=
             dictionnaries[turn]['symbols'][turn + "_" + "population"]
         )
+        model.Add(
+            sum(dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + e['name']] for e in getRuins()[0]['output']) == 0
+        )
     model.Add(dictionnaries[turn]['special'][turn + "_" + "whale"] == 0).OnlyEnforceIf(
         dictionnaries[turn]['technologies'][turn + "_" + 'whaling'].Not()
     )
-    # for r in getRuins():
-    #     for s in r['output']:
-    #         model.Add(dictionnaries[turn]['special'][turn + "_" + r['name'] + "_" + s['name']])
 
 
 def buildAllConstraints(model, turn, dictionnaries):
@@ -507,3 +511,27 @@ def addInitialState(model, turn, dictionnaries):
                 if name != turn + "_" + tribe['tech']:
                     model.Add(dictionnaries[turn]['technologies'][name] == 0
                               ).OnlyEnforceIf(dictionnaries[turn]['tribes'][k1])
+
+
+def addSolution(model, turn, dictionnaries):
+    # model.Add(dictionnaries["start"]['symbols']["start_monument"] == 0)
+    # model.Add(dictionnaries["start"]['city']["start_level-2_count"] == 0)
+    # model.Add(dictionnaries["start"]['city']["start_level-5_count"] == 0)
+    # model.Add(dictionnaries["t0"]['symbols']["t0_level-1"] == 1)
+    # model.Add(dictionnaries["t0"]['symbols']["t0_level-2"] == 1)
+    # model.Add(dictionnaries["t0"]['symbols']["t0_level-3"] == 0)
+    # model.Add(dictionnaries["t0"]['city']["t0_level-1_count"] == 0)
+    # model.Add(dictionnaries["t0"]['city']["t0_level-2_count"] == 1)
+    # model.Add(dictionnaries["t0"]['city']["t0_level-3_count"] == 0)
+    # model.Add(dictionnaries["t0"]['city']["t0_level-4_count"] == 0)
+    # model.Add(dictionnaries["t0"]['city']["t0_level-5_count"] == 0)
+
+    # model.Add(dictionnaries["t0"]['symbols']["t0_population"] == 2)
+    # model.Add(dictionnaries["t0"]['symbols']["t0_claimed"] == 9)
+    # model.Add(dictionnaries["t0"]['symbols']["t0_tier-1"] == 1)
+    # model.Add(dictionnaries["t0"]['symbols']["t0_tier-2"] == 0)
+    # model.Add(dictionnaries["t0"]['symbols']["t0_monument"] == 0)
+    # model.Add(dictionnaries["t0"]['symbols']["t0_giant"] == 0)
+    # model.Add(dictionnaries["t0"]['symbols']["t0_warrior"] == 1)
+    # model.Add(dictionnaries["t0"]['symbols']["t0_explorer"] == 0)
+    pass
