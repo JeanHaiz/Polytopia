@@ -1,0 +1,31 @@
+[
+	{
+		"name" : "ruin",
+		"output" : [
+			{
+				"name": "giant",
+				"amount": 1
+			}, {
+				"name": "explorer",
+				"amount": 1
+			}, {
+				"name": "tech",
+				"amount": 1
+			}, {
+				"name": "population",
+				"amount": 3
+			}, {
+				"name": "stars",
+				"amount": 5
+			}
+		]
+	}, {
+		"name": "whale",
+		"output": [
+			{
+				"name": "stars",
+				"amount": 10
+			}
+		]
+	}
+]
