@@ -6,10 +6,9 @@ import json
 import pandas as pd
 
 from ortools.sat.python import cp_model
-from ortools.sat.python.cp_model import _SumArray
 
 
-MAX_CITY_LEVEL = 5
+MAX_CITY_LEVEL = 10
 
 
 class DataFrameSolutionAggregator(cp_model.CpSolverSolutionCallback):
@@ -118,7 +117,7 @@ def addScore(model, turn):
         # turn + "_" + "delta_raw_score" : model.NewIntVar(0, 200000, turn + "_" + "delta_raw_score"),
         turn + "_" + "full_score": model.NewIntVar(0, 200000, turn + "_" + "full_score"),
         # turn + "_" + "delta_full_score" : model.NewIntVar(0, 200000, turn + "_" + "delta_full_score"),
-        turn + "_" + "computed_full_score": model.NewIntVar(0, 200000, turn + "_" + "computed_full_score")
+        # turn + "_" + "computed_full_score": model.NewIntVar(0, 200000, turn + "_" + "computed_full_score")
         # turn + "_" + "computed_raw_score": model.NewIntVar(0, 200000, turn + "_" + "computed_raw_score"),
     }
     return score_dict
@@ -168,8 +167,10 @@ def buildCityUpgradeConstraints(model, turn, dictionnaries):
               dictionnaries[turn]['city'][turn + "_" + "level-2_explorer"]))
 
     # Add Ruin explorer
-    model.Add(dictionnaries[turn]['city'][turn + "_" + "level-2_explorer"] ==
-              dictionnaries[turn]['symbols'][turn + "_" + "explorer"])
+    model.Add(
+        dictionnaries[turn]['city'][turn + "_" + "level-2_explorer"] +
+        dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + "explorer"] ==
+        dictionnaries[turn]['symbols'][turn + "_" + "explorer"])
 
     # Add level-3 stars
 
@@ -204,31 +205,34 @@ def setDeltaFullScore(model, turn, score_dict, delta_full_score):
 
 
 def buildCityConstrains(model, turn, sym_dict):
-    for i in range(1, MAX_CITY_LEVEL):  # TODO change bounds
+    for i in range(1, MAX_CITY_LEVEL):
         model.Add(sym_dict[turn + "_" + "level-" + str(i)] >= sym_dict[turn + "_" + "level-" + str(i + 1)])
 
 
 def buildGiantConstraints(model, turn, dictionnaries):
     # Add conversion
     model.Add(
-        dictionnaries[turn]['symbols'][turn + "_" + "giant"] == sum(
-            [dictionnaries[turn]['city'][turn + "_" + "level-" + str(i) + "_giant"]
-                for i in range(5, MAX_CITY_LEVEL + 1)]
-            ) + dictionnaries[turn]['special'][turn + "_" + "ruin_giant"])
+        dictionnaries[turn]['symbols'][turn + "_" + "giant"] ==
+        sum(dictionnaries[turn]['city'][turn + "_" + "level-" + str(i) + "_giant"]
+            for i in range(5, MAX_CITY_LEVEL + 1)) +
+        dictionnaries[turn]['special'][turn + "_" + "ruin_giant"])
     # giants >= city upgrade (lvl 5+) + ruin_giant + convert_giant
-    pass
 
 
 def buildUnitTrainByCityConstraint(model, turn, dictionnaries):
-    # Add conversion, giant on lvl_up
+    # Add conversion, giant on lvl_up, ruin
     past_turn = getPastTurn(turn)
     if past_turn is not None:
         model.Add(
-            dictionnaries[turn]['symbols'][turn + "_" + 'level-1'] >= (sum(
-                [dictionnaries[turn]['symbols'][turn + "_" + u] for u in getValues()['units'].keys()]
-            ) - sum(
-                [dictionnaries[past_turn]['symbols'][past_turn + "_" + u] for u in getValues()['units'].keys()]
-            )))
+            dictionnaries[turn]['symbols'][turn + "_" + 'level-1'] +
+            dictionnaries[turn]['special'][turn + "_" + 'ruin' + "_" + "giant"] +
+            sum(dictionnaries[turn]['city'][turn + "_" + "level-" + str(i) + "_giant"] -
+                dictionnaries[past_turn]['city'][past_turn + "_" + "level-" + str(i) + "_giant"]
+                for i in range(5, MAX_CITY_LEVEL + 1)) >= (
+                sum(dictionnaries[turn]['symbols'][turn + "_" + u] for u in getValues()['units'].keys()) -
+                sum(dictionnaries[past_turn]['symbols'][past_turn + "_" + u] for u in getValues()['units'].keys())
+            )
+        )
 
 
 def buildTribeConstraints(model, turn, tribe_dict, tech_dict):
@@ -270,10 +274,10 @@ def buildTechUnitsConstraints(model, turn, tech_dict, sym_dict):
 
 def linkTechAndTech(model, turn, tech_dict, sym_dict):
     techs = getTechs()
-    model.Add(sym_dict[turn + "_" + 'tier-1'] == _SumArray([tech_dict[turn + "_" + t['name']] for t in techs]))
-    model.Add(sym_dict[turn + "_" + 'tier-2'] == _SumArray(
+    model.Add(sym_dict[turn + "_" + 'tier-1'] == sum([tech_dict[turn + "_" + t['name']] for t in techs]))
+    model.Add(sym_dict[turn + "_" + 'tier-2'] == sum(
         [tech_dict[turn + "_" + t['name']] for u in techs for t in u['allows']]))
-    model.Add(sym_dict[turn + "_" + 'tier-3'] == _SumArray(
+    model.Add(sym_dict[turn + "_" + 'tier-3'] == sum(
         [tech_dict[turn + "_" + t['name']] for v in techs for u in v['allows'] for t in u['allows']]))
 
 
@@ -283,11 +287,12 @@ def buildFullScoreConstraint(model, turn, dictionnaries):
     values = getValues()
     cat_eq_dict = {}
     for category in getValues().keys():
-        cat_eq_dict[turn + "_" + category] = _SumArray(
+        cat_eq_dict[turn + "_" + category] = sum(
             [eq_dict[turn + "_" + element] for element in values[category].keys()])
-    # cat_eq_dict.update(city_eq)
     # print(sum([cat_eq_dict[cat] for cat in cat_eq_dict.keys()]))
-    model.Add(sum([cat_eq_dict[cat] for cat in cat_eq_dict.keys()]) == score_dict[turn + "_" + 'computed_full_score'])
+    model.Add(sum([cat_eq_dict[cat] for cat in cat_eq_dict.keys()]) == score_dict[turn + "_" + 'full_score'])
+    # score_dict[turn + "_" + 'computed_full_score'])
+    # model.Add(score_dict[turn + "_" + 'computed_full_score'] == score_dict[turn + "_" + 'full_score'])
 
 
 def buildClaimingCityConstraint(model, turn, sym_dict):
@@ -297,11 +302,13 @@ def buildClaimingCityConstraint(model, turn, sym_dict):
 
 def buildMaxUnitConstraint(model, turn, dictionnaries):
     values = getValues()
+    past_turn = getPastTurn(turn)
     # add conversion
-    # <= num cities + ruin + city upgrades
-    model.Add(_SumArray([dictionnaries[turn]["symbols"][turn + "_" + e] for e in values['units'].keys()]) +
-              dictionnaries[turn]["symbols"][turn + "_" + "giant"] <
-              dictionnaries[turn]["special"][turn + "_" + "ruin_giant"])
+    if past_turn is not None:
+        model.Add(
+            sum(dictionnaries[turn]["city"][turn + "_" + "level-" + str(i) + "_count"] * (i + 1)
+                for i in range(1, MAX_CITY_LEVEL + 1)) >=
+            sum(dictionnaries[turn]["symbols"][turn + "_" + e] for e in values['units'].keys()))
 
 
 def buildVisionConstraint(model, turn, eq_dict, score_dict):
@@ -310,9 +317,9 @@ def buildVisionConstraint(model, turn, eq_dict, score_dict):
 
 
 def buildSpecialConstraints(model, turn, dictionnaries):
-    ruins = [dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + s]
-             for r in getRuins() for s in r['output'] if r == 'ruin']
-    model.Add(dictionnaries[turn]['special'][turn + "_" + "ruin"] == _SumArray(ruins))
+    for r in getRuins():
+        ruins = [dictionnaries[turn]['special'][turn + "_" + r['name'] + "_" + s['name']] for s in r['output']]
+        model.Add(dictionnaries[turn]['special'][turn + "_" + r['name']] == sum(ruins))
 
 
 def buildPopulationConstraints(model, turn, dictionnaries):
@@ -323,11 +330,10 @@ def buildPopulationConstraints(model, turn, dictionnaries):
             dictionnaries[past_turn]['symbols'][past_turn + "_" + 'population'] if past_turn is not None else 0
         ) >= dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + "population"] +
         dictionnaries[turn]['city'][turn + "_" + "level-4_population"] - ((
-            dictionnaries[past_turn]['symbols'][past_turn + "_" + "level-4_population"] +
-            dictionnaries[past_turn]['ruin'][past_turn + "_" + "ruin" + "_" + "population"]
+            dictionnaries[past_turn]['city'][past_turn + "_" + "level-4_population"] +
+            dictionnaries[past_turn]['special'][past_turn + "_" + "ruin" + "_" + "population"]
         ) if past_turn is not None else 0))
-    # pop >= ruin_pop + ruin_pop + lvl-5_pop + tribe_meet_pop + ...
-    pass
+    # pop >= ruin_pop + lvl-4_pop + tribe_meet_pop + ...
 
 
 def buildClaimedConstraints(model, turn, dictionnaries):
@@ -366,46 +372,59 @@ def buildClaimedConstraints(model, turn, dictionnaries):
 
 
 def buildCityPopConstraints(model, turn, dictionnaries):
-    # simple case: 1 city level 1
-    # with pop >= lvl + 1: lvl up => city[lvl + 1] += 1
-
-    # model.Add(dictionnaries[turn]['symbols'][turn + "_" + 'population'] >= _SumArray(
-    #     [i * dictionnaries[turn]['symbols'][turn + "_" + "level-%d" % i] for i in range(2, MAX_CITY_LEVEL + 1)]))
-
-    # if turn == "start":
-    #     model.Add(dictionnaries[turn]['symbols'][turn + "_" + "level-2"] ==
-    #               dictionnaries[turn]['symbols'][turn + "_" + "level-1"] - 1)
-    # else:
-    # model.Add(dictionnaries[turn]['symbols'][turn + "_" + "level-2"] ==
-    #           dictionnaries[turn]['symbols'][turn + "_" + "level-1"])
-    # model.Add((dictionnaries[turn]['city'][turn + "_" + "level-1" + "_count"] +
-    #            dictionnaries[turn]['symbols'][turn + "_" + "level-2"]) ==
-    #           dictionnaries[turn]['symbols'][turn + "_" + "level-1"])
-
-    # model.Add((dictionnaries[turn]['city'][turn + "_" + "level-1" + "_count"] +
-    #                dictionnaries[turn]['symbols'][turn + "_" + "level-2"]) ==
-    #               dictionnaries[turn]['symbols'][turn + "_" + "level-1"])
     if turn != "start":
-        for i in range(1, MAX_CITY_LEVEL):  # 1 to MAX
+        for i in range(1, MAX_CITY_LEVEL):
             model.Add((dictionnaries[turn]['city'][turn + "_" + "level-" + str(i) + "_count"] +
                        dictionnaries[turn]['symbols'][turn + "_" + "level-" + str(i + 1)]) ==
                       dictionnaries[turn]['symbols'][turn + "_" + "level-" + str(i)])
         model.Add(dictionnaries[turn]['city'][turn + "_" + "level-" + str(MAX_CITY_LEVEL) + "_count"] ==
                   dictionnaries[turn]['symbols'][turn + "_" + "level-" + str(MAX_CITY_LEVEL)])
 
-    # print(sum(
-    #     [dictionnaries[turn]['city'][turn + "_" + "level-" + str(i) + "_count"] *
-    #         int(i * (i + 1) / 2 - 1) for i in range(1, MAX_CITY_LEVEL + 1)]))
     model.Add(dictionnaries[turn]['symbols'][turn + "_" + "population"] >= sum(
         [dictionnaries[turn]['city'][turn + "_" + "level-" + str(i) + "_count"] *
             int(i * (i + 1) / 2 - 1) for i in range(1, MAX_CITY_LEVEL + 1)]))
 
-    # print(sum(
-    #     [dictionnaries[turn]['city'][turn + "_" + "level-" + str(i) + "_count"] *
-    #         int((i + 1) * (i + 2) / 2 - 2) for i in range(1, MAX_CITY_LEVEL + 1)]))
     model.Add(dictionnaries[turn]['symbols'][turn + "_" + "population"] <= sum(
         [dictionnaries[turn]['city'][turn + "_" + "level-" + str(i) + "_count"] *
             int((i + 1) * (i + 2) / 2 - 2) for i in range(1, MAX_CITY_LEVEL + 1)]))
+
+
+def buildRuinLinkConstraints(model, turn, dictionnaries):
+    past_turn = getPastTurn(turn)
+    if past_turn is not None:
+        model.Add(
+            (
+                dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + "tech"] -
+                dictionnaries[past_turn]['special'][past_turn + "_" + "ruin" + "_" + "tech"]
+            ) <= (
+                sum(dictionnaries[turn]['symbols'][turn + "_" + "tier-" + str(i)] for i in range(1, 4)) -
+                sum(dictionnaries[past_turn]['symbols'][past_turn + "_" + "tier-" + str(i)] for i in range(1, 4))
+            )
+        )
+        model.Add(
+            3 * (
+                dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + "population"] -
+                dictionnaries[past_turn]['special'][past_turn + "_" + "ruin" + "_" + "population"]
+            ) <= (
+                dictionnaries[turn]['symbols'][turn + "_" + "population"] -
+                dictionnaries[past_turn]['symbols'][past_turn + "_" + "population"]
+            )
+        )
+    else:
+        model.Add(
+            dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + "tech"] <=
+            sum(dictionnaries[turn]['symbols'][turn + "_" + "tier-" + str(i)] for i in range(1, 4))
+        )
+        model.Add(
+            3 * dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + "population"] <=
+            dictionnaries[turn]['symbols'][turn + "_" + "population"]
+        )
+    model.Add(dictionnaries[turn]['special'][turn + "_" + "whale"] == 0).OnlyEnforceIf(
+        dictionnaries[turn]['technologies'][turn + "_" + 'whaling'].Not()
+    )
+    # for r in getRuins():
+    #     for s in r['output']:
+    #         model.Add(dictionnaries[turn]['special'][turn + "_" + r['name'] + "_" + s['name']])
 
 
 def buildAllConstraints(model, turn, dictionnaries):
@@ -425,12 +444,13 @@ def buildAllConstraints(model, turn, dictionnaries):
     buildCityPopConstraints(model, turn, dictionnaries)
     buildUnitTrainByCityConstraint(model, turn, dictionnaries)
     buildClaimedConstraints(model, turn, dictionnaries)
-
-    # buildGiantConstraints(model, turn, dictionnaries)
-    # buildMaxUnitConstraint(model, turn, dictionnaries)
-    # buildSpecialConstraints(model, turn, dictionnaries)
-    # buildPopulationConstraints(model, turn, dictionnaries)
     buildCityUpgradeConstraints(model, turn, dictionnaries)
+    buildRuinLinkConstraints(model, turn, dictionnaries)
+
+    buildGiantConstraints(model, turn, dictionnaries)
+    buildMaxUnitConstraint(model, turn, dictionnaries)
+    buildSpecialConstraints(model, turn, dictionnaries)
+    buildPopulationConstraints(model, turn, dictionnaries)
 
 
 def setObjective(model, turn, dictionnaries):
@@ -456,18 +476,19 @@ def buildDictionnaries(model, turn):
     if turn != "start":
         dictionnaries['symbols'][turn + "_" + 'claimed_cst'] = model.NewBoolVar(turn + "_" + 'claimed_cst')
         dictionnaries['symbols'][turn + "_" + 'lvl_1_cst'] = model.NewBoolVar(turn + "_" + 'lvl_1_cst')
-    # dictionnaries['special'] = addSpecial(model, turn)
+    dictionnaries['special'] = addSpecial(model, turn)
     dictionnaries["city"], dictionnaries["city_equations"] = addCityUpgrade(model, turn)
     return dictionnaries
 
 
 def addInitialState(model, turn, dictionnaries):
     if turn == "start":
-        pass
         model.Add(dictionnaries[turn]['symbols'][turn + "_" + "claimed"] == 9)  # allow for some params
         model.Add(dictionnaries[turn]['symbols'][turn + "_" + "revealed"] == 25)
         model.Add(dictionnaries[turn]['symbols'][turn + "_" + "level-1"] == 1)
         model.Add(dictionnaries[turn]['symbols'][turn + "_" + "population"] == 0)
+        model.Add(dictionnaries[turn]['special'][turn + "_" + "ruin_stars"] == 0)
+        model.Add(dictionnaries[turn]['special'][turn + "_" + "whale_stars"] == 0)
 
         for i in range(2, MAX_CITY_LEVEL + 1):
             model.Add(dictionnaries[turn]['symbols'][turn + "_" + "level-" + str(i)] == 0)

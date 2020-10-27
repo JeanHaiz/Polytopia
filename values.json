@@ -16,7 +16,11 @@
 		"level-3" : 35,
 		"level-4" : 30,
 		"level-5" : 25,
-		
+		"level-6" : 20,
+		"level-7" : 15,
+		"level-8" : 10,
+		"level-9" : 5,
+		"level-10" : 0,
 		"population" : 5,
 		"monument" : 400
 	}, 
