@@ -153,6 +153,9 @@ def addCityUpgrade(model, turn):
         city_upgrade[turn + "_" + "level-" + str(i) + "_count"] = \
             model.NewIntVar(0, 20, turn + "_" + "level-" + str(i) + "_count")
 
+    city_upgrade[turn + "_" + "pop_min"] = model.NewIntVar(0, 40, turn + "_" + "pop_min")
+    city_upgrade[turn + "_" + "pop_max"] = model.NewIntVar(0, 40, turn + "_" + "pop_max")
+
     return city_upgrade, city_eq
 
 
@@ -380,13 +383,29 @@ def buildCityPopConstraints(model, turn, dictionnaries):
         model.Add(dictionnaries[turn]['city'][turn + "_" + "level-" + str(MAX_CITY_LEVEL) + "_count"] ==
                   dictionnaries[turn]['symbols'][turn + "_" + "level-" + str(MAX_CITY_LEVEL)])
 
-    model.Add(dictionnaries[turn]['symbols'][turn + "_" + "population"] >= sum(
-        [dictionnaries[turn]['city'][turn + "_" + "level-" + str(i) + "_count"] *
-            int(i * (i + 1) / 2 - 1) for i in range(1, MAX_CITY_LEVEL + 1)]))
+    model.Add(
+        dictionnaries[turn]['city'][turn + "_" + "pop_min"] ==
+        sum(
+            dictionnaries[turn]['city'][turn + "_" + "level-" + str(i) + "_count"] *
+            int(i * (i + 1) / 2 - 1) for i in range(1, MAX_CITY_LEVEL + 1)
+        )
+    )
+    model.Add(
+        dictionnaries[turn]['symbols'][turn + "_" + "population"] >=
+        dictionnaries[turn]['city'][turn + "_" + "pop_min"]
+    )
 
-    model.Add(dictionnaries[turn]['symbols'][turn + "_" + "population"] <= sum(
-        [dictionnaries[turn]['city'][turn + "_" + "level-" + str(i) + "_count"] *
-            int((i + 1) * (i + 2) / 2 - 2) for i in range(1, MAX_CITY_LEVEL + 1)]))
+    model.Add(
+        dictionnaries[turn]['city'][turn + "_" + "pop_max"] ==
+        sum(
+            dictionnaries[turn]['city'][turn + "_" + "level-" + str(i) + "_count"] *
+            int((i + 1) * (i + 2) / 2 - 2) for i in range(1, MAX_CITY_LEVEL + 1)
+        )
+    )
+    model.Add(
+        dictionnaries[turn]['symbols'][turn + "_" + "population"] <=
+        dictionnaries[turn]['city'][turn + "_" + "pop_max"]
+    )
 
 
 def buildRuinLinkConstraints(model, turn, dictionnaries):
@@ -411,8 +430,11 @@ def buildRuinLinkConstraints(model, turn, dictionnaries):
             )
         )
         model.Add(
-            sum(dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + e['name']] for e in getRuins()[0]['output']) <=
-            sum(dictionnaries[past_turn]["symbols"][past_turn + "_" + e] for e in getValues()['units'])
+            sum(
+                dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + e['name']] for e in getRuins()[0]['output']
+            ) <= sum(
+                dictionnaries[past_turn]["symbols"][past_turn + "_" + e] for e in getValues()['units']
+            )
         )
     else:
         model.Add(
@@ -424,7 +446,9 @@ def buildRuinLinkConstraints(model, turn, dictionnaries):
             dictionnaries[turn]['symbols'][turn + "_" + "population"]
         )
         model.Add(
-            sum(dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + e['name']] for e in getRuins()[0]['output']) == 0
+            sum(
+                dictionnaries[turn]['special'][turn + "_" + "ruin" + "_" + e['name']] for e in getRuins()[0]['output']
+            ) == 0
         )
     model.Add(dictionnaries[turn]['special'][turn + "_" + "whale"] == 0).OnlyEnforceIf(
         dictionnaries[turn]['technologies'][turn + "_" + 'whaling'].Not()
@@ -514,24 +538,79 @@ def addInitialState(model, turn, dictionnaries):
 
 
 def addSolution(model, turn, dictionnaries):
-    # model.Add(dictionnaries["start"]['symbols']["start_monument"] == 0)
-    # model.Add(dictionnaries["start"]['city']["start_level-2_count"] == 0)
-    # model.Add(dictionnaries["start"]['city']["start_level-5_count"] == 0)
-    # model.Add(dictionnaries["t0"]['symbols']["t0_level-1"] == 1)
-    # model.Add(dictionnaries["t0"]['symbols']["t0_level-2"] == 1)
-    # model.Add(dictionnaries["t0"]['symbols']["t0_level-3"] == 0)
-    # model.Add(dictionnaries["t0"]['city']["t0_level-1_count"] == 0)
-    # model.Add(dictionnaries["t0"]['city']["t0_level-2_count"] == 1)
-    # model.Add(dictionnaries["t0"]['city']["t0_level-3_count"] == 0)
-    # model.Add(dictionnaries["t0"]['city']["t0_level-4_count"] == 0)
-    # model.Add(dictionnaries["t0"]['city']["t0_level-5_count"] == 0)
+    model.Add(dictionnaries["start"]['symbols']["start_monument"] == 0)
+    model.Add(dictionnaries["start"]['city']["start_level-2_count"] == 0)
+    model.Add(dictionnaries["start"]['city']["start_level-5_count"] == 0)
+    model.Add(dictionnaries["t0"]['symbols']["t0_level-1"] == 1)
+    model.Add(dictionnaries["t0"]['symbols']["t0_level-2"] == 1)
+    model.Add(dictionnaries["t0"]['symbols']["t0_level-3"] == 0)
+    model.Add(dictionnaries["t0"]['city']["t0_level-1_count"] == 0)
+    model.Add(dictionnaries["t0"]['city']["t0_level-2_count"] == 1)
+    model.Add(dictionnaries["t0"]['city']["t0_level-3_count"] == 0)
+    model.Add(dictionnaries["t0"]['city']["t0_level-4_count"] == 0)
+    model.Add(dictionnaries["t0"]['city']["t0_level-5_count"] == 0)
+    model.Add(dictionnaries["t0"]['symbols']["t0_population"] == 2)
+    model.Add(dictionnaries["t0"]['symbols']["t0_claimed"] == 9)
+    model.Add(dictionnaries["t0"]['symbols']["t0_tier-1"] == 1)
+    model.Add(dictionnaries["t0"]['symbols']["t0_tier-2"] == 0)
+    model.Add(dictionnaries["t0"]['symbols']["t0_monument"] == 0)
+    model.Add(dictionnaries["t0"]['symbols']["t0_giant"] == 0)
+    model.Add(dictionnaries["t0"]['symbols']["t0_warrior"] == 1)
+    model.Add(dictionnaries["t0"]['symbols']["t0_explorer"] == 0)
 
-    # model.Add(dictionnaries["t0"]['symbols']["t0_population"] == 2)
-    # model.Add(dictionnaries["t0"]['symbols']["t0_claimed"] == 9)
-    # model.Add(dictionnaries["t0"]['symbols']["t0_tier-1"] == 1)
-    # model.Add(dictionnaries["t0"]['symbols']["t0_tier-2"] == 0)
-    # model.Add(dictionnaries["t0"]['symbols']["t0_monument"] == 0)
-    # model.Add(dictionnaries["t0"]['symbols']["t0_giant"] == 0)
-    # model.Add(dictionnaries["t0"]['symbols']["t0_warrior"] == 1)
-    # model.Add(dictionnaries["t0"]['symbols']["t0_explorer"] == 0)
-    pass
+
+def printValueList(df):
+    count = 1
+    for i in range(len(df.columns)):
+        c = list(df.columns)[i]
+        print(c, len(df[c].unique()), df[c].unique())
+        count *= len(df[c].unique())
+    return count
+
+
+def printVariants(df):
+    count = 1
+    variants = []
+    for i in range(len(df.columns)):
+        c = list(df.columns)[i]
+        u = df[c].unique()
+        if len(u) > 1:
+            print(c, len(u), u)
+            count *= len(u)
+            variants.append((c, u))
+    return variants
+
+
+def getTechList():
+
+    def rec(tech_dict):
+        if len(tech_dict['allows']) == 0:
+            return [tech_dict['name']]
+        else:
+            return [u for t in tech_dict['allows'] for u in rec(t)] + [tech_dict['name']]
+
+    techs = getTechs()
+    return [u for t in techs for u in rec(t)]
+
+
+def getScenarioRegex():
+    scenario_regex = []
+    for u in list(getValues()['units'].keys()) +\
+            ['tier-' + str(i) for i in range(1, 4)] +\
+            ['level-' + str(i) + "_count" for i in range(1, MAX_CITY_LEVEL)] +\
+            list(map(lambda t: t['name'], getTribes())) +\
+            getTechList() +\
+            ['{1}population', 'claimed', 'revealed', 'level-2_spt', 'level-4_border_growth',
+                'level-4_population', r'ruin([_a-z]*)']:
+        scenario_regex.append(rf"(t[0-9]*_{u})")
+    return scenario_regex
+
+
+def chooseBestSolution(df):
+    for star_column in list(filter(lambda s: 'stars' in s, df.columns)):
+        min_star = min(df[star_column])
+        df = df[df[star_column] == min_star]
+    for ruin_giant_column in list(filter(lambda s: 'ruin_giant' in s, df.columns)):
+        min_ruin_giant = min(df[ruin_giant_column])
+        df = df[df[ruin_giant_column] == min_ruin_giant]
+    return df
