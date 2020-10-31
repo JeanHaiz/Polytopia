@@ -16,7 +16,7 @@ def createModel():
 
 
 def __loadFile(filename):
-    with open(filename, 'r') as file:
+    with open("json" + "/" + filename, 'r') as file:
         return json.load(file)
 
 
@@ -42,6 +42,40 @@ def getCost():
 
 def getPopulation():
     return __loadFile('population.json')
+
+
+def getNextTurn(turn):
+    if turn is None:
+        return "start"
+    elif turn == "start":
+        return "t0"
+    else:
+        return "t" + str(int(turn[1:]) + 1)
+
+
+def getPastTurn(turn):
+    if turn == "start" or turn is None:
+        return None
+    elif turn == "t0":
+        return "start"
+    else:
+        return "t" + str(int(turn[1:]) - 1)
+
+
+def name(turn, var):
+    return turn + "_" + var
+
+
+def getTechList():
+
+    def rec(d):
+        if len(d['allows']) == 0:
+            return [d['name']]
+        else:
+            return [u for t in d['allows'] for u in rec(t)] + [d['name']]
+
+    techs = getTechs()
+    return [u for t in techs for u in rec(t)]
 
 
 createDic()
