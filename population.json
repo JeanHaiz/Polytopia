@@ -1,0 +1,54 @@
+[
+	{
+		"name": "animal",
+		"cost": 2,
+		"pop": 1,
+		"requires": "hunting"
+	},{
+		"name": "lumber_house",
+		"cost": 2,
+		"pop": 1,
+		"requires": "forestry"
+	},{
+		"name": "sawmill",
+		"cost": 5,
+		"pop": "lumber_house",
+		"requires": "mathematics"
+	},{
+		"name": "mine",
+		"cost": 5,
+		"pop": 2,
+		"requires": "mining"
+	},{
+		"name": "forge",
+		"cost": 5,
+		"pop": "mine",
+		"requires": "smithery"
+	},{
+		"name": "fruit",
+		"cost": 2,
+		"pop": 1,
+		"requires": "organisation"
+	},{
+		"name": "farm",
+		"cost": 5,
+		"pop": 2,
+		"requires": "farming"
+	},{
+		"name": "windmill",
+		"cost": 5,
+		"pop": "farm",
+		"requires": "construction"
+	},{
+		"name": "fish",
+		"cost": 2,
+		"pop": 1,
+		"requires": "fishing"
+	},{
+		"name": "port",
+		"cost": 10,
+		"pop": 2,
+		"requires": "sailing"
+	}
+]
+

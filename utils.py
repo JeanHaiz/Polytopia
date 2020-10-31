@@ -56,6 +56,14 @@ def getRuins():
     return __loadFile('ruin.json')
 
 
+def getCost():
+    return __loadFile('cost.json')
+
+
+def getPopulation():
+    return __loadFile('population.json')
+
+
 def getNextTurn(turn):
     if turn is None:
         return "start"
@@ -141,6 +149,7 @@ def addCityUpgrade(model, turn):
     city_eq = {}
     city_upgrade[turn + "_" + "level-2_spt"] = model.NewIntVar(0, 20, turn + "_" + "level-2_spt")
     city_upgrade[turn + "_" + "level-2_explorer"] = model.NewIntVar(0, 20, turn + "_" + "level-2_explorer")
+    city_upgrade[turn + "_" + "level-3-stars"] = model.NewIntVar(0, 20, turn + "_" + "level-3-stars")
     city_upgrade[turn + "_" + "level-4_border_growth"] = model.NewIntVar(0, 20, turn + "_" + "level-4_border_growth")
     city_upgrade[turn + "_" + "level-4_population"] = model.NewIntVar(0, 20, turn + "_" + "level-4_population")
     for i in range(5, MAX_CITY_LEVEL + 1):
@@ -157,6 +166,34 @@ def addCityUpgrade(model, turn):
     city_upgrade[turn + "_" + "pop_max"] = model.NewIntVar(0, 40, turn + "_" + "pop_max")
 
     return city_upgrade, city_eq
+
+
+def addPop(model, turn):
+    pop = getPopulation()
+    pop_dict = {}
+    for p in pop:
+        pop_dict[turn + "_" + p['name']] = model.NewIntVar(0, 20, turn + "_" + p['name'])
+        if type(p['pop']) == str:
+            pop_dict[turn + "_" + p['name'] + "_" + p['pop']] =\
+                model.NewIntVar(0, 20, turn + "_" + p['name'] + "_" + p['pop'])
+    return pop_dict
+
+
+def addStars(model, turn):
+    stars = {}
+    stars[turn + "_" + "stars"] = model.NewIntVar(0, 200, turn + "_" + "stars")
+    stars[turn + "_" + "spt"] = model.NewIntVar(0, 100, turn + "_" + "spt")
+    stars[turn + "_" + "star_income"] = model.NewIntVar(-20, 100, turn + "_" + "star_income")
+    stars[turn + "_" + "star_spending"] = model.NewIntVar(-20, 100, turn + "_" + "star_spending")
+    for p in getPopulation():
+        stars[turn + "_" + p['name'] + "_" + "stars"] = model.NewIntVar(0, 200, turn + "_" + p['name'] + "_" + "stars")
+    for topic, cost_dict in getCost().items():
+        for item, cost in cost_dict.items():
+            stars[turn + "_" + item + "_" + "stars"] = model.NewIntVar(0, 200, turn + "_" + item + "_" + "stars")
+            if topic == 'techs':
+                stars[turn + "_" + item + "_" + "cost"] = model.NewIntVar(0, 25, turn + "_" + item + "_" + "cost")
+                stars[turn + "_" + item + "_" + "stars"] = model.NewIntVar(0, 25, turn + "_" + item + "_" + "stars")
+    return stars
 
 
 def buildCityUpgradeConstraints(model, turn, dictionnaries):
@@ -176,6 +213,10 @@ def buildCityUpgradeConstraints(model, turn, dictionnaries):
         dictionnaries[turn]['symbols'][turn + "_" + "explorer"])
 
     # Add level-3 stars
+    model.Add(
+        dictionnaries[turn]['symbols'][turn + "_" + "level-3"] >=
+        dictionnaries[turn]['city'][turn + "_" + "level-3-stars"]
+    )
 
     model.Add(dictionnaries[turn]['symbols'][turn + "_" + "level-4"] ==
               dictionnaries[turn]['city'][turn + "_" + "level-4_border_growth"] +
@@ -292,10 +333,7 @@ def buildFullScoreConstraint(model, turn, dictionnaries):
     for category in getValues().keys():
         cat_eq_dict[turn + "_" + category] = sum(
             [eq_dict[turn + "_" + element] for element in values[category].keys()])
-    # print(sum([cat_eq_dict[cat] for cat in cat_eq_dict.keys()]))
     model.Add(sum([cat_eq_dict[cat] for cat in cat_eq_dict.keys()]) == score_dict[turn + "_" + 'full_score'])
-    # score_dict[turn + "_" + 'computed_full_score'])
-    # model.Add(score_dict[turn + "_" + 'computed_full_score'] == score_dict[turn + "_" + 'full_score'])
 
 
 def buildClaimingCityConstraint(model, turn, sym_dict):
@@ -455,13 +493,123 @@ def buildRuinLinkConstraints(model, turn, dictionnaries):
     )
 
 
+def buildStarConstraints(model, turn, dictionnaries):
+    past_turn = getPastTurn(turn)
+    # Add tribe meet stars
+
+    for t, c in getCost()['techs'].items():
+        model.Add(
+            dictionnaries[turn]['stars'][turn + "_" + t + "_" + "stars"] ==
+            (4 + c * dictionnaries[turn]['symbols'][turn + "_" + "level-1"])
+        )
+        model.AddProdEquality(dictionnaries[turn]['stars'][turn + "_" + t + "_" + "cost"], [
+            dictionnaries[turn]['symbols'][turn + "_" + t],
+            dictionnaries[turn]['stars'][turn + "_" + t + "_" + "stars"]
+        ])
+    for u, c in getCost()['units'].items():
+        model.Add(
+            dictionnaries[turn]['stars'][turn + "_" + u + "_" + "stars"] ==
+            dictionnaries[turn]['symbols'][turn + "_" + u] * c
+        )
+    for p in getPopulation():
+        model.Add(
+            dictionnaries[turn]['stars'][turn + "_" + p['name'] + "_" + "stars"] ==
+            dictionnaries[turn]['population'][turn + "_" + p['name']] * p['cost']
+        )
+    if past_turn is not None:
+        model.Add(
+            dictionnaries[turn]['stars'][turn + "_" + "star_income"] ==
+            dictionnaries[past_turn]['stars'][past_turn + "_" + "spt"] +
+            5 * dictionnaries[turn]['city'][turn + "_" + "level-3-stars"] +
+            10 * dictionnaries[turn]['special'][turn + "_" + "whale_stars"] +
+            10 * dictionnaries[turn]['special'][turn + "_" + "ruin_stars"] -
+            5 * dictionnaries[past_turn]['city'][past_turn + "_" + "level-3-stars"] -
+            10 * dictionnaries[past_turn]['special'][past_turn + "_" + "whale_stars"] -
+            10 * dictionnaries[past_turn]['special'][past_turn + "_" + "ruin_stars"]
+        )
+
+        # model.Add(
+        #     dictionnaries[turn]['stars'][turn + "_" + "stars"] >=
+        #     dictionnaries[turn]['stars'][turn + "_" + "star_income"]
+        # )
+
+        # Add boat_upgrade
+        model.Add(
+            dictionnaries[turn]['stars'][turn + "_" + "star_spending"] ==
+            sum(dictionnaries[turn]['stars'][turn + "_" + u + "_" + "stars"] for u, c in getCost()['units'].items()) +
+            sum(dictionnaries[turn]['stars'][turn + "_" + t + "_" + "cost"] for t, c in getCost()['techs'].items()) +
+            sum(dictionnaries[turn]['stars'][turn + "_" + p['name'] + "_" + "stars"] for p in getPopulation()) -
+            sum(dictionnaries[past_turn]['stars'][past_turn + "_" + u + "_" + "stars"] for u, c in getCost()['units'].items()) -
+            sum(dictionnaries[past_turn]['stars'][past_turn + "_" + t + "_" + "cost"]
+                for t, c in getCost()['techs'].items()) -
+            sum(dictionnaries[past_turn]['stars'][past_turn + "_" + p['name'] + "_" + "stars"]
+                for p in getPopulation())
+        )
+    else:
+        model.Add(
+            dictionnaries[turn]['stars'][turn + "_" + "star_income"] ==
+            5 * dictionnaries[turn]['city'][turn + "_" + "level-3-stars"] +
+            10 * dictionnaries[turn]['special'][turn + "_" + "whale_stars"] +
+            10 * dictionnaries[turn]['special'][turn + "_" + "ruin_stars"]
+        )
+        # model.Add(
+        #     dictionnaries[turn]['stars'][turn + "_" + "stars"] >=
+        #     dictionnaries[turn]['stars'][turn + "_" + "star_income"]
+        # )
+
+        # Add boat_upgrade
+        model.Add(
+            dictionnaries[turn]['stars'][turn + "_" + "star_spending"] ==
+            sum(dictionnaries[turn]['stars'][turn + "_" + t + "_" + "cost"] for t, c in getCost()['techs'].items()) +
+            sum(dictionnaries[turn]['stars'][turn + "_" + p['name'] + "_" + "stars"] for p in getPopulation())
+        )
+
+
+# Add Temple score adding
+
+
+def buildTechPopConstraints(model, turn, dictionnaries):
+    pop = getPopulation()
+    for p in pop:
+        model.Add(
+            dictionnaries[turn]['population'][turn + "_" + p['name']] == 0
+        ).OnlyEnforceIf(
+            dictionnaries[turn]["technologies"][turn + "_" + p["requires"]].Not()
+        )
+        if type(p['pop']) == str:
+            model.AddProdEquality(
+                dictionnaries[turn]['population'][turn + "_" + p['name'] + "_" + p['pop']], [
+                    dictionnaries[turn]['population'][turn + "_" + p['pop']],
+                    dictionnaries[turn]['population'][turn + "_" + p['name']]
+                ]
+            )
+
+    model.Add(
+        dictionnaries[turn]['symbols'][turn + "_" + "population"] >=
+        sum(dictionnaries[turn]['population'][turn + "_" + p['name']] *
+            p['pop'] for p in pop if type(p['pop']) == int) +
+        dictionnaries[turn]['city'][turn + "_" + "level-4_population"] +
+        dictionnaries[turn]['special'][turn + "_" + "ruin_population"]
+    )
+
+    model.Add(
+        dictionnaries[turn]['symbols'][turn + "_" + "population"] <=
+        sum(dictionnaries[turn]['population'][turn + "_" + p['name']] *
+            p['pop'] for p in pop if type(p['pop']) == int) +
+        sum(
+            dictionnaries[turn]['population'][turn + "_" + p['name'] + "_" + p['pop']]
+            for p in pop if type(p['pop']) == str) +
+        dictionnaries[turn]['city'][turn + "_" + "level-4_population"] +
+        dictionnaries[turn]['special'][turn + "_" + "ruin_population"]
+    )
+
+
 def buildAllConstraints(model, turn, dictionnaries):
     eq_dict = dictionnaries[turn]["equations"]
     score_dict = dictionnaries[turn]["scores"]
     tech_dict = dictionnaries[turn]["technologies"]
     sym_dict = dictionnaries[turn]["symbols"]
     tribe_dict = dictionnaries[turn]["tribes"]
-    # city_eq_dict = dictionnaries[turn]["city_equations"]
     buildVisionConstraint(model, turn, eq_dict, score_dict)
     buildFullScoreConstraint(model, turn, dictionnaries)
     buildTechUnitsConstraints(model, turn, tech_dict, sym_dict)
@@ -474,11 +622,13 @@ def buildAllConstraints(model, turn, dictionnaries):
     buildClaimedConstraints(model, turn, dictionnaries)
     buildCityUpgradeConstraints(model, turn, dictionnaries)
     buildRuinLinkConstraints(model, turn, dictionnaries)
-
     buildGiantConstraints(model, turn, dictionnaries)
     buildMaxUnitConstraint(model, turn, dictionnaries)
     buildSpecialConstraints(model, turn, dictionnaries)
     buildPopulationConstraints(model, turn, dictionnaries)
+
+    buildTechPopConstraints(model, turn, dictionnaries)
+    # buildStarConstraints(model, turn, dictionnaries)
 
 
 def setObjective(model, turn, dictionnaries):
@@ -506,6 +656,8 @@ def buildDictionnaries(model, turn):
         dictionnaries['symbols'][turn + "_" + 'lvl_1_cst'] = model.NewBoolVar(turn + "_" + 'lvl_1_cst')
     dictionnaries['special'] = addSpecial(model, turn)
     dictionnaries["city"], dictionnaries["city_equations"] = addCityUpgrade(model, turn)
+    dictionnaries['population'] = addPop(model, turn)
+    # sdictionnaries['stars'] = addStars(model, turn)
     return dictionnaries
 
 
@@ -517,6 +669,16 @@ def addInitialState(model, turn, dictionnaries):
         model.Add(dictionnaries[turn]['symbols'][turn + "_" + "population"] == 0)
         model.Add(dictionnaries[turn]['special'][turn + "_" + "ruin_stars"] == 0)
         model.Add(dictionnaries[turn]['special'][turn + "_" + "whale_stars"] == 0)
+
+        # model.Add(
+        #     dictionnaries[turn]['stars'][turn + "_" + "stars"] == 12
+        # )
+        # model.Add(
+        #     dictionnaries[turn]['stars'][turn + "_" + "spt"] == 4
+        # ).OnlyEnforceIf(dictionnaries[turn]['tribes'][turn + "_" + 'Luxidoor'])
+        # model.Add(
+        #     dictionnaries[turn]['stars'][turn + "_" + "spt"] == 2
+        # ).OnlyEnforceIf(dictionnaries[turn]['tribes'][turn + "_" + 'Luxidoor'].Not())
 
         for i in range(2, MAX_CITY_LEVEL + 1):
             model.Add(dictionnaries[turn]['symbols'][turn + "_" + "level-" + str(i)] == 0)
@@ -607,7 +769,7 @@ def getScenarioRegex():
 
 
 def chooseBestSolution(df):
-    for star_column in list(filter(lambda s: 'stars' in s, df.columns)):
+    for star_column in list(filter(lambda s: 'whale_stars' in s or 'ruin_stars' in s, df.columns)):
         min_star = min(df[star_column])
         df = df[df[star_column] == min_star]
     for ruin_giant_column in list(filter(lambda s: 'ruin_giant' in s, df.columns)):
