@@ -1,8 +1,4 @@
-from file_utils import getValues, getTechs, getTribes, getRuins, getPopulation, getCost, MAX_CITY_LEVEL, model
-
-
-def name(turn, var):
-    return turn + "_" + var
+from file_utils import getValues, getTechs, getTribes, getRuins, getPopulation, getCost, MAX_CITY_LEVEL, model, name
 
 
 def addVars(turn):
