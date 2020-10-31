@@ -446,8 +446,15 @@ def buildTechPopConstraints(turn):
 def linkTurns(turn):
     past_turn = getPastTurn(turn)
     if past_turn is not None:
-        for var_name, var in dic.items():  # ## CAVEAT !!! TODO
-            model.Add(var <= dic[turn + "_" + "_".join(var_name.split("_")[1:])])
+        for t in getTechList():
+            model.Add(dic[name(past_turn, t)] <= dic[name(past_turn, t)])
+        for t in getTribes():
+            model.Add(dic[name(past_turn, t['name'])] <= dic[name(past_turn, t['name'])])
+        for v in ['explored', ]:
+            model.Add(dic[name(past_turn, v)] <= dic[name(past_turn, v)])
+        # Add unit: past + trained - killed == current
+        # Add cities: past  + captured - lost == current
+        # Add stars: past + spt + special - spent == current
 
 
 def buildAllConstraints(turn):
@@ -458,7 +465,6 @@ def buildAllConstraints(turn):
     buildCityConstrains(turn)
     buildTribeConstraints(turn)
     linkTechAndTech(turn)
-
     buildCityPopConstraints(turn)
     buildUnitTrainByCityConstraint(turn)
     buildClaimedConstraints(turn)
@@ -468,7 +474,6 @@ def buildAllConstraints(turn):
     buildMaxUnitConstraint(turn)
     buildSpecialConstraints(turn)
     buildPopulationConstraints(turn)
-
     buildTechPopConstraints(turn)
     # buildStarConstraints(turn)
 
