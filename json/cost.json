@@ -7,8 +7,7 @@
 		"cata" : 8,
 		"mindbender" : 5,
 		"swordpeople" : 5,
-		"knight" : 8,
-		"giant" : 0
+		"knight" : 8
 	},
 	"techs": {
 		"tier-1" : 1,

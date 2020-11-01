@@ -8,7 +8,12 @@ def addVars(turn):
         for element, score in values[category].items():
             var = name(turn, element)
             # replace 10 with max value of elements, static or dynamic
-            sym_dict[var] = model.NewIntVar(0, 50, var)
+            sym_dict[var] = model.NewIntVar(0, 256, var)
+    for u in values['units'].keys():
+        if u != 'giant':
+            sym_dict[turn + "_trained_" + u] = model.NewIntVar(0, 20, turn + "_trained_" + u)
+            sym_dict[turn + "_killed_" + u] = model.NewIntVar(0, 20, turn + "_killed_" + u)
+    sym_dict[turn + "_custom house"] = model.NewIntVar(0, 20, turn + "_custom house")
     return sym_dict
 
 
@@ -66,6 +71,7 @@ def addCity(turn):
     city[turn + "_" + "level-2_spt"] = model.NewIntVar(0, 20, turn + "_" + "level-2_spt")
     city[turn + "_" + "level-2_explorer"] = model.NewIntVar(0, 20, turn + "_" + "level-2_explorer")
     city[turn + "_" + "level-3-stars"] = model.NewIntVar(0, 20, turn + "_" + "level-3-stars")
+    city[turn + "_" + "level-3-walls"] = model.NewIntVar(0, 20, turn + "_" + "level-3-walls")
     city[turn + "_" + "level-4_border_growth"] = model.NewIntVar(0, 20, turn + "_" + "level-4_border_growth")
     city[turn + "_" + "level-4_population"] = model.NewIntVar(0, 20, turn + "_" + "level-4_population")
     for i in range(5, MAX_CITY_LEVEL + 1):
@@ -98,14 +104,21 @@ def addStars(turn):
     stars = {}
     stars[turn + "_" + "stars"] = model.NewIntVar(0, 200, turn + "_" + "stars")
     stars[turn + "_" + "spt"] = model.NewIntVar(0, 100, turn + "_" + "spt")
-    stars[turn + "_" + "star_income"] = model.NewIntVar(-20, 100, turn + "_" + "star_income")
-    stars[turn + "_" + "star_spending"] = model.NewIntVar(-20, 100, turn + "_" + "star_spending")
+    stars[turn + "_" + "star_income"] = model.NewIntVar(0, 100, turn + "_" + "star_income")
+    stars[turn + "_" + "star_spending"] = model.NewIntVar(0, 100, turn + "_" + "star_spending")
     for p in getPopulation():
         stars[turn + "_" + p['name'] + "_" + "stars"] = model.NewIntVar(0, 200, turn + "_" + p['name'] + "_" + "stars")
     for topic, cost_dict in getCost().items():
         for item, cost in cost_dict.items():
-            stars[turn + "_" + item + "_" + "stars"] = model.NewIntVar(0, 200, turn + "_" + item + "_" + "stars")
+            if topic == 'units':
+                if item != 'giant':
+                    stars[turn + "_" + item + "_" + "stars"] = model.NewIntVar(0, 200, turn + "_" + item + "_" + "stars")
             if topic == 'techs':
                 stars[turn + "_" + item + "_" + "cost"] = model.NewIntVar(0, 25, turn + "_" + item + "_" + "cost")
                 stars[turn + "_" + item + "_" + "stars"] = model.NewIntVar(0, 25, turn + "_" + item + "_" + "stars")
+    stars[turn + "_" + "ch_spt"] = model.NewIntVar(0, 50, turn + "_" + "ch_spt")
+    stars[turn + "_" + "city_spt"] = model.NewIntVar(0, 100, turn + "_" + "city_spt")
+    stars[turn + "_" + "unit_stars"] = model.NewIntVar(0, 100, turn + "_" + "unit_stars")
+    stars[turn + "_" + "pop_stars"] = model.NewIntVar(0, 100, turn + "_" + "pop_stars")
+    stars[turn + "_" + "tech_stars"] = model.NewIntVar(0, 100, turn + "_" + "tech_stars")
     return stars

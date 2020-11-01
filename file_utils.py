@@ -66,6 +66,18 @@ def name(turn, var):
     return turn + "_" + var
 
 
+def get(turn, var):
+    return dic[name(turn, var)]
+
+
+def diff(turn, var):
+    past_turn = getPastTurn(turn)
+    if past_turn is not None:
+        return get(turn, var) - get(past_turn, var)
+    else:
+        return get(turn, var)
+
+
 def getTechList():
 
     def rec(d):

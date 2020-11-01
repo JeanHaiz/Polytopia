@@ -3,21 +3,9 @@ from __future__ import division
 from __future__ import print_function
 
 
-from file_utils import getValues, getTribes
-from file_utils import MAX_CITY_LEVEL, dic, model, getTechList, getPastTurn
-from var_utils import addTechs, addVars, addTribes, addScore, addSpecial, addPop, addCity, name  # addStars
-
-
-def get(turn, var):
-    return dic[name(turn, var)]
-
-
-def diff(turn, var):
-    past_turn = getPastTurn(turn)
-    if past_turn is not None:
-        return get(turn, var) - get(past_turn, var)
-    else:
-        return get(turn, var)
+from file_utils import getValues, getTribes, getRuins
+from file_utils import MAX_CITY_LEVEL, dic, model, getTechList
+from var_utils import addTechs, addVars, addTribes, addScore, addSpecial, addPop, addCity, addStars
 
 
 def setTribe(turn, tribe):
@@ -51,7 +39,7 @@ def buildDictionnaries(turn):
     dic.update(addSpecial(turn))
     dic.update(addCity(turn))
     dic.update(addPop(turn))
-    # dic.update(addStars(turn))
+    dic.update(addStars(turn))
 
 
 def addInitialState(turn):
@@ -63,9 +51,9 @@ def addInitialState(turn):
         model.Add(dic[turn + "_" + "ruin_stars"] == 0)
         model.Add(dic[turn + "_" + "whale_stars"] == 0)
 
-        # model.Add(
-        #     dic[turn + "_" + "stars"] == 12
-        # )
+        model.Add(
+            dic[turn + "_" + "stars"] == 3
+        )
         # model.Add(
         #     dic[turn + "_" + "spt"] == 4
         # ).OnlyEnforceIf(dic[turn + "_" + 'Luxidoor'])
@@ -81,15 +69,22 @@ def addInitialState(turn):
                       ).OnlyEnforceIf(dic[k1])
             for u in getValues()['units']:
                 if u != tribe['unit']:
-                    model.Add(dic[turn + "_" + u] == 0
-                              ).OnlyEnforceIf(dic[k1])
+                    model.Add(dic[turn + "_" + u] == 0).OnlyEnforceIf(dic[k1])
+                    if u != 'giant':
+                        # model.Add(dic[turn + "_trained_" + u] == 0).OnlyEnforceIf(dic[k1])
+                        # model.Add(dic[turn + "_killed_" + u] == 0).OnlyEnforceIf(dic[k1])
+                        pass
                 else:
-                    model.Add(dic[turn + "_" + u] == 1
-                              ).OnlyEnforceIf(dic[k1])
+                    model.Add(dic[turn + "_" + u] == 1).OnlyEnforceIf(dic[k1])
+                    if u != 'giant':
+                        # model.Add(dic[turn + "_trained_" + u] == 1).OnlyEnforceIf(dic[k1])
+                        # model.Add(dic[turn + "_killed_" + u] == 0).OnlyEnforceIf(dic[k1])
+                        pass
             for tech_name in getTechList():
                 if tech_name != tribe['tech']:
                     model.Add(dic[turn + "_" + tech_name] == 0
                               ).OnlyEnforceIf(dic[k1])
+        model.Add(sum(dic[turn + "_" + "ruin" + "_" + e['name']] for e in getRuins()[0]['output']) == 0)
 
 
 def addSolution(turn):
@@ -134,6 +129,14 @@ def printVariants(df):
             count *= len(u)
             variants.append((c, u))
     return variants
+
+
+def dropColumns(df):
+    res = df
+    for col in df.columns:
+        if len(df[col].unique()) == 1:
+            res = res.drop(col, axis=1)
+    return res
 
 
 def getScenarioRegex():
