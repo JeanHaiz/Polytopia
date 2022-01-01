@@ -20,6 +20,10 @@ def __loadFile(filename):
         return json.load(file)
 
 
+def getMoves():
+    return __loadFile('moves.json')
+
+
 def getValues():
     return __loadFile('values.json')
 

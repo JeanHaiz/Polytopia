@@ -1,0 +1,38 @@
+version: '3.3'
+
+services:
+    database:
+        build:
+            context: ./database
+            dockerfile: Dockerfile
+        ports:
+            - 5432:5432
+        environment:
+            POSTGRES_USER: discordBot
+            POSTGRES_PASSWORD: password123
+            POSTGRES_DB: polytopiaHelper_dev
+            DOCKER_DEFAULT_PLATFORM: linux/amd64
+        #env_file:
+        #    - .env
+        # volumes:
+            # - ./database/1_init_sql.sql:/docker-entrypoint-initdb.d/1_init.sql
+            # - ./db-data/:/var/lib/postgresql/data/
+
+    python:
+        build:
+            context: "./python/"
+            dockerfile: Dockerfile
+        volumes:
+            - /Users/jean/Documents/Coding/Polytopia/python:/app
+        depends_on:
+            - database
+
+    jupyter-notebook:
+        image: jupyter/datascience-notebook
+        environment:
+            - CHOWN_HOME=yes
+            - CHOWN_HOME_OPTS='-R'
+        volumes:
+            - /Users/jean/Documents/Coding/Polytopia/jupyter_noteboooks:/home/jovyan/work
+        ports:
+            - 8888:8888

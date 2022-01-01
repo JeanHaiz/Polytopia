@@ -1,4 +1,16 @@
-from file_utils import getValues, getTechs, getTribes, getRuins, getPopulation, getCost, MAX_CITY_LEVEL, model, name
+from python.action_solver.file_utils import getMoves, getValues, getTechs, getTribes, getRuins, getPopulation, getCost
+from python.action_solver.file_utils import MAX_CITY_LEVEL, model, name
+
+
+def addMoves(turn):
+    moves = getMoves()
+    move_dict = {}
+    var = name(turn, "delta_moves")
+    move_dict[var] = model.NewIntVar(0, 64, var)
+    for move in moves:
+        var = name(turn, "move_" + move.replace(" ", "_"))
+        move_dict[var] = model.NewIntVar(0, 64, var)
+    return move_dict
 
 
 def addVars(turn):
@@ -11,9 +23,9 @@ def addVars(turn):
             sym_dict[var] = model.NewIntVar(0, 256, var)
     for u in values['units'].keys():
         if u != 'giant':
-            sym_dict[turn + "_trained_" + u] = model.NewIntVar(0, 20, turn + "_trained_" + u)
-            sym_dict[turn + "_killed_" + u] = model.NewIntVar(0, 20, turn + "_killed_" + u)
-    sym_dict[turn + "_custom house"] = model.NewIntVar(0, 20, turn + "_custom house")
+            sym_dict[name(turn, "trained_" + u)] = model.NewIntVar(0, 20, name(turn, "trained_" + u))
+        sym_dict[name(turn, "killed_" + u)] = model.NewIntVar(0, 20, name(turn, "killed_" + u))
+    sym_dict[name(turn, "custom house")] = model.NewIntVar(0, 20, name(turn, "custom house"))
     return sym_dict
 
 
@@ -43,12 +55,9 @@ def addTribes(turn):
 
 def addScore(turn):
     score_dict = {
-        name(turn, "raw_score"): model.NewIntVar(0, 200000, turn + "_" + "raw_score"),
-        # turn + "_" + "delta_raw_score" : model.NewIntVar(0, 200000, turn + "_" + "delta_raw_score"),
-        turn + "_" + "full_score": model.NewIntVar(0, 200000, turn + "_" + "full_score"),
+        name(turn, "full_score"): model.NewIntVar(0, 200000, turn + "_" + "full_score"),
         # turn + "_" + "delta_full_score" : model.NewIntVar(0, 200000, turn + "_" + "delta_full_score"),
         # turn + "_" + "computed_full_score": model.NewIntVar(0, 200000, turn + "_" + "computed_full_score")
-        # turn + "_" + "computed_raw_score": model.NewIntVar(0, 200000, turn + "_" + "computed_raw_score"),
     }
     return score_dict
 

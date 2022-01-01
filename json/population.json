@@ -49,6 +49,11 @@
 		"cost": 10,
 		"pop": 2,
 		"requires": "sailing"
+	},{
+		"name": "road",
+		"cost": 2,
+		"pop": 0,
+		"requires": "roads"
 	}
 ]
 
