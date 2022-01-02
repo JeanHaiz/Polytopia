@@ -1,6 +1,5 @@
 
 import discord
-import logging
 
 from discord.ext import commands
 
@@ -26,7 +25,7 @@ async def on_ready():
 @bot_client.event
 async def on_message(message):
     print('Message from {0.author}: {0.content}'.format(message))
-    logger.log(logging.DEBUG, "received message: %s" % str(message))
+    logger.debug("received message: %s" % str(message))
 
     if message.author == bot_client.user:
         return
@@ -63,21 +62,21 @@ async def reload_extention(ctx, extension):
 
 @bot_client.command()
 async def activate(ctx):
-    logger.log(logging.DEBUG, "activate channel %s" % ctx.channel)
+    logger.debug("activate channel %s" % ctx.channel)
     database_client.activate_channel(ctx.channel, ctx.guild)
     await ctx.send("channel activated")
 
 
 @bot_client.command()
 async def deactivate(ctx):
-    logger.log(logging.DEBUG, "deactivate channel %s" % ctx.channel)
+    logger.debug("deactivate channel %s" % ctx.channel)
     database_client.deactivate_channel(ctx.channel)
     await ctx.send("channel deactivated")
 
 
 @bot_client.command()
 async def list_active_channels(ctx):
-    logger.log(logging.DEBUG, "list active channels")
+    logger.debug("list active channels")
     active_channels = database_client.list_active_channels(ctx.guild)
     if len(active_channels) > 0:
         message = "active channels:\n- %s" % "\n- ".join([a[0] for a in active_channels if a[0] != ""])

@@ -3,7 +3,6 @@ import pytesseract
 
 import numpy as np
 from common.logger_utils import logger
-from sqlalchemy.sql.expression import true
 
 from .score_image_processing_utils import clear_noise
 
@@ -13,7 +12,8 @@ def is_score_reconition_request(message, attachment, filename):
     # if attachment.content_type.startswith("image/"):
     # else:
     # logger.info("content not supported: %s" % message.id)
-    return true  # discord.PartialEmoji(name="📈") in [r.emoji for r in message.reactions]
+    return "📈" in [r.emoji for r in message.reactions]
+    # return true  # discord.PartialEmoji(name="📈") in [r.emoji for r in message.reactions]
 
 
 def read_scores(image):

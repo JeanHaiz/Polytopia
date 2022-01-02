@@ -279,7 +279,7 @@ def get_intersection(lines):
     return intersections
 
 
-def patch_partial_maps(message, files, database_client: database_client.DatabaseClient):
+async def patch_partial_maps(message, files, database_client: database_client.DatabaseClient):
 
     # reference_size = (2028, 1259)
     # reference_positions = [(1121 - 56, 274 - 221), (105 - 56, 880 - 221)]
@@ -295,11 +295,12 @@ def patch_partial_maps(message, files, database_client: database_client.Database
 
     for i, filename_i in enumerate(files):
         print("map_patching_utils", filename_i)
-        image = image_utils.load_image(message.channel, filename_i, image_utils.ImageOperation.INPUT)
+        image = await image_utils.load_image(database_client, message, filename_i, image_utils.ImageOperation.INPUT)
         if image is None:
             if DEBUG:
                 print("image not found:", filename_i)
-            return
+            print("EXIT LOOP")
+            return None
 
         images.append(image)
 
@@ -362,7 +363,8 @@ def patch_partial_maps(message, files, database_client: database_client.Database
             # image = cv2.polylines(patch_work, [scaled_vertices], True, (255, 255, 255), 10)
 
     filename = database_client.add_resource(message, message.author, ImageOperation.MAP_PATCHING_OUTPUT)
-    return image_utils.save_image(patch_work, message.channel, filename, ImageOperation.MAP_PATCHING_OUTPUT)
+    file_path = image_utils.save_image(patch_work, message.channel, filename, ImageOperation.MAP_PATCHING_OUTPUT)
+    return file_path
 
 
 def is_map_patching_request(message, attachment, filename):
@@ -372,4 +374,4 @@ def is_map_patching_request(message, attachment, filename):
         "🖼️" in [r.emoji for r in message.reactions],
         [r.emoji for r in message.reactions],
         message.reactions)
-    return True
+    return "🖼️" in [r.emoji for r in message.reactions]

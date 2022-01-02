@@ -37,7 +37,20 @@ class DatabaseClient:
                 SET is_active = false
                 WHERE channel_discord_id = {channel.id};""")
 
-    def add_score(self, channel_id, score):
+    # TODO: add create_if_missing=True param
+    # TODO: result should be modified: result = [dict(row) for row in resultproxy]
+    def get_game_players(self, channel):
+        result_proxy = self.engine.execute(
+            f"""SELECT game_players.discord_player_id,
+                       polytopia_player.polytopia_player_name,
+                       polytopia_player.discord_player_name
+                FROM game_players
+                JOIN polytopia_player
+                ON game_players.discord_player_id = polytopia_player.discord_player_id
+                WHERE channel_discord_id = {channel.id};""").fetchall()
+        return [dict(row) for row in result_proxy]
+
+    def add_score(self, channel, player, score):
         return
 
     def get_channel_scores(self, channel_id):
@@ -96,26 +109,27 @@ class DatabaseClient:
         if filename is not None and len(filename) > 0:
             return filename[0]
 
-    def get_resource_filename(self, message, operation):
+    def get_resource_filename(self, message, operation, resource_number):
         filename = self.engine.execute(
             f"""SELECT filename::text
                 FROM message_resources
                 WHERE source_channel_id = {message.channel.id}
                 AND source_message_id = {message.id}
+                AND resource_number = {resource_number}
                 AND operation = {operation.value};""").fetchone()
         if len(filename) > 0:
             return filename[0]
 
     def get_map_patching_files(self, channel):
         filenames = self.engine.execute(
-            f"""SELECT ranked_scores.filename::text
-                FROM (
-                    SELECT message_resources.*, rank() OVER (
-                        PARTITION BY author_id
-                        ORDER BY date_added DESC)
-                    FROM message_resources
-                    WHERE source_channel_id = {channel.id}) ranked_scores
-                WHERE rank <=1
-                ;""").fetchall()
+            f"""SELECT DISTINCT ON (source_message_id) source_message_id,
+                filename::text, author_id
+                FROM message_resources
+                WHERE source_channel_id = {channel.id};""").fetchall()
         print("pre filenames", filenames)
-        return [f[0] for f in filenames]
+        return [dict(row)["filename"] for row in filenames]
+
+    def get_resource_number(self, filename):
+        return self.engine.execute(
+            f"""SELECT resource_number FROM message_resources
+                WHERE filename::text = '{filename}';""").fetchone()[0]

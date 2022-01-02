@@ -1,9 +1,12 @@
 import os
 import cv2
+import sys
+import time
 import discord
 import pathlib
 from enum import Enum
 
+from common.logger_utils import logger
 
 # REPO_ROOT = "/Users/jean/Documents/Coding/Polytopia/"
 REPO_ROOT = pathlib.Path(__file__).parent.parent.absolute()
@@ -28,27 +31,49 @@ class ImageOperation(Enum):
     SCALE = 512
 
 
-def load_image(channel, filename, operation):
+async def load_image(database_client, message, filename, operation):
     # build path from parent directory
     # filename = database_client.get_resource_filename(message, operation)
-    file_path = __get_file_path(channel, operation, filename)
+    file_path = __get_file_path(message.channel, operation, filename)
     image = cv2.imread(file_path)
     if image is None:
-        print("None image", file_path)
+        print("None image (%s): %s" % (operation, file_path))
+        if operation == ImageOperation.INPUT:
+            print("reload image")
+            resource_number = database_client.get_resource_number(filename)
+            await save_attachment(message.attachments[resource_number], message, operation, filename)
+            print("image saved", file_path)
+            image = cv2.imread(file_path)
     else:
         print("Image valid", len(image))
     return image
 
 
-async def save_attachment(attachment, message, operation, filename):
+async def save_attachment(attachment, message, operation, filename, allow_retry=True):
     parent_path = __get_parent_path(message.channel, operation)
     os.makedirs(parent_path, exist_ok=True)
-    await attachment.save(__get_file_path(message.channel, operation, filename))
+    file_path = __get_file_path(message.channel, operation, filename)
+    try:
+        await attachment.save(file_path)
+    except:
+        if allow_retry:
+            time.sleep(3)
+            save_attachment(attachment, message, operation, filename, False)
+        else:
+            logger.error(sys.exc_info()[0])
 
 
 def load_attachment(file_path, filename):
+    logger.debug("loading attachment: %s" % file_path)
+    print("loading attachment: %s" % file_path)
+
+    if file_path is None:
+        return
+
     with open(file_path, "rb") as fh:
         attachment = discord.File(fh, filename=filename + ".png")
+        fh.close()
+
     return attachment
 
 
@@ -56,6 +81,7 @@ def save_image(image, channel, filename, operation):
     parent_path = __get_parent_path(channel, operation)
     os.makedirs(parent_path, exist_ok=True)
     file_path = __get_file_path(channel, operation, filename)
+    logger.debug("writing image: %s" % file_path)
     cv2.imwrite(file_path, image)
     return file_path
 

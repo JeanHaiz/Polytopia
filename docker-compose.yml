@@ -24,6 +24,8 @@ services:
             dockerfile: Dockerfile
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/python:/app
+        env_file:
+            - .env
         depends_on:
             - database
 
