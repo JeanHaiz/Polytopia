@@ -62,8 +62,14 @@ class DatabaseClient:
                 WHERE server_discord_id = {server.id}
                 AND is_active = true;""").fetchall()
 
-    def add_resource(self, message, author, operation, resource_number=0):
+    def remove_resource(self, message_id):
+        filenames = self.engine.execute(
+            f"""DELETE FROM message_resources
+                WHERE source_message_id = {message_id}
+                RETURNING filename::text;""")
+        return [f[0] for f in filenames]
 
+    def add_resource(self, message, author, operation, resource_number=0):
         filename = self.engine.execute(
             f"""INSERT INTO polytopia_player
                 (discord_player_id, discord_player_name)

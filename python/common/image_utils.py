@@ -67,7 +67,7 @@ def load_attachment(file_path, filename):
     logger.debug("loading attachment: %s" % file_path)
     print("loading attachment: %s" % file_path)
 
-    if file_path is None:
+    if file_path is None or filename is None:
         return
 
     with open(file_path, "rb") as fh:
@@ -106,3 +106,15 @@ def __get_parent_path(channel, operation):
 
 def __get_file_path(channel, operation, filename):
     return os.path.join(__get_parent_path(channel, operation), filename + ".png")
+
+
+def __get_template(template):
+    return cv2.imread(os.path.join(REPO_ROOT, "templates", template), cv2.IMREAD_UNCHANGED)
+
+
+def get_cloud_template():
+    return __get_template("cloud_template.png")
+
+
+def get_background_template():
+    return __get_template("image32.png")[:, :, 0:3]

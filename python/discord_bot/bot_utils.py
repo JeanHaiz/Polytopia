@@ -53,6 +53,11 @@ async def reaction_message_routine(database_client, message, filename):
                     return await message.channel.send("patch failed")
 
 
+def reaction_removed_routine(payload, bot_client, database_client: DatabaseClient):
+    if payload.emoji == discord.PartialEmoji(name="📈") or payload.emoji == discord.PartialEmoji(name="🖼️"):
+        database_client.remove_resource(payload.message_id)
+
+
 async def reaction_added_routine(payload, bot_client, database_client: DatabaseClient):
     if payload.emoji == discord.PartialEmoji(name="📈"):
         output = ""
@@ -83,6 +88,10 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
             for i, attachment in enumerate(message.attachments):
                 if map_patching_utils.is_map_patching_request(message, attachment, "filename"):
                     filename = database_client.set_resource_operation(message, ImageOperation.INPUT, i)
+                    if filename is None:
+                        filename = database_client.add_resource(message, message.author,
+                                                                image_utils.ImageOperation.INPUT, i)
+                        image_utils.save_attachment(attachment, message, ImageOperation.INPUT, filename)
                     patch = await map_patching_routine(database_client, attachment, message, filename)
                     if patch is not None:
                         return await channel.send(file=patch, content="map patched")

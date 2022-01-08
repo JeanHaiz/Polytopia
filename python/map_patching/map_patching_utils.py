@@ -1,4 +1,5 @@
 import cv2
+import math
 import discord
 import numpy as np
 import pandas as pd
@@ -72,7 +73,7 @@ def select_contours(image, filename=None):
 
 
 # image: edges
-def draw_contour(image, channel, contour_, epsilon=None, epsilonFactor=0.005, filename=None):
+def draw_contour(image, contour_, channel=None, epsilon=None, epsilonFactor=0.005, filename=None):
     processed = image.copy()
     mask = np.zeros(image.shape[:2], np.uint8)
 
@@ -95,7 +96,7 @@ def draw_contour(image, channel, contour_, epsilon=None, epsilonFactor=0.005, fi
     if DEBUG:
         print("simplified contour has", len(approx), "points with epsilon=", epsilon)
 
-    if filename is not None:
+    if filename is not None and channel is not None:
         cv2.drawContours(processed, [approx], 0, (255, 255, 255), 3)
         cv2.drawContours(mask, [approx], -1, (255, 255, 255), -1)
 
@@ -233,6 +234,8 @@ def get_lines(vertices_i):
              (delta[1] / delta[0]) if delta[0] != 0 else np.sign(delta[0]) * np.sign(delta[1]) * np.inf,
              np.sign(delta[0]), np.sign(delta[1]), p0.tolist(), p1.tolist()) for j, p0, p1, delta in delta]
 
+    if DEBUG:
+        print("all lines\n", pd.DataFrame(lines))
     # very permissive: slopes of selected lines are within 0.55 < abs(slope) < 0.65
     selected_lines = sorted([(j, length, slope, sign_x, sign_y, p0, p1)
                             for (j, length, slope, sign_x, sign_y, p0, p1)
@@ -286,8 +289,11 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
 
     # reference_positions = [(2242, 548), (210, 1760)]
 
+    files.insert(0, "background")
+
     vertices = []
     bits = []
+    transparency_masks = []
     scaled_paddings = []
     sizes = []
     images = []
@@ -295,7 +301,10 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
 
     for i, filename_i in enumerate(files):
         print("map_patching_utils", filename_i)
-        image = await image_utils.load_image(database_client, message, filename_i, image_utils.ImageOperation.INPUT)
+        if i == 0:
+            image = image_utils.get_background_template()
+        else:
+            image = await image_utils.load_image(database_client, message, filename_i, image_utils.ImageOperation.INPUT)
         if image is None:
             if DEBUG:
                 print("image not found:", filename_i)
@@ -305,11 +314,16 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
         images.append(image)
 
         edges = get_three_color_edges(image, filename=filename_i, channel=message.channel)
-
-        contour = select_contours(edges, filename_i)
-        polygon = draw_contour(edges, message.channel, contour, filename=filename_i)
+        blur = cv2.GaussianBlur(edges, (15, 15), sigmaX=25)
+        contour = select_contours(blur, filename_i)
+        polygon = draw_contour(edges, contour, message.channel, filename=filename_i)
         vertices_i = compute_vertices(polygon)
         lines = get_lines([p[0] for p in polygon])
+
+        if lines is None:
+            print("lines not detected for file:", filename_i)
+            continue
+
         intersections = get_intersection(lines)
 
         if DEBUG:
@@ -326,7 +340,7 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
 
     reference_position, reference_size = get_references(vertices)
 
-    for i, filename_i in enumerate(files):
+    for i in range(len(images)):
         image_i = images[i]
         vertices_i = vertices[i]
         scale_factor, padding = get_transformation_dimensions(vertices_i, reference_position, reference_size)
@@ -337,13 +351,16 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
 
         cropped_image = crop_padding(image_i, padding)
         scaled_image = scale_image(cropped_image, message.channel, scale_factor)
-        # scaled_image = scale_image(image, scale_factor)
+        oppacity = remove_clouds(scaled_image, message.channel)
 
+        transparency_masks.append(oppacity)
         bits.append(scaled_image)
         # scaled_paddings.append((padding).astype(int))
         scaled_paddings.append(padding)
         scaled_vertices.append((vertices_i / scale_factor).tolist())
         sizes.append(np.flip(scaled_image.shape[0:2]))
+
+        print("sizes:", scaled_image.shape, oppacity.shape)
 
         if DEBUG:
             print()
@@ -357,7 +374,17 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
         bit = bits[i]
         scaled_padding = scaled_paddings[i]
         size = sizes[i]
-        patch_work[scaled_padding[1]:scaled_padding[1]+size[1], scaled_padding[0]:scaled_padding[0]+size[0], :] = bit
+        oppacity = transparency_masks[i]
+        background = patch_work[
+            scaled_padding[1]:scaled_padding[1]+size[1],
+            scaled_padding[0]:scaled_padding[0]+size[0], :]
+        print(background.shape, oppacity.shape)
+        if i == 0:
+            result = bit
+        else:
+            result = cv2.multiply(background, 1 - oppacity) + cv2.multiply(bit, oppacity)
+        patch_work[scaled_padding[1]:scaled_padding[1]+size[1], scaled_padding[0]:scaled_padding[0]+size[0], :] = result
+
         if DEBUG:
             print(scaled_vertices)
             # image = cv2.polylines(patch_work, [scaled_vertices], True, (255, 255, 255), 10)
@@ -375,3 +402,64 @@ def is_map_patching_request(message, attachment, filename):
         [r.emoji for r in message.reactions],
         message.reactions)
     return "🖼️" in [r.emoji for r in message.reactions]
+
+
+def remove_clouds(img, channel, ouptut_prefix=None, ksize=31, sigma=25):
+    # read chessboard image
+    # img = cv2.imread(image_path)
+    img_alpha = np.ones((img.shape[0:2]))
+
+    # read pawn image template
+    template = image_utils.get_cloud_template()
+    hh, ww = template.shape[:2]
+
+    # extract pawn base image and alpha channel and make alpha 3 channels
+    pawn = template[:, :, 0:3]
+    alpha_template = template[:, :, 3]
+    alpha = cv2.merge([alpha_template, alpha_template, alpha_template])
+
+    # do masked template matching and save correlation image
+    corr_img = cv2.matchTemplate(img, pawn, cv2.TM_CCOEFF_NORMED, mask=alpha)
+    correlation_raw = (255 * corr_img).clip(0, 255).astype(np.uint8)
+
+    blur = cv2.GaussianBlur(correlation_raw, (ksize, ksize), sigmaX=sigma)
+    blur_copy = blur.copy()
+
+    threshold = 40
+    result = img.copy()
+    max_val = np.max(blur)
+    rad = int(math.sqrt(hh * hh + ww * ww) / 4)
+
+    while max_val > threshold:
+
+        # find max value of correlation image
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(blur)
+        # print(max_val, max_loc)
+
+        if max_val > threshold:
+            # draw match on copy of input
+            # cv2.rectangle(result, max_loc, (max_loc[0]+ww, max_loc[1]+hh), (0, 0, 255), 2)
+            img_alpha[max_loc[1]: max_loc[1]+hh, max_loc[0]: max_loc[0]+ww] = \
+                img_alpha[max_loc[1]: max_loc[1]+hh, max_loc[0]: max_loc[0]+ww] - alpha_template / 255.0
+
+            # write black circle at max_loc in corr_img
+            cv2.circle(blur, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
+
+        else:
+            break
+
+    img_alpha_c = img_alpha.clip(0, 1).astype(np.uint8)
+    mask = cv2.merge([img_alpha_c, img_alpha_c, img_alpha_c]).astype(np.uint8)
+
+    if False:
+        image_utils.save_image(correlation_raw, channel)
+        cv2.imwrite(ouptut_prefix + '_correlation_3.png', correlation_raw)
+        cv2.imwrite(ouptut_prefix + '_blur.jpg', blur_copy)
+        cv2.imwrite(ouptut_prefix + '_correlation_2.png', corr_img)
+        cv2.imwrite(ouptut_prefix + "_img_alpha.png", (255*img_alpha).clip(0, 255).astype(np.uint8))
+        # cv2.imwrite(ouptut_prefix + "_with_alpha.png", with_alpha)
+        cv2.imwrite(ouptut_prefix + '_pawn.png', pawn)
+        cv2.imwrite(ouptut_prefix + '_alpha.png', alpha)
+        cv2.imwrite(ouptut_prefix + '_correlation.png', blur)
+        cv2.imwrite(ouptut_prefix + '_matches2.jpg', result)
+    return mask

@@ -33,7 +33,7 @@ async def on_message(message):
     if message.author.bot:
         return
 
-    if message.attachments is not None:
+    if message.attachments is not None and len(message.attachments) != 0:
         is_active = database_client.is_channel_active(message.channel.id)
         if is_active:
             for i, attachment in enumerate(message.attachments):
@@ -50,6 +50,13 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     is_active = database_client.is_channel_active(payload.channel_id)
     if is_active:
         await bot_utils.reaction_added_routine(payload, bot_client, database_client)
+
+
+@bot_client.event
+async def on_raw_reaction_remove(payload: discord.RawReactionActionEvent):
+    is_active = database_client.is_channel_active(payload.channel_id)
+    if is_active:
+        bot_utils.reaction_removed_routine(payload, bot_client, database_client)
 
 
 @bot_client.command()
