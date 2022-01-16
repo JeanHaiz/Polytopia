@@ -1,3 +1,4 @@
+import re
 import cv2
 import pytesseract
 
@@ -20,12 +21,13 @@ def read_scores(image):
     # image = cv2.imread(path)
     cropped = crop(image)
     clear = clear_noise(cropped)
-    scores = get_scores(clear)
-    return scores
+    scores_you = get_scores(clear, only_you=True)
+    scores = get_scores(image)
+    return scores + scores_you
 
 
-def read(image):
-    return pytesseract.image_to_string(image)
+def read(image, config=''):
+    return pytesseract.image_to_string(image, config=config)
 
 
 def crop(image):
@@ -37,19 +39,40 @@ def crop(image):
     return image[heights[0]:heights[-1], :]
 
 
-def get_scores(image):
+def get_scores(image, only_you=False):
     logger.debug("read image scores")
     logger.debug(read(image))
-    logger.debug([f(t) for t in read(image).split('\n') if "score" in t])
-    return [f(t) for t in read(image).split('\n') if "score" in t]
+    image_text = read(image).replace("¢", "c").split('\n')
+    # print("image text", only_you, image_text)
+    scores = [read_line(t) for t in image_text if "score" in t and (not only_you or "Ruled by you" in t)]
+    logger.debug(scores)
+    print(scores)
+    return scores
 
 
-def f(t):
-    s1 = t.split(", ")
-    if "Unknown ruler" in s1[0].strip() or "Ruled by you" in s1[0].strip():
-        player = s1[0]
+def read_line(line):
+    print("line", line)
+    line = line.replace(".", "").replace(" ", "")
+
+    s1 = line.split(",")
+    if len(s1) >= 2:
+        if "Unknownruler" in s1[0]:
+            player = "Unknown ruler"
+        elif "Ruledbyyou" in s1[0]:
+            player = "Ruled by you"
+        else:
+            player = s1[0][len("Ruledby"):]
+
+        if player is not None:
+            player = re.sub(r"[^a-zA-Z0-9 ]", "", player)
+
+        s2 = "".join(s1[1:]).split(":")
+        if len(s2) >= 2:
+            score = int(s2[1].split("points")[0].replace(",", ""))
+        else:
+            print("s2 error", line)
+            return
     else:
-        player = s1[0].strip().split(" ")[-1]
-    s2 = s1[1].split(": ")
-    score = int(s2[1].split(" ")[0].replace(",", ""))
+        print("s1 error", line)
+        return
     return (player, score)

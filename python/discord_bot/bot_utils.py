@@ -1,6 +1,7 @@
 import datetime
 import discord
 
+from difflib import SequenceMatcher
 
 from common import image_utils
 from common.logger_utils import logger
@@ -19,11 +20,28 @@ async def score_recognition_routine(database_client: DatabaseClient, attachment,
     # await attachment.save(path)
     scores = score_recognition_utils.read_scores(image)
     for player, player_score in scores:
-        discord_player = database_client.get_player(message.channel, player)
-        if discord_player is not None:
-            database_client.add_score(message.channel, discord_player, player_score)
+        if player == "Unknown ruler":
+            database_client.add_score(message.channel, None, player_score)
+        else:
+            if player == "Ruled by you":
+                player = message.author.name
+
+            game_players = database_client.get_game_players(message.channel)
+            print(game_players)
+            name_proximity = [(
+                player_entry["discord_player_id"],
+                SequenceMatcher(
+                    None,
+                    player_entry["polytopia_player_name"] or player_entry["discord_player_name"] or "",
+                    player).ratio())
+                for player_entry in game_players]
+            print("name proximity", name_proximity)
+
+            discord_player_id = sorted(name_proximity, key=lambda x: -x[1])[0][0]
+            if discord_player_id is not None:
+                database_client.add_score(message.channel, discord_player_id, player_score)
     score_text = "Scores:\n"
-    score_text += "\n".join([s[0] + ": " + str(s[1]) for s in scores])
+    score_text += "\n".join([(s[0] or "Unknown ruler") + ": " + str(s[1]) for s in scores])
     return score_text
 
 
@@ -69,8 +87,10 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
                     filename = database_client.set_resource_operation(message, ImageOperation.INPUT, i)
                     if filename is None:
                         filename = database_client.add_resource(message, message.author,
-                                                                image_utils.ImageOperation.INPUT, i)
-                        image_utils.save_attachment(attachment, message, ImageOperation.INPUT, filename)
+                                                                image_utils.ImageOperation.SCORE_INPUT, i)
+                        await image_utils.save_attachment(attachment, message, ImageOperation.SCORE_INPUT, filename)
+                    else:
+                        image_utils.move_input_image(message.channel, filename, ImageOperation.SCORE_INPUT)
                     score_text = await score_recognition_routine(database_client, attachment, message, filename)
                     print("score text:", score_text)
                     if score_text is not None:
@@ -87,11 +107,13 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
         if len(message.attachments) > 0:
             for i, attachment in enumerate(message.attachments):
                 if map_patching_utils.is_map_patching_request(message, attachment, "filename"):
-                    filename = database_client.set_resource_operation(message, ImageOperation.INPUT, i)
+                    filename = database_client.set_resource_operation(message, ImageOperation.MAP_INPUT, i)
                     if filename is None:
                         filename = database_client.add_resource(message, message.author,
-                                                                image_utils.ImageOperation.INPUT, i)
-                        image_utils.save_attachment(attachment, message, ImageOperation.INPUT, filename)
+                                                                image_utils.ImageOperation.MAP_INPUT, i)
+                        await image_utils.save_attachment(attachment, message, ImageOperation.MAP_INPUT, filename)
+                    else:
+                        image_utils.move_input_image(message.channel, filename, ImageOperation.MAP_INPUT)
                     patch = await map_patching_routine(database_client, attachment, message, filename)
                     if patch is not None:
                         return await channel.send(file=patch, content="map patched")

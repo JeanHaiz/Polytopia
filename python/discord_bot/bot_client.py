@@ -90,3 +90,30 @@ async def list_active_channels(ctx):
     else:
         message = "no active channel"
     await ctx.send(message)
+
+
+@bot_client.command(name="setname")
+async def set_player_discord_name(ctx, discord_id, discord_name, polytopia_name):
+    logger.debug("set player name")
+    database_client.set_player_discord_name(discord_id, discord_name, polytopia_name)
+    await ctx.send("Hi %s!" % discord_name)
+
+
+@bot_client.command(name="opponent")
+async def add_game_opponent(ctx, discord_id, discord_name, polytopia_name):
+    logger.debug("set player name")
+    database_client.set_player_discord_name(discord_id, discord_name, polytopia_name)
+    await ctx.send("Hi %s!" % discord_name)
+
+
+@bot_client.command(name="setmyname")
+async def set_self_discord_name(ctx, polytopia_name):
+    logger.debug("set self player name")
+    database_client.set_player_discord_name(ctx.author.id, ctx.author.name, polytopia_name)
+    await ctx.send("Hi %s!" % ctx.author.name)
+
+
+@bot_client.command(name="scores")
+async def get_channel_scores(ctx):
+    scores = database_client.get_channel_scores(ctx.channel.id)
+    await ctx.send(str(scores))

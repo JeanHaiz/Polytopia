@@ -165,14 +165,24 @@ def get_transformation_dimensions(vertices, reference_position, reference_size):
     return scale_factor, padding
 
 
-def crop_padding(image, padding):
+def crop_padding_(image, padding):
     if padding[0] < 0:
         image = image[:, -padding[0]:]
         padding[0] = 0
     if padding[1] < 0:
         image = image[-padding[1]:, :]
         padding[1] = 0
-    return image
+    return image, padding
+
+
+def crop_padding(image, padding):
+    if padding[0] < 0:
+        image = image[-padding[0]:, :]
+        padding[0] = 0
+    if padding[1] < 0:
+        image = image[:, -padding[1]:]
+        padding[1] = 0
+    return image, padding
 
 
 def scale_image(image, channel, scale_factor, filename=None):
@@ -231,7 +241,7 @@ def get_lines(vertices_i):
               vertices_i[(j + 1) % len(vertices_i)] - vertices_i[j]) for j in range(len(vertices_i))]
 
     lines = [(j, (delta * delta).sum(),
-             (delta[1] / delta[0]) if delta[0] != 0 else np.sign(delta[0]) * np.sign(delta[1]) * np.inf,
+             (delta[1] / delta[0]) if delta[0] != 0 else np.sign(delta[0]) * np.sign(delta[1]) * 100000,
              np.sign(delta[0]), np.sign(delta[1]), p0.tolist(), p1.tolist()) for j, p0, p1, delta in delta]
 
     if DEBUG:
@@ -349,7 +359,7 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
         # print(np.flip(image.shape[0:2]),
         #       (image.shape[1] + reference_padding[0], image_i.shape[0] + reference_padding[1]))
 
-        cropped_image = crop_padding(image_i, padding)
+        cropped_image, padding = crop_padding(image_i, padding)
         scaled_image = scale_image(cropped_image, message.channel, scale_factor)
         oppacity = remove_clouds(scaled_image, message.channel)
 
@@ -373,6 +383,8 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
     for i in range(len(bits)):
         bit = bits[i]
         scaled_padding = scaled_paddings[i]
+        # scaled_padding = [scaled_padding[1], scaled_padding[0]]
+        # scaled_padding = np.clip(scaled_padding, 0, None)
         size = sizes[i]
         oppacity = transparency_masks[i]
         background = patch_work[

@@ -29,6 +29,8 @@ class ImageOperation(Enum):
     OVERLAY = 128
     MASK = 256
     SCALE = 512
+    SCORE_INPUT = 1024
+    MAP_INPUT = 2048
 
 
 async def load_image(database_client, message, filename, operation):
@@ -84,6 +86,12 @@ def save_image(image, channel, filename, operation):
     logger.debug("writing image: %s" % file_path)
     cv2.imwrite(file_path, image)
     return file_path
+
+
+def move_input_image(channel, filename, target_operation):
+    file_path = __get_file_path(channel, ImageOperation.INPUT, filename)
+    image = cv2.imread(file_path)
+    save_image(image, channel, filename, target_operation)
 
 
 def __read_img(filename):

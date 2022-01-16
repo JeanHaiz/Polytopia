@@ -1,5 +1,7 @@
 import sqlalchemy
 
+from common.image_utils import ImageOperation
+
 
 class DatabaseClient:
 
@@ -50,11 +52,24 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel.id};""").fetchall()
         return [dict(row) for row in result_proxy]
 
-    def add_score(self, channel, player, score):
-        return
+    def add_score(self, channel, player_id, score):
+        return self.engine.execute(
+            f"""INSERT INTO game_player_scores
+                (channel_discord_id, discord_player_id, turn, score, confirmed)
+                VALUES ({channel.id}, {player_id or 'NULL'}, -1, {score}, false);""")
 
     def get_channel_scores(self, channel_id):
-        return
+        return self.engine.execute(
+            f"""SELECT discord_player_id, turn, score
+                FROM game_player_scores
+                WHERE channel_discord_id = {channel_id};""").fetchall()
+
+    def get_channel_scores_gb(self, channel_id):
+        return self.engine.execute(
+            f"""SELECT discord_player_id, array_agg(turn), array_agg(score)
+                FROM game_player_scores
+                WHERE channel_discord_id = {channel_id}
+                GROUP BY discord_player_id;""").fetchall()
 
     def list_active_channels(self, server):
         return self.engine.execute(
@@ -131,7 +146,8 @@ class DatabaseClient:
             f"""SELECT DISTINCT ON (source_message_id) source_message_id,
                 filename::text, author_id
                 FROM message_resources
-                WHERE source_channel_id = {channel.id};""").fetchall()
+                WHERE source_channel_id = {channel.id}
+                AND operation = {ImageOperation.MAP_INPUT.value};""").fetchall()
         print("pre filenames", filenames)
         return [dict(row)["filename"] for row in filenames]
 
@@ -139,3 +155,12 @@ class DatabaseClient:
         return self.engine.execute(
             f"""SELECT resource_number FROM message_resources
                 WHERE filename::text = '{filename}';""").fetchone()[0]
+
+    def set_player_discord_name(self, discord_player_id, discord_player_name, polytopia_player_name):
+        return self.engine.execute(
+            f"""INSERT INTO polytopia_player
+                (discord_player_id, discord_player_name, polytopia_player_name)
+                VALUES ({discord_player_id}, '{str(discord_player_name)}', '{str(polytopia_player_name)}')
+                ON CONFLICT (discord_player_id) DO UPDATE
+                SET discord_player_name = '{str(discord_player_name)}',
+                polytopia_player_name = '{str(polytopia_player_name)}';""")

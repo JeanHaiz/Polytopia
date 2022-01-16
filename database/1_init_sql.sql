@@ -43,10 +43,11 @@ CREATE TABLE IF NOT EXISTS polytopia_game(
 GRANT ALL PRIVILEGES ON TABLE polytopia_game TO discordBot;
 
 CREATE TABLE IF NOT EXISTS polytopia_player(
+	game_player_uuid uuid DEFAULT uuid_generate_v4() UNIQUE NOT NULL,
 	discord_player_id BIGINT UNIQUE NOT NULL,
 	discord_player_name VARCHAR(40),
 	polytopia_player_name VARCHAR(40),
-	PRIMARY KEY (discord_player_id)
+	PRIMARY KEY (game_player_uuid)
 );
 GRANT ALL PRIVILEGES ON TABLE polytopia_player TO discordBot;
 
@@ -61,13 +62,13 @@ CREATE TABLE IF NOT EXISTS game_players(
 GRANT ALL PRIVILEGES ON TABLE game_players TO discordBot;
 
 CREATE TABLE IF NOT EXISTS game_player_scores(
-	game_player_uuid uuid DEFAULT uuid_generate_v4() UNIQUE NOT NULL,
+	score_uuid uuid DEFAULT uuid_generate_v4() UNIQUE NOT NULL,
 	channel_discord_id BIGINT NOT NULL,
-	discord_player_id BIGINT NOT NULL,
+	discord_player_id BIGINT,
 	turn INT,
 	score INT,
 	confirmed BOOLEAN,
-	PRIMARY KEY (game_player_uuid),
+	PRIMARY KEY (score_uuid),
 	CONSTRAINT fk_channel FOREIGN KEY (channel_discord_id) REFERENCES polytopia_game(channel_discord_id),
 	CONSTRAINT fk_player FOREIGN KEY (discord_player_id) REFERENCES polytopia_player(discord_player_id)
 );
