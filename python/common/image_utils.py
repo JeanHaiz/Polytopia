@@ -21,6 +21,7 @@ OUTPUT_ROOT = os.path.join(REPO_ROOT, "output")
 class ImageOperation(Enum):
     NONE = 0
     INPUT = 1
+    DEBUG_VERTICES = 2
     MAP_STORY = 4
     MAP_PATCHING_OUTPUT = 8
     ONE_COLOR_EDGES = 16

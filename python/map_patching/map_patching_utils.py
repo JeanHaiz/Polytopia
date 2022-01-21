@@ -1,6 +1,8 @@
+import re
 import cv2
 import math
 import discord
+import pytesseract
 import numpy as np
 import pandas as pd
 
@@ -144,25 +146,28 @@ def get_transformation_dimensions(vertices, reference_position, reference_size):
     if d_w / d_h < ratio:  # smaller width or larger height proportionally
         # missing width; scale on height
         scale_factor = d_h / reference_size[1]  # then divide by scale factor to find right size
-        padding = [
+        scaled_padding = [
             int(reference_position[0] - (vertices[0][0] - 50) / scale_factor),
             int(reference_position[1] - (vertices[0][1] - 50) / scale_factor)
         ]
     else:
         # missing height; scale on width
         scale_factor = d_w / reference_size[0]
-        padding = [
+        scaled_padding = [
             int(reference_position[0] - (vertices[2][0] - 50) / scale_factor),
             int(reference_position[1] - (vertices[2][1] - 50) / scale_factor)
         ]
+    padded_and_scaled_vertices = vertices / scale_factor + scaled_padding
+    padded_and_scaled_vertices = [[int(a) for a in b] for b in padded_and_scaled_vertices]
+
     if DEBUG:
         print("scale factor:", scale_factor)
-        print("padding:", padding)
+        print("padding:", scaled_padding)
         print("cropped and scaled vertices:\n",
               # (vertices + padding - reference_positions[0]) / scale_factor + reference_positions[0])
               # (vertices + padding) / scale_factor)
-              vertices / scale_factor + padding)
-    return scale_factor, padding
+              padded_and_scaled_vertices)
+    return scaled_padding, scale_factor, padded_and_scaled_vertices
 
 
 def crop_padding_(image, padding):
@@ -208,10 +213,10 @@ def get_references(vertices):
     for vertex_i in vertices:
         dx = vertex_i[0][0] - vertex_i[2][0]
         dy = vertex_i[2][1] - vertex_i[0][1]
-        if top_bottom_ref and dx > reference_position[0]:
-            reference_position = [dx, dy]
-        if not top_bottom_ref and dy > reference_position[1]:
-            reference_position = [dx, dy]
+        if dx > reference_position[0]:
+            reference_position[0] = dx
+        if dy > reference_position[1]:
+            reference_position[1] = dy
 
     # find reference size
     for vertex_i in vertices:
@@ -281,8 +286,8 @@ def get_intersection(lines):
             p2 = points[2].iloc[1]
             h2 = y2 - p2 * x2
 
-            x = (h2 - h1) / (p1 - p2)
-            y = p1 * x + h1
+            x = int((h2 - h1) / (p1 - p2))
+            y = int(p1 * x + h1)
             intersections.append([x, y])
 
     elif len(lines) == 2:
@@ -321,8 +326,6 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
             print("EXIT LOOP")
             return None
 
-        images.append(image)
-
         edges = get_three_color_edges(image, filename=filename_i, channel=message.channel)
         blur = cv2.GaussianBlur(edges, (15, 15), sigmaX=25)
         contour = select_contours(blur, filename_i)
@@ -330,7 +333,7 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
         vertices_i = compute_vertices(polygon)
         lines = get_lines([p[0] for p in polygon])
 
-        if lines is None:
+        if lines is None or len(lines) != 4:
             print("lines not detected for file:", filename_i)
             continue
 
@@ -339,13 +342,19 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
         if DEBUG:
             print()
             print("intersections:\n", intersections)
-            print("vertices:\n", vertices_i)
 
+        if len(intersections) != 2:
+            print("intersections not detected for file:", filename_i)
+            continue
         vertices_i = np.concatenate((vertices_i[0:2], intersections))
 
         if DEBUG:
             print("vertices after:\n", vertices_i)
+            for i in range(len(vertices_i)):
+                cv2.line(edges, vertices_i[i], vertices_i[(i + 1) % len(vertices_i)], (255, 255, 255), 2)
+            image_utils.save_image(edges, message.channel, filename_i, ImageOperation.DEBUG_VERTICES)
 
+        images.append(image)
         vertices.append(vertices_i)
 
     reference_position, reference_size = get_references(vertices)
@@ -353,13 +362,14 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
     for i in range(len(images)):
         image_i = images[i]
         vertices_i = vertices[i]
-        scale_factor, padding = get_transformation_dimensions(vertices_i, reference_position, reference_size)
+        transformation_dimensions = get_transformation_dimensions(vertices_i, reference_position, reference_size)
+        padding, scale_factor, padded_and_scaled = transformation_dimensions
 
         # print("pre-translation padding", reference_padding, np.flip(image_i.shape[0:2]))
         # print(np.flip(image.shape[0:2]),
         #       (image.shape[1] + reference_padding[0], image_i.shape[0] + reference_padding[1]))
 
-        cropped_image, padding = crop_padding(image_i, padding)
+        cropped_image, padding = crop_padding_(image_i, padding)
         scaled_image = scale_image(cropped_image, message.channel, scale_factor)
         oppacity = remove_clouds(scaled_image, message.channel)
 
@@ -475,3 +485,69 @@ def remove_clouds(img, channel, ouptut_prefix=None, ksize=31, sigma=25):
         cv2.imwrite(ouptut_prefix + '_correlation.png', blur)
         cv2.imwrite(ouptut_prefix + '_matches2.jpg', result)
     return mask
+
+
+def get_turn(image):
+    crop = image[:int(image.shape[0] / 6), :]
+    grayImage = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    (_, blackAndWhiteImage) = cv2.threshold(grayImage, 100, 255, cv2.THRESH_BINARY)
+    selected_image = blackAndWhiteImage
+    # map_text = pytesseract.image_to_string(selected_image, config='--oem 3 --psm 6').split("\n")
+
+    contours, _ = cv2.findContours(selected_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+    rows = {}
+    row_mins = {}
+    row_maxes = {}
+
+    for c in contours:
+        (y, x, h, w) = cv2.boundingRect(c)
+        if w > 10 and h > 10:
+            found_row = False
+            for i in rows.keys():
+                if not found_row:
+                    row_min_i = row_mins[i]
+                    row_max_i = row_maxes[i]
+                    if x >= row_min_i and x + w <= row_max_i:
+                        found_row = True
+                        rows[i] = rows[i] + [c]
+                    elif x >= row_min_i and x <= row_max_i and x + w >= row_max_i:
+                        row_max_i = x + w
+                        found_row = True
+                        rows[i] = rows[i] + [c]
+                    elif x <= row_min_i and x + w >= row_min_i and x + w <= row_max_i:
+                        row_min_i = x
+                        found_row = True
+                        rows[i] = rows[i] + [c]
+                    elif x <= row_min_i and x + w >= row_max_i:
+                        row_min_i = x
+                        row_max_i = x + w
+                        found_row = True
+                        rows[i] = rows[i] + [c]
+
+            if not found_row:
+                new_i = len(rows.keys())
+                rows[new_i] = [c]
+                row_mins[new_i] = x
+                row_maxes[new_i] = x + w
+
+    delta = 15
+    turn = None
+    for i in rows.keys():
+        row_min_i = max(row_mins[i] - delta, 0)
+        row_max_i = min(row_maxes[i] + delta, selected_image.shape[0])
+        row_image = selected_image[row_min_i:row_max_i]
+        cv2.imwrite("binary_%d.png" % i, row_image)
+        row_text = pytesseract.image_to_string(row_image, config='--psm 6')
+
+        cleared_row_text = row_text.replace("\n", "").replace("\x0c", "")
+        cleared_row_text = re.sub(r"[^a-zA-Z0-9 ]", "", cleared_row_text)
+        if 'Scores' not in cleared_row_text and 'Stars' not in cleared_row_text:
+            cleared_row_text_split = cleared_row_text.split(" ")
+            if len(cleared_row_text_split) > 2 and cleared_row_text_split[2].isnumeric():
+                turn = cleared_row_text_split[2]
+    if turn is None:
+        print("turn not recognised")
+    else:
+        print("turn %s" % turn)
+    return turn

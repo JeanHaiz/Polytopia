@@ -52,11 +52,11 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel.id};""").fetchall()
         return [dict(row) for row in result_proxy]
 
-    def add_score(self, channel, player_id, score):
+    def add_score(self, channel, player_id, score, turn):
         return self.engine.execute(
             f"""INSERT INTO game_player_scores
                 (channel_discord_id, discord_player_id, turn, score, confirmed)
-                VALUES ({channel.id}, {player_id or 'NULL'}, -1, {score}, false);""")
+                VALUES ({channel.id}, {player_id or 'NULL'}, {turn}, {score}, false);""")
 
     def get_channel_scores(self, channel_id):
         return self.engine.execute(
@@ -164,3 +164,16 @@ class DatabaseClient:
                 ON CONFLICT (discord_player_id) DO UPDATE
                 SET discord_player_name = '{str(discord_player_name)}',
                 polytopia_player_name = '{str(polytopia_player_name)}';""")
+
+    def get_last_turn(self, channel_id):
+        latest_turn = self.engine.execute(
+            f"""SELECT latest_turn FROM polytopia_game
+                WHERE channel_discord_id = {channel_id};""").fetchone()
+        if len(latest_turn) > 0:
+            return latest_turn[0]
+
+    def set_new_last_turn(self, channel_id, turn):
+        return self.engine.execute(
+            f"""UPDATE polytopia_game
+                SET latest_turn = {turn}
+                WHERE channel_discord_id = {channel_id};""")

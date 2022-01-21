@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS polytopia_game(
 	channel_discord_id BIGINT UNIQUE NOT NULL,
 	game_name VARCHAR(40),
 	n_players INT,
+	latest_turn INT DEFAULT -1,
 	PRIMARY KEY (channel_discord_id),
 	CONSTRAINT fk_server FOREIGN KEY (server_discord_id) REFERENCES discord_server(server_discord_id),
 	CONSTRAINT fk_channel FOREIGN KEY (channel_discord_id) REFERENCES discord_channel(channel_discord_id)
