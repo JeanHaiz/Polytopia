@@ -1,9 +1,10 @@
 from file_utils import getValues, getTechs, getTribes, getRuins, getPopulation, getCost
-from file_utils import MAX_CITY_LEVEL, dic, model, getTechList, name, getPastTurn, get, diff
+from file_utils import MAX_CITY_LEVEL, dic, model, getTechList, getPastTurn, get, diff, name
 
 
 # Add Temple score
 # Add Garden score
+killed = {}
 
 
 def buildCityConstrains(turn):
@@ -57,6 +58,9 @@ def buildUnitConstraints(turn):
                 model.Add(dic[past_turn + "_" + u] >= dic[turn + "_killed_" + u])
             else:
                 model.Add(dic[turn + "_trained_" + u] == 0)
+                model.Add(dic[turn + "_killed_" + u] == 0)
+        else:
+            if past_turn is None:
                 model.Add(dic[turn + "_killed_" + u] == 0)
     model.Add(
         sum(dic[turn + "_trained_" + u] for u in values['units'].keys() if u != 'giant') <= dic[turn + "_level-1"]
@@ -415,6 +419,14 @@ def buildTechPopConstraints(turn):
     )
 
 
+def buildKilledConstraints(turn):
+    for u in getValues()['units']:
+        if name(turn, u) in killed:
+            model.Add(dic[name(turn, "killed_" + u)] == killed[name(turn, u)])
+        else:
+            model.Add(dic[name(turn, "killed_" + u)] == 0)
+
+
 def buildCityUpgradeConstraints(turn):
 
     # diff city level with previous turn + capture == consequences for each level
@@ -457,9 +469,13 @@ def buildAllConstraints(turn):
     buildTechPopConstraints(turn)
     buildTechConstraints(turn)
     buildUnitConstraints(turn)
-
     buildStarConstraints(turn)
+
+    buildKilledConstraints(turn)
 
     for v in ['revealed']:
         model.Add(diff(turn, v) >= 0)
-    pass
+
+
+def setKilled(turn, unit, number):
+    killed[name(turn, unit)] = number

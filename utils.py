@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import re
 
 from file_utils import getValues, getTribes, getRuins
 from file_utils import MAX_CITY_LEVEL, dic, model, getTechList
@@ -166,3 +167,28 @@ def setObjective(turn):
     # min ruin events
     # min tribe meeting
     pass
+
+
+def printScenario(full_df):
+    regex = getScenarioRegex()
+    selected_columns = [u for u in full_df.columns if sum(re.search(r, u) is not None for r in regex) != 0]
+    # print(selected_columns)
+    df = full_df[selected_columns]
+    identical_columns = list(filter(lambda x: len(df[x].unique()) == 1, selected_columns))
+    different_columns = list(filter(lambda x: len(df[x].unique()) != 1, selected_columns))
+    turns = list(set(map(lambda u: u.split("_")[0], selected_columns)))
+    for turn_i in sorted(turns):
+        turn_string = ("Turn " + turn_i[1:] + ":" if turn_i.startswith("t") else "Start:")
+        print(turn_string)
+        print("  Common:")
+        for element in identical_columns:
+            # print(df[element].iloc[0])
+            if element.startswith(turn_i) and df[element].iloc[0] != 0:
+                print("   " + " ".join(element.split("_")[1:]) + ": " + str(df[element].iloc[0]))
+        if sum(e.startswith(turn_i) for e in different_columns) > 0:
+            for i, row in df.iterrows():
+                print(" Scenario " + str(i) + ":")
+                print("  Specific:")
+                for element in different_columns:
+                    if element.startswith(turn_i):
+                        print("   " + " ".join(element.split("_")[1:]) + ": " + str(row[element]))

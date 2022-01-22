@@ -12,7 +12,7 @@ def addVars(turn):
     for u in values['units'].keys():
         if u != 'giant':
             sym_dict[turn + "_trained_" + u] = model.NewIntVar(0, 20, turn + "_trained_" + u)
-            sym_dict[turn + "_killed_" + u] = model.NewIntVar(0, 20, turn + "_killed_" + u)
+        sym_dict[turn + "_killed_" + u] = model.NewIntVar(0, 20, turn + "_killed_" + u)
     sym_dict[turn + "_custom house"] = model.NewIntVar(0, 20, turn + "_custom house")
     return sym_dict
 
