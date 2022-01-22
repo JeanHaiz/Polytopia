@@ -5,6 +5,7 @@ services:
         build:
             context: ./database
             dockerfile: Dockerfile
+        restart: "always"
         ports:
             - 5432:5432
         environment:
@@ -22,6 +23,7 @@ services:
         build:
             context: "./python/"
             dockerfile: Dockerfile
+        restart: "always"
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/python:/app
         env_file:
