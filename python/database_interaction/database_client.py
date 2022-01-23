@@ -1,6 +1,7 @@
 import sqlalchemy
+import pandas as pd
 
-from common.image_utils import ImageOperation
+from common.image_utils import ImageOp
 
 
 class DatabaseClient:
@@ -10,8 +11,8 @@ class DatabaseClient:
         # db_url = 'postgresql://discordBot:password123@172.25.0.2:5432/polytopiaHelper_dev'
 
         self.database = database
-        database_url = f"""postgresql://{user}:{password}@{host}:{port}/{database}"""
-        self.engine = sqlalchemy.create_engine(database_url, echo=True)
+        self.database_url = f"""postgresql://{user}:{password}@{host}:{port}/{database}"""
+        self.engine = sqlalchemy.create_engine(self.database_url, echo=True)
 
     def is_channel_active(self, channel_id: int):
         is_active = self.engine.execute(
@@ -59,10 +60,13 @@ class DatabaseClient:
                 VALUES ({channel.id}, {player_id or 'NULL'}, {turn}, {score}, false);""")
 
     def get_channel_scores(self, channel_id):
-        return self.engine.execute(
+        scores = self.engine.execute(
             f"""SELECT discord_player_id, turn, score
                 FROM game_player_scores
-                WHERE channel_discord_id = {channel_id};""").fetchall()
+                WHERE channel_discord_id = {channel_id};""")
+        scores_df = pd.DataFrame(scores.fetchall())
+        scores_df.columns = scores.keys()
+        return scores_df
 
     def get_channel_scores_gb(self, channel_id):
         return self.engine.execute(
@@ -147,7 +151,7 @@ class DatabaseClient:
                 filename::text, author_id
                 FROM message_resources
                 WHERE source_channel_id = {channel.id}
-                AND operation = {ImageOperation.MAP_INPUT.value};""").fetchall()
+                AND operation = {ImageOp.MAP_INPUT.value};""").fetchall()
         print("pre filenames", filenames)
         return [dict(row)["filename"] for row in filenames]
 

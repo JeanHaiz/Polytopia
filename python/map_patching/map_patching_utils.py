@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from common import image_utils
-from common.image_utils import ImageOperation
+from common.image_utils import ImageOp
 from database_interaction import database_client
 
 DEBUG = 1
@@ -16,7 +16,7 @@ DEBUG = 1
 def get_one_color_edges(image, channel=None, filename=None, low=50, high=150):
     edges = cv2.Canny(image, low, high, apertureSize=3)
     if filename and channel:
-        image_utils.save_image(edges, channel, filename, ImageOperation.ONE_COLOR_EDGES)
+        image_utils.save_image(edges, channel.name, filename, ImageOp.ONE_COLOR_EDGES)
         # image_utils.write_img(edges, filename, 'one_colour_edges_%d_%d' % (low, high))
     return edges
 
@@ -32,12 +32,12 @@ def getLines(image, minLineLength=500, channel=None, filename=None):
         cv2.line(processed, (lines[i][0][0], lines[i][0][1]), (lines[i][0][2], lines[i][0][3]), (0, 0, 255), 3,
                  cv2.LINE_AA)
         if filename:
-            image_utils.save_image(image, channel, filename, ImageOperation.HOUGH_LINES)
+            image_utils.save_image(image, channel.name, filename, ImageOp.HOUGH_LINES)
             # image_utils.write_img(image, filename, "houghlines5")
     return processed
 
 
-def get_three_color_edges(image, channel=None, filename=None):
+def get_three_color_edges(image, channel_name=None, filename=None):
     img = cv2.copyMakeBorder(image, 50, 50, 50, 50, cv2.BORDER_CONSTANT)
 
     # Split out each channel
@@ -51,7 +51,7 @@ def get_three_color_edges(image, channel=None, filename=None):
     # Join edges back into image
     edges = blue_edges | green_edges | red_edges
     if filename is not None:
-        image_utils.save_image(edges, channel, filename, ImageOperation.THREE_COLOR_EDGES)
+        image_utils.save_image(edges, channel_name, filename, ImageOp.THREE_COLOR_EDGES)
         # image_utils.write_img(edges, filename, 'three_color_edges_200_250')
     return edges
 
@@ -75,7 +75,7 @@ def select_contours(image, filename=None):
 
 
 # image: edges
-def draw_contour(image, contour_, channel=None, epsilon=None, epsilonFactor=0.005, filename=None):
+def draw_contour(image, contour_, channel_name=None, epsilon=None, epsilonFactor=0.005, filename=None):
     processed = image.copy()
     mask = np.zeros(image.shape[:2], np.uint8)
 
@@ -98,12 +98,12 @@ def draw_contour(image, contour_, channel=None, epsilon=None, epsilonFactor=0.00
     if DEBUG:
         print("simplified contour has", len(approx), "points with epsilon=", epsilon)
 
-    if filename is not None and channel is not None:
+    if filename is not None and channel_name is not None:
         cv2.drawContours(processed, [approx], 0, (255, 255, 255), 3)
         cv2.drawContours(mask, [approx], -1, (255, 255, 255), -1)
 
-        image_utils.save_image(processed, channel, filename, ImageOperation.OVERLAY)
-        image_utils.save_image(mask, channel, filename, ImageOperation.MASK)
+        image_utils.save_image(processed, channel_name, filename, ImageOp.OVERLAY)
+        image_utils.save_image(mask, channel_name, filename, ImageOp.MASK)
         # image_utils.write_img(processed, filename, "overlay")
         # image_utils.write_img(mask, filename, "mask")
         if DEBUG:
@@ -160,6 +160,7 @@ def get_transformation_dimensions(vertices, reference_position, reference_size):
     padded_and_scaled_vertices = vertices / scale_factor + scaled_padding
     padded_and_scaled_vertices = [[int(a) for a in b] for b in padded_and_scaled_vertices]
 
+    # scaled_padding = np.flip(scaled_padding)
     if DEBUG:
         print("scale factor:", scale_factor)
         print("padding:", scaled_padding)
@@ -190,13 +191,13 @@ def crop_padding(image, padding):
     return image, padding
 
 
-def scale_image(image, channel, scale_factor, filename=None):
+def scale_image(image, channel_name, scale_factor, filename=None):
     new_dim = (int(image.shape[1] / scale_factor), int(image.shape[0] / scale_factor))
     # print("new dimenstion", new_dim, np.flip(image.shape))
     scaled_image = cv2.resize(image, new_dim, interpolation=cv2.INTER_AREA)
     # print("image shape", np.flip(scaled_bit.shape[0:2]), reference_padding)
-    if filename is not None:
-        image_utils.save_image(scaled_image, channel, filename, ImageOperation.SCALE)
+    if filename is not None and channel_name is not None:
+        image_utils.save_image(scaled_image, channel_name, filename, ImageOp.SCALE)
         # image_utils.write_img(scaled_image, filename, "position&scale")
     return scaled_image
 
@@ -297,8 +298,85 @@ def get_intersection(lines):
     return intersections
 
 
-async def patch_partial_maps(message, files, database_client: database_client.DatabaseClient):
+async def process_raw_map(filename_i, i, channel_name):
+    print("map_patching_utils", filename_i)
+    if i == 0:
+        image = image_utils.get_background_template()
+    else:
+        image = await image_utils.load_image(database_client, channel_name, None, filename_i, ImageOp.INPUT)
 
+    print("size for i", i, image.shape, type(image))
+    if image is None:
+        if DEBUG:
+            print("image not found:", filename_i)
+        print("EXIT LOOP")
+        return None
+
+    edges = get_three_color_edges(image, channel_name, filename_i)
+    blur = cv2.GaussianBlur(edges, (15, 15), sigmaX=25)
+    contour = select_contours(blur, filename_i)
+    polygon = draw_contour(edges, contour, channel_name, filename=filename_i)
+    vertices_i = compute_vertices(polygon)
+    lines = get_lines([p[0] for p in polygon])
+
+    if lines is None or len(lines) != 4:
+        print("lines not detected for file:", filename_i)
+        return
+
+    intersections = get_intersection(lines)
+
+    if DEBUG:
+        print()
+        print("intersections:\n", intersections)
+
+    if len(intersections) != 2:
+        print("intersections not detected for file:", filename_i)
+        return
+    vertices_i = np.concatenate((vertices_i[0:2], intersections))
+
+    if DEBUG:
+        print("vertices after:\n", vertices_i)
+        for i in range(len(vertices_i)):
+            cv2.line(edges, vertices_i[i], vertices_i[(i + 1) % len(vertices_i)], (255, 255, 255), 2)
+        image_utils.save_image(edges, channel_name, filename_i, ImageOp.DEBUG_VERTICES)
+    return image, vertices_i
+
+
+async def transform_image(image_i, vertices_i, reference_position, reference_size, channel_name):
+    transformation_dimensions = get_transformation_dimensions(vertices_i, reference_position, reference_size)
+    padding, scale_factor, padded_and_scaled = transformation_dimensions
+
+    # print("pre-translation padding", reference_padding, np.flip(image_i.shape[0:2]))
+    # print(np.flip(image.shape[0:2]),
+    #       (image.shape[1] + reference_padding[0], image_i.shape[0] + reference_padding[1]))
+
+    cropped_image, padding = crop_padding_(image_i, padding)
+    scaled_image = scale_image(cropped_image, channel_name, scale_factor)
+    oppacity = remove_clouds(scaled_image)
+
+    padding = np.flip(padding)
+
+    return scaled_image, oppacity, padding, scale_factor
+
+
+async def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
+    background = patch_work[
+        scaled_padding[0]:scaled_padding[0]+size[0],
+        scaled_padding[1]:scaled_padding[1]+size[1], :]
+    print(background.shape, oppacity.shape)
+    print("scaled_padding", scaled_padding)
+    print("size")
+    print("bit size", bit.shape)
+    if i == 0:
+        result = bit
+    else:
+        result = cv2.multiply(background, 1 - oppacity) + cv2.multiply(bit, oppacity)
+    # result = cv2.multiply(bit, oppacity)
+    patch_work[scaled_padding[0]:scaled_padding[0]+size[0], scaled_padding[1]:scaled_padding[1]+size[1], :] = result
+    return patch_work
+
+
+async def patch_partial_maps(channel_name, files, database_client: database_client.DatabaseClient = None, message=None):
     # reference_size = (2028, 1259)
     # reference_positions = [(1121 - 56, 274 - 221), (105 - 56, 880 - 221)]
 
@@ -315,45 +393,7 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
     scaled_vertices = []
 
     for i, filename_i in enumerate(files):
-        print("map_patching_utils", filename_i)
-        if i == 0:
-            image = image_utils.get_background_template()
-        else:
-            image = await image_utils.load_image(database_client, message, filename_i, image_utils.ImageOperation.INPUT)
-        if image is None:
-            if DEBUG:
-                print("image not found:", filename_i)
-            print("EXIT LOOP")
-            return None
-
-        edges = get_three_color_edges(image, filename=filename_i, channel=message.channel)
-        blur = cv2.GaussianBlur(edges, (15, 15), sigmaX=25)
-        contour = select_contours(blur, filename_i)
-        polygon = draw_contour(edges, contour, message.channel, filename=filename_i)
-        vertices_i = compute_vertices(polygon)
-        lines = get_lines([p[0] for p in polygon])
-
-        if lines is None or len(lines) != 4:
-            print("lines not detected for file:", filename_i)
-            continue
-
-        intersections = get_intersection(lines)
-
-        if DEBUG:
-            print()
-            print("intersections:\n", intersections)
-
-        if len(intersections) != 2:
-            print("intersections not detected for file:", filename_i)
-            continue
-        vertices_i = np.concatenate((vertices_i[0:2], intersections))
-
-        if DEBUG:
-            print("vertices after:\n", vertices_i)
-            for i in range(len(vertices_i)):
-                cv2.line(edges, vertices_i[i], vertices_i[(i + 1) % len(vertices_i)], (255, 255, 255), 2)
-            image_utils.save_image(edges, message.channel, filename_i, ImageOperation.DEBUG_VERTICES)
-
+        image, vertices_i = await process_raw_map(filename_i, i, channel_name)
         images.append(image)
         vertices.append(vertices_i)
 
@@ -362,33 +402,21 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
     for i in range(len(images)):
         image_i = images[i]
         vertices_i = vertices[i]
-        transformation_dimensions = get_transformation_dimensions(vertices_i, reference_position, reference_size)
-        padding, scale_factor, padded_and_scaled = transformation_dimensions
-
-        # print("pre-translation padding", reference_padding, np.flip(image_i.shape[0:2]))
-        # print(np.flip(image.shape[0:2]),
-        #       (image.shape[1] + reference_padding[0], image_i.shape[0] + reference_padding[1]))
-
-        cropped_image, padding = crop_padding_(image_i, padding)
-        scaled_image = scale_image(cropped_image, message.channel, scale_factor)
-        oppacity = remove_clouds(scaled_image, message.channel)
+        transformation = await transform_image(image_i, vertices_i, reference_position, reference_size, channel_name)
+        scaled_image, oppacity, padding, scale_factor = transformation
 
         transparency_masks.append(oppacity)
         bits.append(scaled_image)
-        # scaled_paddings.append((padding).astype(int))
         scaled_paddings.append(padding)
         scaled_vertices.append((vertices_i / scale_factor).tolist())
-        sizes.append(np.flip(scaled_image.shape[0:2]))
+        sizes.append(scaled_image.shape[0:2])
 
         print("sizes:", scaled_image.shape, oppacity.shape)
-
-        if DEBUG:
-            print()
 
     output_size = np.max(np.array(scaled_paddings) + np.array(sizes), axis=0)
     if DEBUG:
         print("output size:", output_size)
-    patch_work = np.zeros([output_size[1], output_size[0], 3], np.uint8)
+    patch_work = np.zeros([output_size[0], output_size[1], 3], np.uint8)
 
     for i in range(len(bits)):
         bit = bits[i]
@@ -397,22 +425,17 @@ async def patch_partial_maps(message, files, database_client: database_client.Da
         # scaled_padding = np.clip(scaled_padding, 0, None)
         size = sizes[i]
         oppacity = transparency_masks[i]
-        background = patch_work[
-            scaled_padding[1]:scaled_padding[1]+size[1],
-            scaled_padding[0]:scaled_padding[0]+size[0], :]
-        print(background.shape, oppacity.shape)
-        if i == 0:
-            result = bit
-        else:
-            result = cv2.multiply(background, 1 - oppacity) + cv2.multiply(bit, oppacity)
-        patch_work[scaled_padding[1]:scaled_padding[1]+size[1], scaled_padding[0]:scaled_padding[0]+size[0], :] = result
+        patch_work = await patch_output(patch_work, scaled_padding, oppacity, size, bit, i)
 
         if DEBUG:
             print(scaled_vertices)
             # image = cv2.polylines(patch_work, [scaled_vertices], True, (255, 255, 255), 10)
 
-    filename = database_client.add_resource(message, message.author, ImageOperation.MAP_PATCHING_OUTPUT)
-    file_path = image_utils.save_image(patch_work, message.channel, filename, ImageOperation.MAP_PATCHING_OUTPUT)
+    if message is not None and database_client is not None:
+        filename = database_client.add_resource(message, message.author, ImageOp.MAP_PATCHING_OUTPUT)
+        file_path = image_utils.save_image(patch_work, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)
+    else:
+        file_path = image_utils.save_image(patch_work, channel_name, 'map_patching_debug', ImageOp.MAP_PATCHING_OUTPUT)
     return file_path
 
 
@@ -426,7 +449,7 @@ def is_map_patching_request(message, attachment, filename):
     return "🖼️" in [r.emoji for r in message.reactions]
 
 
-def remove_clouds(img, channel, ouptut_prefix=None, ksize=31, sigma=25):
+def remove_clouds(img, ouptut_prefix=None, ksize=31, sigma=25):
     # read chessboard image
     # img = cv2.imread(image_path)
     img_alpha = np.ones((img.shape[0:2]))
@@ -474,7 +497,7 @@ def remove_clouds(img, channel, ouptut_prefix=None, ksize=31, sigma=25):
     mask = cv2.merge([img_alpha_c, img_alpha_c, img_alpha_c]).astype(np.uint8)
 
     if False:
-        image_utils.save_image(correlation_raw, channel)
+        # image_utils.save_image(correlation_raw, channel)
         cv2.imwrite(ouptut_prefix + '_correlation_3.png', correlation_raw)
         cv2.imwrite(ouptut_prefix + '_blur.jpg', blur_copy)
         cv2.imwrite(ouptut_prefix + '_correlation_2.png', corr_img)

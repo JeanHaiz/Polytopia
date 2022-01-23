@@ -22,11 +22,15 @@ There you go, the bot answers and is ready to serve.
 
 If the bot is not yet on your server, please reach out to JeanH#1394 on discord.
 
-## Functionalities:
+## Functionalities
+
+The beta program includes two main functionalities, map patching and score recognition. 
+
+Currently, the might game type in english language is supported. Additional game types and languages are not in the development plan.
 
 ### Map patching
 
-Polytopia helper allows you to patch screenshots of the polytopia game map to share get the full map view and share the point of view of your game mates. It will also recognise the score and use this information accross funtionalities
+Polytopia helper allows you to patch screenshots of the polytopia game map to share get the full map view and share the point of view of your game mates. It will also recognise the score and use this information accross funtionalities.
 
 For now, the patching works best with clear maps:
 - Either the top and bottom or left and right corners of the map are visible

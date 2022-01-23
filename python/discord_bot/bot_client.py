@@ -7,6 +7,7 @@ from discord_bot import bot_utils
 from database_interaction.database_client import DatabaseClient
 from common import image_utils
 from common.logger_utils import logger
+from common.image_utils import ImageOp
 
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
 
@@ -37,8 +38,8 @@ async def on_message(message):
         is_active = database_client.is_channel_active(message.channel.id)
         if is_active:
             for i, attachment in enumerate(message.attachments):
-                filename = database_client.add_resource(message, message.author, image_utils.ImageOperation.INPUT, i)
-                await image_utils.save_attachment(attachment, message, image_utils.ImageOperation.INPUT, filename)
+                filename = database_client.add_resource(message, message.author, ImageOp.INPUT, i)
+                await image_utils.save_attachment(attachment, message.channel.name, ImageOp.INPUT, filename)
                 print("attachment saved", filename)
                 if message.reactions is not None and len(message.reactions) > 0:
                     await bot_utils.reaction_message_routine(message, filename)
@@ -56,7 +57,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
 async def on_raw_reaction_remove(payload: discord.RawReactionActionEvent):
     is_active = database_client.is_channel_active(payload.channel_id)
     if is_active:
-        bot_utils.reaction_removed_routine(payload, bot_client, database_client)
+        await bot_utils.reaction_removed_routine(payload, bot_client, database_client)
 
 
 @bot_client.command()
@@ -117,3 +118,9 @@ async def set_self_discord_name(ctx, polytopia_name):
 async def get_channel_scores(ctx):
     scores = database_client.get_channel_scores(ctx.channel.id)
     await ctx.send(str(scores))
+
+
+@bot_client.command(name="turn")
+async def set_turn(ctx, turn):
+    database_client.set_new_last_turn(ctx.channel.id, turn)
+    await ctx.send("current turn is now %s" % str(turn))

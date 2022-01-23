@@ -41,12 +41,13 @@ def crop(image):
 
 def get_scores(image, only_you=False):
     logger.debug("read image scores")
-    logger.debug(read(image))
-    image_text = read(image).replace("¢", "c").split('\n')
-    # print("image text", only_you, image_text)
+    image_reading = read(image)
+    logger.debug("image reading: %s" % image_reading)
+    image_text = image_reading.replace("¢", "c").split('\n')
+    print("image text", only_you, image_text)
     scores = [read_line(t) for t in image_text if "score" in t and (not only_you or "Ruled by you" in t)]
     logger.debug(scores)
-    print(scores)
+    print("scores", only_you, scores)
     return scores
 
 

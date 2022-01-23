@@ -18,7 +18,7 @@ OUTPUT_ROOT = os.path.join(REPO_ROOT, "output")
 # os.makedirs(OUTPUT_ROOT, exist_ok=True)
 
 
-class ImageOperation(Enum):
+class ImageOp(Enum):
     NONE = 0
     INPUT = 1
     DEBUG_VERTICES = 2
@@ -34,17 +34,17 @@ class ImageOperation(Enum):
     MAP_INPUT = 2048
 
 
-async def load_image(database_client, message, filename, operation):
+async def load_image(database_client, channel_name, message, filename, operation):
     # build path from parent directory
     # filename = database_client.get_resource_filename(message, operation)
-    file_path = __get_file_path(message.channel, operation, filename)
+    file_path = __get_file_path(channel_name, operation, filename)
     image = cv2.imread(file_path)
-    if image is None:
+    if image is None and message is not None:
         print("None image (%s): %s" % (operation, file_path))
-        if operation == ImageOperation.INPUT:
+        if operation == ImageOp.INPUT:
             print("reload image")
             resource_number = database_client.get_resource_number(filename)
-            await save_attachment(message.attachments[resource_number], message, operation, filename)
+            await save_attachment(message.attachments[resource_number], channel_name, operation, filename)
             print("image saved", file_path)
             image = cv2.imread(file_path)
     else:
@@ -52,16 +52,16 @@ async def load_image(database_client, message, filename, operation):
     return image
 
 
-async def save_attachment(attachment, message, operation, filename, allow_retry=True):
-    parent_path = __get_parent_path(message.channel, operation)
+async def save_attachment(attachment, channel_name, operation, filename, allow_retry=True):
+    parent_path = __get_parent_path(channel_name, operation)
     os.makedirs(parent_path, exist_ok=True)
-    file_path = __get_file_path(message.channel, operation, filename)
+    file_path = __get_file_path(channel_name, operation, filename)
     try:
         await attachment.save(file_path)
     except:
         if allow_retry:
             time.sleep(3)
-            save_attachment(attachment, message, operation, filename, False)
+            await save_attachment(attachment, channel_name, operation, filename, False)
         else:
             logger.error(sys.exc_info()[0])
 
@@ -80,19 +80,27 @@ def load_attachment(file_path, filename):
     return attachment
 
 
-def save_image(image, channel, filename, operation):
-    parent_path = __get_parent_path(channel, operation)
+def save_image(image, channel_name, filename, operation):
+    parent_path = __get_parent_path(channel_name, operation)
     os.makedirs(parent_path, exist_ok=True)
-    file_path = __get_file_path(channel, operation, filename)
+    file_path = __get_file_path(channel_name, operation, filename)
     logger.debug("writing image: %s" % file_path)
     cv2.imwrite(file_path, image)
     return file_path
 
 
 def move_input_image(channel, filename, target_operation):
-    file_path = __get_file_path(channel, ImageOperation.INPUT, filename)
+    file_path = __get_file_path(channel.name, ImageOp.INPUT, filename)
     image = cv2.imread(file_path)
-    save_image(image, channel, filename, target_operation)
+    if image is not None:
+        return save_image(image, channel.name, filename, target_operation)
+
+
+def move_back_input_image(channel, filename, source_operation):
+    file_path = __get_file_path(channel.name, source_operation, filename)
+    image = cv2.imread(file_path)
+    if image is not None:
+        return save_image(image, channel.name, filename, ImageOp.INPUT)
 
 
 def __read_img(filename):
@@ -109,12 +117,12 @@ def __get_path(filename):
     return os.path.join(INPUT_ROOT, filename)
 
 
-def __get_parent_path(channel, operation):
-    return os.path.join(REPO_ROOT, "resources", channel.name, operation.name)
+def __get_parent_path(channel_name, operation):
+    return os.path.join(REPO_ROOT, "resources", channel_name, operation.name)
 
 
-def __get_file_path(channel, operation, filename):
-    return os.path.join(__get_parent_path(channel, operation), filename + ".png")
+def __get_file_path(channel_name, operation, filename):
+    return os.path.join(__get_parent_path(channel_name, operation), filename + ".png")
 
 
 def __get_template(template):
@@ -126,4 +134,4 @@ def get_cloud_template():
 
 
 def get_background_template():
-    return __get_template("image32.png")[:, :, 0:3]
+    return __get_template("background_template_196.png")[:, :, 0:3]
