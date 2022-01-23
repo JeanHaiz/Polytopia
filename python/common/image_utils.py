@@ -39,9 +39,9 @@ async def load_image(database_client, channel_name, message, filename, operation
     # filename = database_client.get_resource_filename(message, operation)
     file_path = __get_file_path(channel_name, operation, filename)
     image = cv2.imread(file_path)
-    if image is None and message is not None:
+    if image is None:
         print("None image (%s): %s" % (operation, file_path))
-        if operation == ImageOp.INPUT:
+        if operation == ImageOp.INPUT and message is not None:
             print("reload image")
             resource_number = database_client.get_resource_number(filename)
             await save_attachment(message.attachments[resource_number], channel_name, operation, filename)
