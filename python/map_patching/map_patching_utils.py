@@ -306,12 +306,12 @@ def get_orientation(vertices):
     return True
 
 
-async def process_raw_map(filename_i, i, channel_name, map_size):
+async def process_raw_map(filename_i, i, channel_name, map_size, database_client, message=None):
     print("map_patching_utils", filename_i)
     if i == 0:
         image = image_utils.get_background_template(map_size)
     else:
-        image = await image_utils.load_image(database_client, channel_name, None, filename_i, ImageOp.INPUT)
+        image = await image_utils.load_image(database_client, channel_name, message, filename_i, ImageOp.INPUT)
 
     print("size for i", i, image.shape, type(image))
     if image is None:
@@ -415,7 +415,8 @@ async def patch_partial_maps(
     scaled_vertices = []
 
     for i, filename_i in enumerate(files):
-        image, vertices_i, is_vertical_i = await process_raw_map(filename_i, i, channel_name, map_size)
+        image, vertices_i, is_vertical_i = await process_raw_map(
+            filename_i, i, channel_name, map_size, database_client, message)
         images.append(image)
         vertices.append(vertices_i)
         vertical.append(is_vertical_i)
@@ -425,8 +426,9 @@ async def patch_partial_maps(
     for i in range(len(images)):
         image_i = images[i]
         vertices_i = vertices[i]
-        is_vertical_id = vertical[i]
-        transformation = await transform_image(image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name)
+        is_vertical_i = vertical[i]
+        transformation = await transform_image(
+            image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name)
         scaled_image, oppacity, padding, scale_factor, padded_and_scaled = transformation
 
         transparency_masks.append(oppacity)

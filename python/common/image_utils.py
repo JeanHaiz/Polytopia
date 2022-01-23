@@ -47,6 +47,8 @@ async def load_image(database_client, channel_name, message, filename, operation
             await save_attachment(message.attachments[resource_number], channel_name, operation, filename)
             print("image saved", file_path)
             image = cv2.imread(file_path)
+        if image is None:
+            return
     else:
         print("Image valid", len(image))
     return image
