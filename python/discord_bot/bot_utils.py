@@ -55,7 +55,7 @@ async def map_patching_routine(database_client: DatabaseClient, attachment, mess
     print("files_log %s" % str(files))
     logger.debug("files_log %s" % str(files))
     image = await image_utils.load_image(database_client, channel_name, message, filename, ImageOp.INPUT)
-    turn = map_patching_utils.get_turn(image)
+    turn = map_patching_utils.get_turn(image, channel_name)
     last_turn = database_client.get_last_turn(message.channel.id)
     if turn is None:
         turn = last_turn
@@ -99,7 +99,8 @@ async def reaction_removed_routine(payload, bot_client, database_client: Databas
         channel = bot_client.get_channel(payload.channel_id)
         message = await channel.fetch_message(payload.message_id)
         filename = database_client.get_resource_filename(message, source_operation, 0)
-        image_utils.move_back_input_image(message.channel, filename, source_operation)
+        if filename is not None:
+            image_utils.move_back_input_image(message.channel, filename, source_operation)
         # database_client.remove_resource(payload.message_id)
 
 

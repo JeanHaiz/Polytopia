@@ -172,13 +172,15 @@ def get_transformation_dimensions(vertices, is_vertical, reference_position, ref
     return scaled_padding, scale_factor, padded_and_scaled_vertices
 
 
-def crop_padding_(image, padding):
+def crop_padding_(image, padding, filename, channel_name):
     if padding[0] < 0:
         image = image[:, -padding[0]:]
         padding[0] = 0
     if padding[1] < 0:
         image = image[-padding[1]:, :]
         padding[1] = 0
+    if filename is not None and channel_name is not None:
+        image_utils.save_image(image, channel_name, filename, ImageOp.PADDING)
     return image, padding
 
 
@@ -199,7 +201,6 @@ def scale_image(image, channel_name, scale_factor, filename=None):
     # print("image shape", np.flip(scaled_bit.shape[0:2]), reference_padding)
     if filename is not None and channel_name is not None:
         image_utils.save_image(scaled_image, channel_name, filename, ImageOp.SCALE)
-        # image_utils.write_img(scaled_image, filename, "position&scale")
     return scaled_image
 
 
@@ -341,6 +342,7 @@ async def process_raw_map(filename_i, i, channel_name, map_size, database_client
     if len(intersections) != 2:
         print("intersections not detected for file:", filename_i)
         return
+
     if is_vertical_i:
         vertices_i = np.concatenate((vertices_i[0:2], intersections))
     else:
@@ -357,7 +359,8 @@ async def process_raw_map(filename_i, i, channel_name, map_size, database_client
     return image, vertices_i, is_vertical_i
 
 
-async def transform_image(image_i, vertices_i, is_vertical, reference_position, reference_size, channel_name):
+async def transform_image(
+        image_i, vertices_i, is_vertical, reference_position, reference_size, channel_name, filename_i):
     transformation_dimensions = get_transformation_dimensions(
         vertices_i, is_vertical, reference_position, reference_size)
     padding, scale_factor, padded_and_scaled = transformation_dimensions
@@ -366,13 +369,13 @@ async def transform_image(image_i, vertices_i, is_vertical, reference_position, 
     # print(np.flip(image.shape[0:2]),
     #       (image.shape[1] + reference_padding[0], image_i.shape[0] + reference_padding[1]))
 
-    cropped_image, padding = crop_padding_(image_i, padding)
-    scaled_image = scale_image(cropped_image, channel_name, scale_factor)
-    oppacity = remove_clouds(scaled_image)
+    scaled_image = scale_image(image_i, channel_name, scale_factor, filename_i)
+    cropped_image, padding = crop_padding_(scaled_image, padding, filename_i, channel_name)
+    oppacity = remove_clouds(cropped_image)
 
     padding = np.flip(padding)
 
-    return scaled_image, oppacity, padding, scale_factor, padded_and_scaled
+    return cropped_image, oppacity, padding, scale_factor, padded_and_scaled
 
 
 async def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
@@ -381,7 +384,7 @@ async def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
         scaled_padding[1]:scaled_padding[1]+size[1], :]
     print(background.shape, oppacity.shape)
     print("scaled_padding", scaled_padding)
-    print("size")
+    print("size", size)
     print("bit size", bit.shape)
     if i == 0:
         result = bit
@@ -428,7 +431,7 @@ async def patch_partial_maps(
         vertices_i = vertices[i]
         is_vertical_i = vertical[i]
         transformation = await transform_image(
-            image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name)
+            image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name, filename_i)
         scaled_image, oppacity, padding, scale_factor, padded_and_scaled = transformation
 
         transparency_masks.append(oppacity)
@@ -547,7 +550,7 @@ def remove_clouds(img, ouptut_prefix=None, ksize=31, sigma=25):
     return mask
 
 
-def get_turn(image):
+def get_turn(image, channel_name):
     crop = image[:int(image.shape[0] / 6), :]
     grayImage = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     (_, blackAndWhiteImage) = cv2.threshold(grayImage, 100, 255, cv2.THRESH_BINARY)
@@ -597,7 +600,7 @@ def get_turn(image):
         row_min_i = max(row_mins[i] - delta, 0)
         row_max_i = min(row_maxes[i] + delta, selected_image.shape[0])
         row_image = selected_image[row_min_i:row_max_i]
-        cv2.imwrite("binary_%d.png" % i, row_image)
+        image_utils.save_image(row_image, channel_name, "binary_%d" % i, ImageOp.TURN_PIECES)
         row_text = pytesseract.image_to_string(row_image, config='--psm 6')
 
         cleared_row_text = row_text.replace("\n", "").replace("\x0c", "")

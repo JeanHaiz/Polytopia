@@ -32,6 +32,8 @@ class ImageOp(Enum):
     SCALE = 512
     SCORE_INPUT = 1024
     MAP_INPUT = 2048
+    PADDING = 4096
+    TURN_PIECES = 8192
 
 
 async def load_image(database_client, channel_name, message, filename, operation):

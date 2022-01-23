@@ -17,6 +17,7 @@ Activating the bot is very straightforward:
 1. Select the channel where the bot will support you
 2. Add the `polytopia-helper` bot to the channel
 3. Run `:activate`
+1. Run `:size 400` with the size of the map for the specific game
 
 There you go, the bot answers and is ready to serve.
 
@@ -66,3 +67,6 @@ We are actively improving the bot as you read this message, and you can expect t
 To vote on the most desired functionality, checkout the functionality improvement channel: #polytopia-helper-voting
 
 To post your ideas for new functionalities, join #polytopia-helper-feedback
+
+
+https://discord.com/oauth2/authorize?scope=bot&permissions=2147609664&client_id=918189457893621760
