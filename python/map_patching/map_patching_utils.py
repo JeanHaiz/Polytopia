@@ -62,7 +62,7 @@ def select_contours(image, filename=None):
 
     keepers = []
 
-    for index_, contour_ in enumerate(contours):
+    for contour_ in contours:
 
         x, y, w, h = cv2.boundingRect(contour_)
 
@@ -134,16 +134,17 @@ def compute_vertices(c):
     return np.array([up, down, left, right])
 
 
-def get_transformation_dimensions(vertices, reference_position, reference_size):
+def get_transformation_dimensions(vertices, is_vertical, reference_position, reference_size):
 
-    ratio = reference_size[0] / reference_size[1]  # width / heigth = 1.6108...
+    # ratio = reference_size[0] / reference_size[1]  # width / heigth = 1.6108...
 
     d_h = vertices[1][1] - vertices[0][1]
     d_w = vertices[3][0] - vertices[2][0]
 
     # print(i, "%.2f" % (d_w / d_h), estimated_size)
 
-    if d_w / d_h < ratio:  # smaller width or larger height proportionally
+    # print("here", d_w / d_h < ratio, d_w, d_h, ratio)
+    if is_vertical:  # d_w / d_h < ratio:  # smaller width or larger height proportionally
         # missing width; scale on height
         scale_factor = d_h / reference_size[1]  # then divide by scale factor to find right size
         scaled_padding = [
@@ -298,6 +299,13 @@ def get_intersection(lines):
     return intersections
 
 
+def get_orientation(vertices):
+    d_h = vertices[1][1] - vertices[0][1]
+    d_w = vertices[3][0] - vertices[2][0]
+    print("orientation", d_w / d_h < 2, d_w / d_h)
+    return True
+
+
 async def process_raw_map(filename_i, i, channel_name, map_size):
     print("map_patching_utils", filename_i)
     if i == 0:
@@ -317,6 +325,7 @@ async def process_raw_map(filename_i, i, channel_name, map_size):
     contour = select_contours(blur, filename_i)
     polygon = draw_contour(edges, contour, channel_name, filename=filename_i)
     vertices_i = compute_vertices(polygon)
+    is_vertical_i = get_orientation(vertices_i)
     lines = get_lines([p[0] for p in polygon])
 
     if lines is None or len(lines) != 4:
@@ -332,18 +341,25 @@ async def process_raw_map(filename_i, i, channel_name, map_size):
     if len(intersections) != 2:
         print("intersections not detected for file:", filename_i)
         return
-    vertices_i = np.concatenate((vertices_i[0:2], intersections))
+    if is_vertical_i:
+        vertices_i = np.concatenate((vertices_i[0:2], intersections))
+    else:
+        vertices_i = np.concatenate((intersections, vertices_i[2:4]))
 
     if DEBUG:
         print("vertices after:\n", vertices_i)
-        for i in range(len(vertices_i)):
-            cv2.line(edges, vertices_i[i], vertices_i[(i + 1) % len(vertices_i)], (255, 255, 255), 2)
+        print_vertices = [vertices_i[0], vertices_i[3], vertices_i[1], vertices_i[2], vertices_i[0]]
+        for i in range(len(print_vertices) - 1):
+            cv2.line(edges, print_vertices[i], print_vertices[i + 1], (255, 255, 255), 2)
+            cv2.putText(edges, "%s" % (i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6, 
+                        (255, 255, 255), 3, cv2.LINE_AA)
         image_utils.save_image(edges, channel_name, filename_i, ImageOp.DEBUG_VERTICES)
-    return image, vertices_i
+    return image, vertices_i, is_vertical_i
 
 
-async def transform_image(image_i, vertices_i, reference_position, reference_size, channel_name):
-    transformation_dimensions = get_transformation_dimensions(vertices_i, reference_position, reference_size)
+async def transform_image(image_i, vertices_i, is_vertical, reference_position, reference_size, channel_name):
+    transformation_dimensions = get_transformation_dimensions(
+        vertices_i, is_vertical, reference_position, reference_size)
     padding, scale_factor, padded_and_scaled = transformation_dimensions
 
     # print("pre-translation padding", reference_padding, np.flip(image_i.shape[0:2]))
@@ -356,7 +372,7 @@ async def transform_image(image_i, vertices_i, reference_position, reference_siz
 
     padding = np.flip(padding)
 
-    return scaled_image, oppacity, padding, scale_factor
+    return scaled_image, oppacity, padding, scale_factor, padded_and_scaled
 
 
 async def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
@@ -390,6 +406,7 @@ async def patch_partial_maps(
     files.insert(0, "background")
 
     vertices = []
+    vertical = []
     bits = []
     transparency_masks = []
     scaled_paddings = []
@@ -398,22 +415,25 @@ async def patch_partial_maps(
     scaled_vertices = []
 
     for i, filename_i in enumerate(files):
-        image, vertices_i = await process_raw_map(filename_i, i, channel_name, map_size)
+        image, vertices_i, is_vertical_i = await process_raw_map(filename_i, i, channel_name, map_size)
         images.append(image)
         vertices.append(vertices_i)
+        vertical.append(is_vertical_i)
 
     reference_position, reference_size = get_references(vertices)
 
     for i in range(len(images)):
         image_i = images[i]
         vertices_i = vertices[i]
-        transformation = await transform_image(image_i, vertices_i, reference_position, reference_size, channel_name)
-        scaled_image, oppacity, padding, scale_factor = transformation
+        is_vertical_id = vertical[i]
+        transformation = await transform_image(image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name)
+        scaled_image, oppacity, padding, scale_factor, padded_and_scaled = transformation
 
         transparency_masks.append(oppacity)
         bits.append(scaled_image)
         scaled_paddings.append(padding)
-        scaled_vertices.append((vertices_i / scale_factor).tolist())
+        scaled_vertices.append(padded_and_scaled)
+        # scaled_vertices.append([[int(a) for a in b] for b in (vertices_i / scale_factor).tolist()])
         sizes.append(scaled_image.shape[0:2])
 
         print("sizes:", scaled_image.shape, oppacity.shape)
@@ -432,9 +452,19 @@ async def patch_partial_maps(
         oppacity = transparency_masks[i]
         patch_work = await patch_output(patch_work, scaled_padding, oppacity, size, bit, i)
 
-        if DEBUG:
-            print(scaled_vertices)
-            # image = cv2.polylines(patch_work, [scaled_vertices], True, (255, 255, 255), 10)
+    if DEBUG:
+        print(scaled_vertices)
+        vertex_lines = np.zeros_like(patch_work)
+        for j, vertices in enumerate(scaled_vertices):
+            print_vertices = [vertices[0], vertices[3], vertices[1], vertices[2], vertices[0]]
+            for i in range(len(print_vertices) - 1):
+                cv2.line(vertex_lines, print_vertices[i], print_vertices[i + 1], (255, 255, 255), 2)
+                cv2.putText(vertex_lines, "%s, %s" % (j, i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6, 
+                            (255, 255, 255), 3, cv2.LINE_AA)
+
+                # cv2.line(patch_work, vertices[i], vertices[i+1])
+                # image = cv2.polylines(patch_work, [scaled_vertices], True, (255, 255, 255), 10)
+        image_utils.save_image(vertex_lines, channel_name, 'map_patching_debut', ImageOp.DEBUG_VERTICES)
 
     if message is not None and database_client is not None:
         filename = database_client.add_resource(message, message.author, ImageOp.MAP_PATCHING_OUTPUT)
