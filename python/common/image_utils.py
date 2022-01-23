@@ -133,5 +133,7 @@ def get_cloud_template():
     return __get_template("cloud_template.png")
 
 
-def get_background_template():
-    return __get_template("background_template_196.png")[:, :, 0:3]
+def get_background_template(map_size: str):
+    if map_size == "0":
+        map_size = "400"
+    return __get_template("background_template_%s.png" % map_size)[:, :, 0:3]

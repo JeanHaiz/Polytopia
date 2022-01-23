@@ -124,3 +124,12 @@ async def get_channel_scores(ctx):
 async def set_turn(ctx, turn):
     database_client.set_new_last_turn(ctx.channel.id, turn)
     await ctx.send("current turn is now %s" % str(turn))
+
+
+@bot_client.command(name="size")
+async def set_map_size(ctx, size):
+    if size.isnumeric() and int(size) in [121, 196, 256, 324, 400, 900]:
+        database_client.set_game_map_size(ctx.channel.id, int(size))
+        await ctx.send("current map size now is %s" % size)
+    else:
+        await ctx.send("map size not recognised")

@@ -61,7 +61,10 @@ async def map_patching_routine(database_client: DatabaseClient, attachment, mess
         turn = last_turn
     elif last_turn is None or int(last_turn) < int(turn):
         database_client.set_new_last_turn(message.channel.id, turn)
-    output_file_path = await map_patching_utils.patch_partial_maps(channel_name, files, database_client, message)
+
+    map_size = database_client.get_game_map_size(message.channel.id)
+    output_file_path = await map_patching_utils.patch_partial_maps(
+        channel_name, files, map_size, database_client, message)
     if output_file_path is not None:
         return turn, image_utils.load_attachment(output_file_path, filename)
 

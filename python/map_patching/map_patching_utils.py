@@ -298,10 +298,10 @@ def get_intersection(lines):
     return intersections
 
 
-async def process_raw_map(filename_i, i, channel_name):
+async def process_raw_map(filename_i, i, channel_name, map_size):
     print("map_patching_utils", filename_i)
     if i == 0:
-        image = image_utils.get_background_template()
+        image = image_utils.get_background_template(map_size)
     else:
         image = await image_utils.load_image(database_client, channel_name, None, filename_i, ImageOp.INPUT)
 
@@ -376,7 +376,12 @@ async def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
     return patch_work
 
 
-async def patch_partial_maps(channel_name, files, database_client: database_client.DatabaseClient = None, message=None):
+async def patch_partial_maps(
+        channel_name: str,
+        files: list,
+        map_size: str,
+        database_client: database_client.DatabaseClient = None,
+        message=None):
     # reference_size = (2028, 1259)
     # reference_positions = [(1121 - 56, 274 - 221), (105 - 56, 880 - 221)]
 
@@ -393,7 +398,7 @@ async def patch_partial_maps(channel_name, files, database_client: database_clie
     scaled_vertices = []
 
     for i, filename_i in enumerate(files):
-        image, vertices_i = await process_raw_map(filename_i, i, channel_name)
+        image, vertices_i = await process_raw_map(filename_i, i, channel_name, map_size)
         images.append(image)
         vertices.append(vertices_i)
 

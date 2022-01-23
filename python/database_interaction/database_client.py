@@ -142,7 +142,7 @@ class DatabaseClient:
                 AND source_message_id = {message.id}
                 AND resource_number = {resource_number}
                 AND operation = {operation.value};""").fetchone()
-        if len(filename) > 0:
+        if filename is not None and len(filename) > 0:
             return filename[0]
 
     def get_map_patching_files(self, channel):
@@ -180,4 +180,17 @@ class DatabaseClient:
         return self.engine.execute(
             f"""UPDATE polytopia_game
                 SET latest_turn = {turn}
+                WHERE channel_discord_id = {channel_id};""")
+
+    def get_game_map_size(self, channel_id):
+        map_size = self.engine.execute(
+            f"""SELECT map_size FROM polytopia_game
+                WHERE channel_discord_id = {channel_id};""").fetchone()
+        if len(map_size) > 0:
+            return map_size[0]
+
+    def set_game_map_size(self, channel_id, size):
+        return self.engine.execute(
+            f"""UPDATE polytopia_game
+                SET map_size = {size}
                 WHERE channel_discord_id = {channel_id};""")
