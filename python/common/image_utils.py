@@ -34,6 +34,7 @@ class ImageOp(Enum):
     MAP_INPUT = 2048
     PADDING = 4096
     TURN_PIECES = 8192
+    SCORE_PLT = 16384
 
 
 async def load_image(database_client, channel_name, message, filename, operation):
@@ -142,3 +143,9 @@ def get_background_template(map_size: str):
     if map_size is None or map_size == "0":
         map_size = "400"
     return __get_template("background_template_%s.png" % map_size)[:, :, 0:3]
+
+
+def get_plt_path(channel_name, filename):
+    parent_path = __get_parent_path(channel_name, ImageOp.SCORE_PLT)
+    file_path = __get_file_path(channel_name, ImageOp.SCORE_PLT, filename)
+    return parent_path, file_path

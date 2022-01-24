@@ -8,6 +8,7 @@ from database_interaction.database_client import DatabaseClient
 from common import image_utils
 from common.logger_utils import logger
 from common.image_utils import ImageOp
+from score_recognition import score_visualisation
 
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
 
@@ -117,19 +118,32 @@ async def set_self_discord_name(ctx, polytopia_name):
 @bot_client.command(name="scores")
 async def get_channel_scores(ctx):
     scores = database_client.get_channel_scores(ctx.channel.id)
-    await ctx.send(str(scores))
+    if scores is not None:
+        scores = scores[scores['turn'] != -1]
+        score_plt = score_visualisation.plotScores(scores, ctx.channel.name, str(ctx.message.id))
+        await ctx.message.channel.send(file=score_plt, content="score recognition")
+        await ctx.send(str(scores))
+    else:
+        await ctx.send("No score found")
 
 
 @bot_client.command(name="turn")
 async def set_turn(ctx, turn):
+    database_client.add_player_n_game(ctx.message, ctx.author)
     database_client.set_new_last_turn(ctx.channel.id, turn)
     await ctx.send("current turn is now %s" % str(turn))
 
 
 @bot_client.command(name="size")
 async def set_map_size(ctx, size):
+    database_client.add_player_n_game(ctx.message, ctx.author)
     if size.isnumeric() and int(size) in [121, 196, 256, 324, 400, 900]:
         database_client.set_game_map_size(ctx.channel.id, int(size))
         await ctx.send("current map size now is %s" % size)
     else:
         await ctx.send("map size not recognised")
+
+
+@bot_client.command(name="drop")
+async def drop_score(ctx, turn):
+    database_client.drop_score(ctx.channel.id, turn)

@@ -61,12 +61,17 @@ class DatabaseClient:
 
     def get_channel_scores(self, channel_id):
         scores = self.engine.execute(
-            f"""SELECT discord_player_id, turn, score
+            f"""SELECT discord_player_name, turn, score
                 FROM game_player_scores
-                WHERE channel_discord_id = {channel_id};""")
-        scores_df = pd.DataFrame(scores.fetchall())
-        scores_df.columns = scores.keys()
-        return scores_df
+                LEFT JOIN polytopia_player
+                ON game_player_scores.discord_player_id = polytopia_player.discord_player_id
+                WHERE channel_discord_id = {channel_id}
+                ORDER BY turn ASC;""")
+        score_entries = scores.fetchall()
+        if score_entries is not None and len(score_entries) > 0:
+            scores_df = pd.DataFrame(score_entries)
+            scores_df.columns = scores.keys()
+            return scores_df
 
     def get_channel_scores_gb(self, channel_id):
         return self.engine.execute(
@@ -89,24 +94,9 @@ class DatabaseClient:
         return [f[0] for f in filenames]
 
     def add_resource(self, message, author, operation, resource_number=0):
+        self.add_player_n_game(message, author)
         filename = self.engine.execute(
-            f"""INSERT INTO polytopia_player
-                (discord_player_id, discord_player_name)
-                VALUES ({author.id}, '{str(author.name)}')
-                ON CONFLICT (discord_player_id) DO UPDATE
-                SET discord_player_name = '{author.name}';
-
-                INSERT INTO polytopia_game
-                (server_discord_id, channel_discord_id)
-                VALUES ({message.guild.id}, {message.channel.id})
-                ON CONFLICT (channel_discord_id) DO NOTHING;
-
-                INSERT INTO game_players
-                (discord_player_id, channel_discord_id, is_alive)
-                VALUES ({author.id}, {message.channel.id}, true)
-                ON CONFLICT (discord_player_id, channel_discord_id) DO NOTHING;
-
-                INSERT INTO message_resources
+            f"""INSERT INTO message_resources
                 (source_channel_id, source_message_id, resource_number, author_id, operation)
                 VALUES ({message.channel.id}, {message.id}, {resource_number}, {author.id}, {operation.value})
                 RETURNING filename::text;
@@ -194,3 +184,27 @@ class DatabaseClient:
             f"""UPDATE polytopia_game
                 SET map_size = {size}
                 WHERE channel_discord_id = {channel_id};""")
+
+    def add_player_n_game(self, message, author):
+        return self.engine.execute(
+            f"""INSERT INTO polytopia_player
+                (discord_player_id, discord_player_name)
+                VALUES ({author.id}, '{str(author.name)}')
+                ON CONFLICT (discord_player_id) DO UPDATE
+                SET discord_player_name = '{author.name}';
+
+                INSERT INTO polytopia_game
+                (server_discord_id, channel_discord_id)
+                VALUES ({message.guild.id}, {message.channel.id})
+                ON CONFLICT (channel_discord_id) DO NOTHING;
+
+                INSERT INTO game_players
+                (discord_player_id, channel_discord_id, is_alive)
+                VALUES ({author.id}, {message.channel.id}, true)
+                ON CONFLICT (discord_player_id, channel_discord_id) DO NOTHING;""")
+
+    def drop_score(self, channel_id, turn):
+        return self.engine.execute(
+            f"""DELETE FROM game_player_scores
+                WHERE channel_discord_id = {channel_id}
+                AND turn = {turn};""")
