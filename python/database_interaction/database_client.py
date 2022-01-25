@@ -1,3 +1,5 @@
+import re
+
 import sqlalchemy
 import pandas as pd
 
@@ -21,6 +23,7 @@ class DatabaseClient:
         return is_active is not None and len(is_active) > 0 and is_active[0]
 
     def activate_channel(self, channel, server):
+        channel_name = re.sub(r"[^a-zA-Z0-9 ]", "", channel.name)[:40]
         return self.engine.execute(
             f"""INSERT INTO discord_server
                 (server_discord_id, server_name)
@@ -30,7 +33,7 @@ class DatabaseClient:
 
                 INSERT INTO discord_channel
                 (server_discord_id, channel_discord_id, channel_name, is_active)
-                VALUES ({server.id}, {channel.id}, '{channel.name}', true)
+                VALUES ({server.id}, {channel.id}, '{channel_name}', true)
                 ON CONFLICT (channel_discord_id) DO UPDATE
                 SET is_active = true;""")
 
