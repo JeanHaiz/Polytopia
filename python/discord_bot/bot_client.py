@@ -43,7 +43,7 @@ async def on_message(message):
                 await image_utils.save_attachment(attachment, message.channel.name, ImageOp.INPUT, filename)
                 print("attachment saved", filename)
                 if message.reactions is not None and len(message.reactions) > 0:
-                    await bot_utils.reaction_message_routine(message, filename)
+                    await bot_utils.reaction_message_routine(database_client, message, filename)
     await bot_client.process_commands(message)
 
 
