@@ -8,12 +8,12 @@ from common.logger_utils import logger
 from .score_image_processing_utils import clear_noise
 
 
-def is_score_reconition_request(message, attachment, filename):
+def is_score_reconition_request(reactions, attachment, filename):
     # TODO: complete with image analysis heuristics
     # if attachment.content_type.startswith("image/"):
     # else:
     # logger.info("content not supported: %s" % message.id)
-    return "📈" in [r.emoji for r in message.reactions]
+    return "📈" in [r.emoji for r in reactions]
     # return true  # discord.PartialEmoji(name="📈") in [r.emoji for r in message.reactions]
 
 

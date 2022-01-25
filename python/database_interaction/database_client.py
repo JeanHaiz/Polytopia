@@ -34,15 +34,15 @@ class DatabaseClient:
                 ON CONFLICT (channel_discord_id) DO UPDATE
                 SET is_active = true;""")
 
-    def deactivate_channel(self, channel):
+    def deactivate_channel(self, channel_id):
         return self.engine.execute(
             f"""UPDATE discord_channel
                 SET is_active = false
-                WHERE channel_discord_id = {channel.id};""")
+                WHERE channel_discord_id = {channel_id};""")
 
     # TODO: add create_if_missing=True param
     # TODO: result should be modified: result = [dict(row) for row in resultproxy]
-    def get_game_players(self, channel):
+    def get_game_players(self, channel_id):
         result_proxy = self.engine.execute(
             f"""SELECT game_players.discord_player_id,
                        polytopia_player.polytopia_player_name,
@@ -50,14 +50,14 @@ class DatabaseClient:
                 FROM game_players
                 JOIN polytopia_player
                 ON game_players.discord_player_id = polytopia_player.discord_player_id
-                WHERE channel_discord_id = {channel.id};""").fetchall()
+                WHERE channel_discord_id = {channel_id};""").fetchall()
         return [dict(row) for row in result_proxy]
 
-    def add_score(self, channel, player_id, score, turn):
+    def add_score(self, channel_id, player_id, score, turn):
         return self.engine.execute(
             f"""INSERT INTO game_player_scores
                 (channel_discord_id, discord_player_id, turn, score, confirmed)
-                VALUES ({channel.id}, {player_id or 'NULL'}, {turn}, {score}, false);""")
+                VALUES ({channel_id}, {player_id or 'NULL'}, {turn}, {score}, false);""")
 
     def get_channel_scores(self, channel_id):
         scores = self.engine.execute(
@@ -80,10 +80,10 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id}
                 GROUP BY discord_player_id;""").fetchall()
 
-    def list_active_channels(self, server):
+    def list_active_channels(self, server_id):
         return self.engine.execute(
             f"""SELECT channel_name FROM discord_channel
-                WHERE server_discord_id = {server.id}
+                WHERE server_discord_id = {server_id}
                 AND is_active = true;""").fetchall()
 
     def remove_resource(self, message_id):
@@ -104,21 +104,19 @@ class DatabaseClient:
         if len(filename) > 0:
             return filename[0]
 
-    def get_resource(self, message, resource_number=0):
+    def get_resource(self, message_id, resource_number=0):
         resource = self.engine.execute(
             f"""SELECT * FROM message_resources
-                WHERE source_channel_id = {message.channel.id}
-                AND source_message_id = {message.id}
+                WHERE source_message_id = {message_id}
                 AND resource_number = {resource_number};""").fetchall()
         if len(resource) > 0:
             return resource[0]
 
-    def set_resource_operation(self, message, operation, resource_number):
+    def set_resource_operation(self, message_id, operation, resource_number):
         filename = self.engine.execute(
             f"""UPDATE message_resources
                 SET operation = {operation.value}
-                WHERE source_channel_id = {message.channel.id}
-                AND source_message_id = {message.id}
+                WHERE source_message_id = {message_id}
                 AND resource_number = {resource_number}
                 RETURNING filename::text;""").fetchone()
         if filename is not None and len(filename) > 0:
@@ -135,12 +133,12 @@ class DatabaseClient:
         if filename is not None and len(filename) > 0:
             return filename[0]
 
-    def get_map_patching_files(self, channel):
+    def get_map_patching_files(self, channel_id):
         filenames = self.engine.execute(
             f"""SELECT DISTINCT ON (source_message_id) source_message_id,
                 filename::text, author_id
                 FROM message_resources
-                WHERE source_channel_id = {channel.id}
+                WHERE source_channel_id = {channel_id}
                 AND operation = {ImageOp.MAP_INPUT.value};""").fetchall()
         print("pre filenames", filenames)
         return [dict(row)["filename"] for row in filenames]

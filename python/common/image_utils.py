@@ -94,11 +94,11 @@ def save_image(image, channel_name, filename, operation):
     return file_path
 
 
-def move_input_image(channel, filename, target_operation):
-    file_path = __get_file_path(channel.name, ImageOp.INPUT, filename)
+def move_input_image(channel_name, filename, target_operation):
+    file_path = __get_file_path(channel_name, ImageOp.INPUT, filename)
     image = cv2.imread(file_path)
     if image is not None:
-        return save_image(image, channel.name, filename, target_operation)
+        return save_image(image, channel_name, filename, target_operation)
 
 
 def move_back_input_image(channel, filename, source_operation):

@@ -79,14 +79,14 @@ async def activate(ctx):
 @bot_client.command()
 async def deactivate(ctx):
     logger.debug("deactivate channel %s" % ctx.channel)
-    database_client.deactivate_channel(ctx.channel)
+    database_client.deactivate_channel(ctx.channel.id)
     await ctx.send("channel deactivated")
 
 
 @bot_client.command()
 async def list_active_channels(ctx):
     logger.debug("list active channels")
-    active_channels = database_client.list_active_channels(ctx.guild)
+    active_channels = database_client.list_active_channels(ctx.guild.id)
     if len(active_channels) > 0:
         message = "active channels:\n- %s" % "\n- ".join([a[0] for a in active_channels if a[0] != ""])
     else:
