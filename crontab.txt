@@ -1,0 +1,4 @@
+
+# m h dom mon dow
+
+0 * * * * ./post-receive
