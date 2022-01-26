@@ -1,0 +1,12 @@
+git fetch
+HEADHASH=$(git rev-parse HEAD)
+UPSTREAMHASH=$(git rev-parse master@{upstream})
+
+if [ "$HEADHASH" != "$UPSTREAMHASH" ]
+then
+	echo -e Not up to date with origin. Pulling & Restarting.
+	git pull
+	make restart
+else
+	echo -e Current branch is up to date with origin/master.
+fi
