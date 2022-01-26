@@ -147,3 +147,8 @@ async def set_map_size(ctx, size):
 @bot_client.command(name="drop")
 async def drop_score(ctx, turn):
     database_client.drop_score(ctx.channel.id, turn)
+
+
+@bot_client.command(name="map")
+async def patch_map(ctx):
+    bot_utils.process_map_patching(ctx.message, ctx.channel, database_client)

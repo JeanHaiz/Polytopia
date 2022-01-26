@@ -134,23 +134,27 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
     elif payload.emoji == discord.PartialEmoji(name="🖼️"):
         channel = bot_client.get_channel(payload.channel_id)
         message = await channel.fetch_message(payload.message_id)
-        if len(message.attachments) > 0:
-            for i, attachment in enumerate(message.attachments):
-                if map_patching_utils.is_map_patching_request(message, attachment, "filename"):
-                    filename = database_client.set_resource_operation(message.id, ImageOp.MAP_INPUT, i)
-                    if filename is None:
-                        filename = database_client.add_resource(message, message.author, ImageOp.MAP_INPUT, i)
-                        await image_utils.save_attachment(attachment, channel.name, ImageOp.MAP_INPUT, filename)
-                    else:
-                        image_utils.move_input_image(channel.name, filename, ImageOp.MAP_INPUT)
-                    turn, patch = await map_patching_routine(database_client, attachment, message, filename)
-                    if patch is not None:
-                        return await channel.send(file=patch, content="map patched for turn %s" % turn)
-                    else:
-                        return await channel.send("patch failed")
+        return process_map_patching(message, channel, database_client)
 
     else:
         print("emoji not recognised:", payload.emoji, discord.PartialEmoji(name="🖼️"))
+
+
+async def process_map_patching(message, channel, database_client):
+    if len(message.attachments) > 0:
+        for i, attachment in enumerate(message.attachments):
+            if map_patching_utils.is_map_patching_request(message, attachment, "filename"):
+                filename = database_client.set_resource_operation(message.id, ImageOp.MAP_INPUT, i)
+                if filename is None:
+                    filename = database_client.add_resource(message, message.author, ImageOp.MAP_INPUT, i)
+                    await image_utils.save_attachment(attachment, channel.name, ImageOp.MAP_INPUT, filename)
+                else:
+                    image_utils.move_input_image(channel.name, filename, ImageOp.MAP_INPUT)
+                turn, patch = await map_patching_routine(database_client, attachment, message, filename)
+                if patch is not None:
+                    return await channel.send(file=patch, content="map patched for turn %s" % turn)
+                else:
+                    return await channel.send("patch failed")
 
 
 def now():
