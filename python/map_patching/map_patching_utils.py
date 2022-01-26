@@ -272,6 +272,28 @@ def get_lines(vertices_i):
 def get_intersection(lines):
     intersections = []
     if len(lines) == 4:
+
+        y0 = np.stack(lines[5].to_numpy())[:, 1]
+        y1 = np.stack(lines[6].to_numpy())[:, 1]
+        lines[7] = y0 + y1
+        lines.sort_values(7, inplace=True)
+
+        for i in range(2):
+            points = lines[i*2:i*2+2]
+            point_0 = np.stack(points[5].to_numpy())
+
+            x1, y1 = point_0[0]
+            p1 = points[2].iloc[0]
+            h1 = y1 - p1 * x1
+
+            x2, y2 = point_0[1]
+            p2 = points[2].iloc[1]
+            h2 = y2 - p2 * x2
+
+            x = int((h2 - h1) / (p1 - p2))
+            y = int(p1 * x + h1)
+            intersections.append([x, y])
+
         x0 = np.stack(lines[5].to_numpy())[:, 0]
         x1 = np.stack(lines[6].to_numpy())[:, 0]
         lines[7] = x0 + x1
@@ -307,7 +329,8 @@ def get_orientation(vertices):
     return True
 
 
-async def process_raw_map(filename_i, i, channel_name, map_size, database_client, message=None):
+async def process_raw_map(
+        filename_i, i, channel_name, map_size, database_client, message=None, kernel_size=5, sigma=5):
     print("map_patching_utils", filename_i)
     if i == 0:
         image = image_utils.get_background_template(map_size)
@@ -322,7 +345,7 @@ async def process_raw_map(filename_i, i, channel_name, map_size, database_client
         return None
 
     edges = get_three_color_edges(image, channel_name, filename_i)
-    blur = cv2.GaussianBlur(edges, (15, 15), sigmaX=25)
+    blur = cv2.GaussianBlur(edges, (kernel_size, kernel_size), sigmaX=sigma)
     contour = select_contours(blur, filename_i)
     polygon = draw_contour(edges, contour, channel_name, filename=filename_i)
     vertices_i = compute_vertices(polygon)
@@ -338,15 +361,19 @@ async def process_raw_map(filename_i, i, channel_name, map_size, database_client
     if DEBUG:
         print()
         print("intersections:\n", intersections)
+        print(len(intersections), len(intersections[0]), type(intersections))
+        print(vertices_i.shape, type(vertices_i))
 
-    if len(intersections) != 2:
+    if len(intersections) < 2:
         print("intersections not detected for file:", filename_i)
         return
 
-    if is_vertical_i:
-        vertices_i = np.concatenate((vertices_i[0:2], intersections))
-    else:
-        vertices_i = np.concatenate((intersections, vertices_i[2:4]))
+    vertices_i = np.array(intersections)
+
+    # if is_vertical_i:
+    #     vertices_i = np.array(intersections)  # np.concatenate((vertices_i[0:2], intersections[0:2]))
+    # else:
+    #     vertices_i = np.concatenate((intersections[0:2], vertices_i[2:4]))
 
     if DEBUG:
         print("vertices after:\n", vertices_i)
