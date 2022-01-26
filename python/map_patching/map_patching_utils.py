@@ -337,12 +337,11 @@ async def process_raw_map(
     else:
         image = await image_utils.load_image(database_client, channel_name, message, filename_i, ImageOp.INPUT)
 
-    print("size for i", i, image.shape, type(image))
     if image is None:
         if DEBUG:
             print("image not found:", filename_i)
         print("EXIT LOOP")
-        return None
+        return
 
     edges = get_three_color_edges(image, channel_name, filename_i)
     blur = cv2.GaussianBlur(edges, (kernel_size, kernel_size), sigmaX=sigma)
@@ -445,8 +444,11 @@ async def patch_partial_maps(
     scaled_vertices = []
 
     for i, filename_i in enumerate(files):
-        image, vertices_i, is_vertical_i = await process_raw_map(
-            filename_i, i, channel_name, map_size, database_client, message)
+        processed_raw_map = await process_raw_map(filename_i, i, channel_name, map_size, database_client, message)
+        if processed_raw_map is None:
+            continue
+
+        image, vertices_i, is_vertical_i = processed_raw_map
         images.append(image)
         vertices.append(vertices_i)
         vertical.append(is_vertical_i)

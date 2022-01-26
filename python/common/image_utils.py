@@ -142,7 +142,9 @@ def get_background_template(map_size: str):
     print("map size", map_size)
     if map_size is None or map_size == "0":
         map_size = "400"
-    return __get_template("background_template_%s.png" % map_size)[:, :, 0:3]
+    template = __get_template("background_template_%s.png" % map_size)
+    if template is not None:
+        return template[:, :, 0:3]
 
 
 def get_plt_path(channel_name, filename):
