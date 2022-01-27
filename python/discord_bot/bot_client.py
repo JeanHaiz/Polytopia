@@ -151,4 +151,4 @@ async def drop_score(ctx, turn):
 
 @bot_client.command(name="map")
 async def patch_map(ctx):
-    bot_utils.process_map_patching(ctx.message, ctx.channel, database_client)
+    await bot_utils.process_map_patching(ctx.message, ctx.channel, database_client)
