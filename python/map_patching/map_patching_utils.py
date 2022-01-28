@@ -421,6 +421,12 @@ async def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
     return patch_work
 
 
+def crop_output(image, position, size):
+    return image[
+        (position[1] - 20).clip(0): (position[1]+size[1] + 20).clip(0, image.shape[1]),
+        (position[0] - size[0] - 20).clip(0): (position[0]+size[0] + 20).clip(0, image.shape[0])]
+
+
 async def patch_partial_maps(
         channel_name: str,
         files: list,
@@ -486,6 +492,8 @@ async def patch_partial_maps(
         oppacity = transparency_masks[i]
         patch_work = await patch_output(patch_work, scaled_padding, oppacity, size, bit, i)
 
+    cropped_patch_work = crop_output(patch_work, reference_position, reference_size)
+
     if DEBUG:
         print(scaled_vertices)
         vertex_lines = np.zeros_like(patch_work)
@@ -502,9 +510,10 @@ async def patch_partial_maps(
 
     if message is not None and database_client is not None:
         filename = database_client.add_resource(message, message.author, ImageOp.MAP_PATCHING_OUTPUT)
-        file_path = image_utils.save_image(patch_work, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)
+        file_path = image_utils.save_image(cropped_patch_work, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)
     else:
-        file_path = image_utils.save_image(patch_work, channel_name, 'map_patching_debug', ImageOp.MAP_PATCHING_OUTPUT)
+        file_path = image_utils.save_image(
+            cropped_patch_work, channel_name, 'map_patching_debug', ImageOp.MAP_PATCHING_OUTPUT)
     return file_path
 
 
