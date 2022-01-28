@@ -1,4 +1,3 @@
-
 # m h dom mon dow
 
-0 * * * * ./post-receive
+*/30 * * * * ./Users/jean/Documents/Coding/Polytopia/post-receive > /Users/jean/Documents/Coding/Polytopia/crontab_log.txt

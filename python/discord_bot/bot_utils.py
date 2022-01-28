@@ -134,7 +134,7 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
     elif payload.emoji == discord.PartialEmoji(name="🖼️"):
         channel = bot_client.get_channel(payload.channel_id)
         message = await channel.fetch_message(payload.message_id)
-        return process_map_patching(message, channel, database_client)
+        return await process_map_patching(message, channel, database_client)
 
     else:
         print("emoji not recognised:", payload.emoji, discord.PartialEmoji(name="🖼️"))
