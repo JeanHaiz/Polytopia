@@ -156,4 +156,4 @@ async def patch_map(ctx):
 
 @bot_client.command(name="hello")
 async def say_hello(ctx):
-    await ctx.send("hello")
+    await ctx.send("hello there")
