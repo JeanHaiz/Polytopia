@@ -8,7 +8,6 @@ from database_interaction.database_client import DatabaseClient
 from common import image_utils
 from common.logger_utils import logger
 from common.image_utils import ImageOp
-from score_recognition import score_visualisation
 
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
 
@@ -43,7 +42,9 @@ async def on_message(message):
                 await image_utils.save_attachment(attachment, message.channel.name, ImageOp.INPUT, filename)
                 print("attachment saved", filename)
                 if message.reactions is not None and len(message.reactions) > 0:
-                    await bot_utils.reaction_message_routine(database_client, message, filename)
+                    await bot_utils.wrap_errors(
+                        message.channel, message.guild.id, bot_utils.reaction_message_routine, True,
+                        *(database_client, message, filename))
     await bot_client.process_commands(message)
 
 
@@ -60,7 +61,10 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
 async def on_raw_reaction_remove(payload: discord.RawReactionActionEvent):
     is_active = database_client.is_channel_active(payload.channel_id)
     if is_active:
-        await bot_utils.reaction_removed_routine(payload, bot_client, database_client)
+        channel = bot_client.get_channel(payload.channel_id)
+        await bot_utils.wrap_errors(
+            channel, channel.guild.id, bot_utils.reaction_removed_routine, True,
+            *(payload, bot_client, database_client))
 
 
 @bot_client.command()
@@ -68,21 +72,21 @@ async def reload_extention(ctx, extension):
     print("reloading")
     bot_client.reload_extension(f"{extension}")
     embed = discord.Embed(title='Reload', description=f'{extension} successfully reloaded', color=0xff00c8)
-    await bot_client.send(embed=embed)
+    await bot_utils.wrap_errors(ctx, ctx.guild_id, ctx.send, True, bot_client.send, embed=embed)
 
 
 @bot_client.command()
 async def activate(ctx):
     logger.debug("activate channel %s" % ctx.channel)
     database_client.activate_channel(ctx.channel, ctx.guild)
-    await ctx.send("channel activated")
+    await bot_utils.wrap_errors(ctx, ctx.guild_id, ctx.send, True, *("channel activated"))
 
 
 @bot_client.command()
 async def deactivate(ctx):
     logger.debug("deactivate channel %s" % ctx.channel)
     database_client.deactivate_channel(ctx.channel.id)
-    await ctx.send("channel deactivated")
+    await bot_utils.wrap_errors(ctx, ctx.guild_id, ctx.send, True, *("channel deactivated"))
 
 
 @bot_client.command()
@@ -93,48 +97,40 @@ async def list_active_channels(ctx):
         message = "active channels:\n- %s" % "\n- ".join([a[0] for a in active_channels if a[0] != ""])
     else:
         message = "no active channel"
-    await ctx.send(message)
+    await bot_utils.wrap_errors(ctx, ctx.guild_id, ctx.send, True, *(message))
 
 
 @bot_client.command(name="setname")
 async def set_player_discord_name(ctx, discord_id, discord_name, polytopia_name):
     logger.debug("set player name")
     database_client.set_player_discord_name(discord_id, discord_name, polytopia_name)
-    await ctx.send("Hi %s!" % discord_name)
+    await bot_utils.wrap_errors(ctx, ctx.guild_id, ctx.send, True, *("Hi %s!" % discord_name))
 
 
 @bot_client.command(name="opponent")
 async def add_game_opponent(ctx, discord_name, polytopia_name):
     logger.debug("set player name")
     database_client.set_player_discord_name(None, discord_name, polytopia_name)
-    await ctx.send("Hi %s!" % discord_name)
+    await bot_utils.wrap_errors(ctx, ctx.guild_id, ctx.send, True, *("Hi %s!" % discord_name))
 
 
 @bot_client.command(name="setmyname")
 async def set_self_discord_name(ctx, polytopia_name):
     logger.debug("set self player name")
     database_client.set_player_discord_name(ctx.author.id, ctx.author.name, polytopia_name)
-    await ctx.send("Hi %s!" % ctx.author.name)
+    await bot_utils.wrap_errors(ctx, ctx.guild_id, ctx.send, True, *("Hi %s!" % ctx.author.name))
 
 
 @bot_client.command(name="scores")
 async def get_channel_scores(ctx):
-    scores = database_client.get_channel_scores(ctx.channel.id)
-    if scores is not None:
-        scores = scores[scores['turn'] != -1]
-        score_plt = await bot_utils.wrap_error(
-            ctx, score_visualisation.plotScores, False, (scores, ctx.channel.name, str(ctx.message.id)))
-        await ctx.message.channel.send(file=score_plt, content="score recognition")
-        await ctx.send(str(scores))
-    else:
-        await ctx.send("No score found")
+    await bot_utils.wrap_errors(ctx, ctx.guild_id, bot_utils.get_scores, True, *(database_client, ctx))
 
 
 @bot_client.command(name="turn")
 async def set_turn(ctx, turn):
     database_client.add_player_n_game(ctx.message, ctx.author)
     database_client.set_new_last_turn(ctx.channel.id, turn)
-    await ctx.send("current turn is now %s" % str(turn))
+    await bot_utils.wrap_errors(ctx, ctx.guild_id, ctx.send, True, *("current turn is now %s" % str(turn)))
 
 
 @bot_client.command(name="size")
@@ -142,9 +138,9 @@ async def set_map_size(ctx, size):
     database_client.add_player_n_game(ctx.message, ctx.author)
     if size.isnumeric() and int(size) in [121, 196, 256, 324, 400, 900]:
         database_client.set_game_map_size(ctx.channel.id, int(size))
-        await ctx.send("current map size now is %s" % size)
+        await bot_utils.wrap_errors(ctx, ctx.guild_id, ctx.send, True, *("current map size now is %s" % size))
     else:
-        await ctx.send("map size not recognised")
+        await bot_utils.wrap_errors(ctx, ctx.guild_id, ctx.send, True, *("map size not recognised"))
 
 
 @bot_client.command(name="drop")

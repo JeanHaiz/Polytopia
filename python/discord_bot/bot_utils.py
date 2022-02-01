@@ -12,6 +12,7 @@ from common.image_utils import ImageOp
 from map_patching import map_patching_utils
 from database_interaction.database_client import DatabaseClient
 from score_recognition import score_recognition_utils
+from score_recognition import score_visualisation
 
 
 async def score_recognition_routine(database_client: DatabaseClient, message, filename):
@@ -203,3 +204,14 @@ async def wrap_errors(ctx, guild_id, fct, is_async, *params):
         traceback.print_exc()
         myid = '<@338067113639936003>'  # Jean's id
         await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
+
+
+async def get_scores(database_client, ctx):
+    scores = database_client.get_channel_scores(ctx.channel.id)
+    if scores is not None:
+        scores = scores[scores['turn'] != -1]
+        score_plt = await score_visualisation.plotScores(scores, ctx.channel.name, str(ctx.message.id))
+        await ctx.message.channel.send(file=score_plt, content="score recognition")
+        await ctx.send(str(scores))
+    else:
+        await ctx.send("No score found")
