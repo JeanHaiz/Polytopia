@@ -379,7 +379,7 @@ async def process_raw_map(
         print_vertices = [vertices_i[0], vertices_i[3], vertices_i[1], vertices_i[2], vertices_i[0]]
         for i in range(len(print_vertices) - 1):
             cv2.line(edges, print_vertices[i], print_vertices[i + 1], (255, 255, 255), 2)
-            cv2.putText(edges, "%s" % (i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6, 
+            cv2.putText(edges, "%s" % (i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
                         (255, 255, 255), 3, cv2.LINE_AA)
         image_utils.save_image(edges, channel_name, filename_i, ImageOp.DEBUG_VERTICES)
     return image, vertices_i, is_vertical_i
@@ -397,7 +397,7 @@ async def transform_image(
 
     scaled_image = scale_image(image_i, channel_name, scale_factor, filename_i)
     cropped_image, padding = crop_padding_(scaled_image, padding, filename_i, channel_name)
-    oppacity = remove_clouds(cropped_image)
+    oppacity = remove_clouds_scaled(cropped_image)
 
     padding = np.flip(padding)
 
@@ -501,7 +501,7 @@ async def patch_partial_maps(
             print_vertices = [vertices[0], vertices[3], vertices[1], vertices[2], vertices[0]]
             for i in range(len(print_vertices) - 1):
                 cv2.line(vertex_lines, print_vertices[i], print_vertices[i + 1], (255, 255, 255), 2)
-                cv2.putText(vertex_lines, "%s, %s" % (j, i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6, 
+                cv2.putText(vertex_lines, "%s, %s" % (j, i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
                             (255, 255, 255), 3, cv2.LINE_AA)
 
                 # cv2.line(patch_work, vertices[i], vertices[i+1])
@@ -586,6 +586,72 @@ def remove_clouds(img, ouptut_prefix=None, ksize=31, sigma=25):
         cv2.imwrite(ouptut_prefix + '_correlation.png', blur)
         cv2.imwrite(ouptut_prefix + '_matches2.jpg', result)
     return mask
+
+
+def remove_clouds_scaled(img, ksize=7, sigma=15):
+    template = image_utils.get_cloud_template()
+    hh, ww = template.shape[:2]
+
+    pawn = template[:, :, 0:3]
+    alpha_template = template[:, :, 3]
+    alpha = cv2.merge([alpha_template, alpha_template, alpha_template])
+
+    result_set = []
+
+    # Optimisation possibilities:
+    # - not go linear, look for the point
+    # - start in the middle and go out, based on gradient
+    # - stop when it goes down again
+    # - change spacing
+    for scale in range(90, 110, 2):
+        scale = scale / 100.0
+        new_dim = (int(img.shape[1] * scale), int(img.shape[0] * scale))
+        resized = cv2.resize(img, new_dim, interpolation=cv2.INTER_AREA)
+        if resized.shape[0] < template.shape[0] or resized.shape[1] < template.shape[1]:
+            break
+
+        img_alpha = np.ones((resized.shape[0:2]))
+
+        corr_img = cv2.matchTemplate(resized, pawn, cv2.TM_CCOEFF_NORMED, mask=alpha)
+        correlation_raw = (255 * corr_img).clip(0, 255).astype(np.uint8)
+
+        blur = cv2.GaussianBlur(correlation_raw, (ksize, ksize), sigmaX=sigma)
+        threshold = 100
+
+        # cv2.imwrite('./cloud/blur_%.2f.png' % scale, blur)
+
+        maximum = np.max(blur)
+
+        max_val = np.max(blur)
+        rad = int(math.sqrt(hh * hh + ww * ww) / 4)
+
+        count = 0
+
+        while max_val > threshold:
+
+            # find max value of correlation image
+            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(blur)
+
+            if max_val > threshold:
+                # draw match on copy of input
+                img_alpha[max_loc[1]: max_loc[1]+hh, max_loc[0]: max_loc[0]+ww] = \
+                    img_alpha[max_loc[1]: max_loc[1]+hh, max_loc[0]: max_loc[0]+ww] - alpha_template / 255.0
+
+                # write black circle at max_loc in corr_img
+                cv2.circle(blur, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
+                count += 1
+
+            else:
+                break
+        img_alpha_c = img_alpha.clip(0, 1).astype(np.uint8)
+        mask = cv2.merge([img_alpha_c, img_alpha_c, img_alpha_c]).astype(np.uint8)
+        alpha_area = np.sum(img_alpha_c == 0) / (img_alpha_c.shape[0] * img_alpha_c.shape[1])
+        result_set.append([scale, maximum, maximum / scale, count, alpha_area, mask])
+
+    selected_scaling = sorted(result_set, key=lambda x: -x[2])[0]
+    print("selected_scaling", selected_scaling[:5])
+    resized_original = cv2.resize(selected_scaling[5], (img.shape[1], img.shape[0]), interpolation=cv2.INTER_AREA)
+    return resized_original
 
 
 def get_turn(image, channel_name):
