@@ -51,7 +51,9 @@ async def on_message(message):
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     is_active = database_client.is_channel_active(payload.channel_id)
     if is_active:
-        await bot_utils.reaction_added_routine(payload, bot_client, database_client)
+        channel = bot_client.get_channel(payload.channel_id)
+        await bot_utils.wrap_errors(
+            channel, bot_utils.reaction_added_routine, True, (payload, bot_client, database_client))
 
 
 @bot_client.event
@@ -102,9 +104,9 @@ async def set_player_discord_name(ctx, discord_id, discord_name, polytopia_name)
 
 
 @bot_client.command(name="opponent")
-async def add_game_opponent(ctx, discord_id, discord_name, polytopia_name):
+async def add_game_opponent(ctx, discord_name, polytopia_name):
     logger.debug("set player name")
-    database_client.set_player_discord_name(discord_id, discord_name, polytopia_name)
+    database_client.set_player_discord_name(None, discord_name, polytopia_name)
     await ctx.send("Hi %s!" % discord_name)
 
 
@@ -120,7 +122,8 @@ async def get_channel_scores(ctx):
     scores = database_client.get_channel_scores(ctx.channel.id)
     if scores is not None:
         scores = scores[scores['turn'] != -1]
-        score_plt = score_visualisation.plotScores(scores, ctx.channel.name, str(ctx.message.id))
+        score_plt = await bot_utils.wrap_error(
+            ctx, score_visualisation.plotScores, False, (scores, ctx.channel.name, str(ctx.message.id)))
         await ctx.message.channel.send(file=score_plt, content="score recognition")
         await ctx.send(str(scores))
     else:
@@ -146,14 +149,14 @@ async def set_map_size(ctx, size):
 
 @bot_client.command(name="drop")
 async def drop_score(ctx, turn):
-    database_client.drop_score(ctx.channel.id, turn)
+    await bot_utils.wrap_errors(ctx, database_client.drop_score, False, (ctx.channel.id, turn))
 
 
 @bot_client.command(name="map")
 async def patch_map(ctx):
-    await bot_utils.process_map_patching(ctx.message, ctx.channel, database_client)
+    await bot_utils.wrap_errors(ctx, bot_utils.process_map_patching, True, (ctx.message, ctx.channel, database_client))
 
 
 @bot_client.command(name="hello")
 async def say_hello(ctx):
-    await ctx.send("hello there")
+    await bot_utils.wrap_errors(ctx, ctx.send, True, ("hello here"))

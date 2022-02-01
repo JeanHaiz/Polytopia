@@ -1,3 +1,4 @@
+import sys
 import datetime
 import discord
 
@@ -136,6 +137,11 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
         message = await channel.fetch_message(payload.message_id)
         return await process_map_patching(message, channel, database_client)
 
+    elif payload.emoji == discord.PartialEmoji(name="⁉️"):
+        channel = bot_client.get_channel(payload.channel_id)
+        myid = '<@338067113639936003>'  # Jean's id
+        await channel.send("Was there a small issue? Tell me more about it. Also %s has been notified." % myid)
+
     else:
         print("emoji not recognised:", payload.emoji, discord.PartialEmoji(name="🖼️"))
 
@@ -169,3 +175,19 @@ async def get_message(bot_client, channel_id, message_id):
 async def get_attachments(bot_client, channel_id, message_id):
     message = await get_message(bot_client, channel_id, message_id)
     return message.attachments
+
+
+async def wrap_errors(ctx, fct, is_async, *params):
+    try:
+        if is_async:
+            return await fct(*params)
+        else:
+            return fct(*params)
+    except Exception:
+        error = sys.exc_info()[0]
+        logger.error("##### ERROR #####")
+        logger.error(error)
+        print("##### ERROR #####")
+        print(error)
+        myid = '<@338067113639936003>'  # Jean's id
+        await ctx.send('There was an error. %s has been notified.' % myid)
