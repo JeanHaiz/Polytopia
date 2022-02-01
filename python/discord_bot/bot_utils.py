@@ -1,3 +1,4 @@
+import os
 import sys
 import datetime
 import discord
@@ -143,9 +144,10 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
         message = await channel.fetch_message(payload.message_id)
         print("users", message.author, bot_client.user)
         if message.author == bot_client.user:
-            channel = bot_client.get_channel(payload.channel_id)
             myid = '<@338067113639936003>'  # Jean's id
-            await channel.send("Was there a small issue? Tell me more about it. Also %s has been notified." % myid)
+            await message.reply(
+                "Was there a small issue? Tell me more about it. Also %s has been notified." % myid,
+                mention_author=False)
 
     else:
         print("emoji not recognised:", payload.emoji, discord.PartialEmoji(name="🖼️"))
@@ -182,18 +184,22 @@ async def get_attachments(bot_client, channel_id, message_id):
     return message.attachments
 
 
-async def wrap_errors(ctx, fct, is_async, *params):
+async def wrap_errors(ctx, guild_id, fct, is_async, *params):
     try:
-        if is_async:
-            return await fct(*params)
-        else:
-            return fct(*params)
+        is_test_server = str(guild_id) == os.getenv("POLYTOPIA_TEST_SERVER", "0")
+        is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
+        if (is_dev_env and is_test_server) or (not is_test_server and not is_dev_env):
+            if is_async:
+                return await fct(*params)
+            else:
+                return fct(*params)
     except Exception:
         error = sys.exc_info()[0]
         logger.error("##### ERROR #####")
         logger.error(error)
+        logger.error(traceback.format_exc())
         print("##### ERROR #####")
         print(error)
         traceback.print_exc()
         myid = '<@338067113639936003>'  # Jean's id
-        await ctx.send('There was an error. %s has been notified.' % myid)
+        await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)

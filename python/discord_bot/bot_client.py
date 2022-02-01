@@ -53,7 +53,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     if is_active:
         channel = bot_client.get_channel(payload.channel_id)
         await bot_utils.wrap_errors(
-            channel, bot_utils.reaction_added_routine, True, *(payload, bot_client, database_client))
+            channel, channel.guild.id, bot_utils.reaction_added_routine, True, *(payload, bot_client, database_client))
 
 
 @bot_client.event
@@ -149,14 +149,15 @@ async def set_map_size(ctx, size):
 
 @bot_client.command(name="drop")
 async def drop_score(ctx, turn):
-    await bot_utils.wrap_errors(ctx, database_client.drop_score, False, *(ctx.channel.id, turn))
+    await bot_utils.wrap_errors(ctx, ctx.guild_id, database_client.drop_score, False, *(ctx.channel.id, turn))
 
 
 @bot_client.command(name="map")
 async def patch_map(ctx):
-    await bot_utils.wrap_errors(ctx, bot_utils.process_map_patching, True, *(ctx.message, ctx.channel, database_client))
+    await bot_utils.wrap_errors(
+        ctx, ctx.guild_id, bot_utils.process_map_patching, True, *(ctx.message, ctx.channel, database_client))
 
 
 @bot_client.command(name="hello")
 async def say_hello(ctx):
-    await bot_utils.wrap_errors(ctx, ctx.send, True, *("hello here"))
+    await bot_utils.wrap_errors(ctx, ctx.guild_id, ctx.send, True, *("hello here"))
