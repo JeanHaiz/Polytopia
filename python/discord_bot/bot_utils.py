@@ -1,6 +1,7 @@
 import sys
 import datetime
 import discord
+import traceback
 
 from difflib import SequenceMatcher
 
@@ -139,8 +140,12 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
 
     elif payload.emoji == discord.PartialEmoji(name="⁉️"):
         channel = bot_client.get_channel(payload.channel_id)
-        myid = '<@338067113639936003>'  # Jean's id
-        await channel.send("Was there a small issue? Tell me more about it. Also %s has been notified." % myid)
+        message = await channel.fetch_message(payload.message_id)
+        print("users", message.author, bot_client.user)
+        if message.author == bot_client.user:
+            channel = bot_client.get_channel(payload.channel_id)
+            myid = '<@338067113639936003>'  # Jean's id
+            await channel.send("Was there a small issue? Tell me more about it. Also %s has been notified." % myid)
 
     else:
         print("emoji not recognised:", payload.emoji, discord.PartialEmoji(name="🖼️"))
@@ -189,5 +194,6 @@ async def wrap_errors(ctx, fct, is_async, *params):
         logger.error(error)
         print("##### ERROR #####")
         print(error)
+        traceback.print_exc()
         myid = '<@338067113639936003>'  # Jean's id
         await ctx.send('There was an error. %s has been notified.' % myid)
