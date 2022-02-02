@@ -79,7 +79,7 @@ async def reload_extention(ctx, extension):
 async def activate(ctx):
     logger.debug("activate channel %s" % ctx.channel)
     database_client.activate_channel(ctx.channel, ctx.guild)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, ctx.send, True, "channel activated")
+    await bot_utils.wrap_errors(ctx, ctx.guild.id, ctx.send, True, "channel activated :)")
 
 
 @bot_client.command()
@@ -148,10 +148,19 @@ async def drop_score(ctx, turn):
     await bot_utils.wrap_errors(ctx, ctx.guild.id, database_client.drop_score, False, *(ctx.channel.id, turn))
 
 
-@bot_client.command(name="map")
+@bot_client.command(name="patch")
 async def patch_map(ctx):
-    await bot_utils.wrap_errors(
-        ctx, ctx.guild.id, bot_utils.process_map_patching, True, *(ctx.message, ctx.channel, database_client))
+    print("in")
+    turn = database_client.get_last_turn(ctx.channel.id)
+    turn, patch = await bot_utils.generate_patched_map(
+        database_client, ctx.channel.id, ctx.channel.name, ctx.message, turn)
+    if patch is not None:
+        return await ctx.channel.send(file=patch, content="map patched for turn %s" % turn)
+    else:
+        return await ctx.channel.send("patch failed")
+    # await bot_utils.process_map_patching(ctx.message, ctx.channel, database_client)
+    # await bot_utils.wrap_errors(ctx.message, ctx.guild.id, bot_utils.process_map_patching, True, ctx.message,
+    # ctx.channel, database_client)
 
 
 @bot_client.command(name="hello")

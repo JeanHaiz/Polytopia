@@ -174,9 +174,13 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""")
 
     def get_game_map_size(self, channel_id):
+        print("something")
         map_size = self.engine.execute(
             f"""SELECT map_size FROM polytopia_game
-                WHERE channel_discord_id = {channel_id};""").fetchone()
+                WHERE channel_discord_id = {channel_id};""")
+        print("between", map_size)
+        map_size = map_size.fetchone()
+        print("after", len(map_size))
         if len(map_size) > 0:
             return map_size[0]
 

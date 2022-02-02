@@ -58,9 +58,6 @@ async def score_recognition_routine(database_client: DatabaseClient, message, fi
 async def map_patching_routine(database_client: DatabaseClient, attachment, message, filename):
     channel_name = message.channel.name
     channel_id = message.channel.id
-    files = database_client.get_map_patching_files(channel_id)
-    print("files_log %s" % str(files))
-    logger.debug("files_log %s" % str(files))
     image = await image_utils.load_image(database_client, channel_name, message, filename, ImageOp.INPUT)
     turn = map_patching_utils.get_turn(image, channel_name)
     last_turn = database_client.get_last_turn(channel_id)
@@ -68,10 +65,18 @@ async def map_patching_routine(database_client: DatabaseClient, attachment, mess
         turn = last_turn
     elif last_turn is None or int(last_turn) < int(turn):
         database_client.set_new_last_turn(channel_id, turn)
+    return await generate_patched_map(database_client, channel_id, channel_name, message, turn)
 
+
+async def generate_patched_map(database_client: DatabaseClient, channel_id, channel_name, message, turn):
+    files = database_client.get_map_patching_files(channel_id)
+    print("files_log %s" % str(files))
+    logger.debug("files_log %s" % str(files))
     map_size = database_client.get_game_map_size(channel_id)
-    output_file_path = await map_patching_utils.patch_partial_maps(
+    print("map size", map_size)
+    output_file_path, filename = await map_patching_utils.patch_partial_maps(
         channel_name, files, map_size, database_client, message)
+    print("output path", output_file_path)
     if output_file_path is not None:
         return turn, image_utils.load_attachment(output_file_path, filename)
 
@@ -155,6 +160,7 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
 
 
 async def process_map_patching(message, channel, database_client):
+    print("in here")
     if len(message.attachments) > 0:
         for i, attachment in enumerate(message.attachments):
             if map_patching_utils.is_map_patching_request(message, attachment, "filename"):
@@ -186,24 +192,28 @@ async def get_attachments(bot_client, channel_id, message_id):
 
 
 async def wrap_errors(ctx, guild_id, fct, is_async, *params):
-    try:
-        is_test_server = str(guild_id) == os.getenv("POLYTOPIA_TEST_SERVER", "0")
+    print("params", len(params), params)
+    if True:
+        is_test_server = str(guild_id) == "918195469245628446"
         is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
-        if (is_dev_env and is_test_server) or (not is_test_server and not is_dev_env):
+        print("environment", is_test_server, is_dev_env, os.getenv("POLYTOPIA_TEST_SERVER", "0"),
+              os.getenv("POLYTOPIA_ENVIRONMENT", ""))
+        if (is_dev_env and is_test_server) or ((not is_test_server) and (not is_dev_env)):
             if is_async:
                 return await fct(*params)
             else:
                 return fct(*params)
-    except Exception:
+        print("out")
+    else:
         error = sys.exc_info()[0]
         logger.error("##### ERROR #####")
         logger.error(error)
-        logger.error(traceback.format_exc())
+        # logger.error(traceback.format_exc())
         print("##### ERROR #####")
         print(error)
         traceback.print_exc()
-        myid = '<@338067113639936003>'  # Jean's id
-        await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
+        # myid = '<@338067113639936003>'  # Jean's id
+        # await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
 
 
 async def get_scores(database_client, ctx):

@@ -435,7 +435,7 @@ async def patch_partial_maps(
         message=None):
     # reference_size = (2028, 1259)
     # reference_positions = [(1121 - 56, 274 - 221), (105 - 56, 880 - 221)]
-
+    print("begin")
     # reference_positions = [(2242, 548), (210, 1760)]
 
     files.insert(0, "background")
@@ -478,6 +478,7 @@ async def patch_partial_maps(
 
         print("sizes:", scaled_image.shape, oppacity.shape)
 
+    print("middle")
     output_size = np.max(np.array(scaled_paddings) + np.array(sizes), axis=0)
     if DEBUG:
         print("output size:", output_size)
@@ -508,13 +509,13 @@ async def patch_partial_maps(
                 # image = cv2.polylines(patch_work, [scaled_vertices], True, (255, 255, 255), 10)
         image_utils.save_image(vertex_lines, channel_name, 'map_patching_debut', ImageOp.DEBUG_VERTICES)
 
+    print("end")
     if message is not None and database_client is not None:
         filename = database_client.add_resource(message, message.author, ImageOp.MAP_PATCHING_OUTPUT)
-        file_path = image_utils.save_image(cropped_patch_work, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)
     else:
-        file_path = image_utils.save_image(
-            cropped_patch_work, channel_name, 'map_patching_debug', ImageOp.MAP_PATCHING_OUTPUT)
-    return file_path
+        filename = 'map_patching_debug'
+    file_path = image_utils.save_image(cropped_patch_work, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)
+    return file_path, filename
 
 
 def is_map_patching_request(message, attachment, filename):
