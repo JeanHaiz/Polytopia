@@ -1,4 +1,4 @@
-# POLYTOPIA-HELPER
+**POLYTOPIA-HELPER**
 
 Welcome to the polytopia-helper info page.
 
@@ -6,11 +6,11 @@ Polytopia-helper is a general purpose bot for all the small tasks* that a polyto
 
 *at least, we're working on it. To see your favourite funtionality come to light, help us out by voting in #polytopia-helper-voting
 
-## Status
+**Status**
 
 The service currently is in beta mode: some downtime and errors can be expected.
 
-## Installation
+**Installation**
 
 Activating the bot is very straightforward:
 
@@ -23,13 +23,13 @@ There you go, the bot answers and is ready to serve.
 
 If the bot is not yet on your server, please reach out to JeanH#1394 on discord.
 
-## Functionalities
+**Functionalities**
 
 The beta program includes two main functionalities, map patching and score recognition. 
 
 Currently, the might game type in english language is supported. Additional game types and languages are not in the development plan.
 
-### Map patching
+__Map patching__
 
 Polytopia helper allows you to patch screenshots of the polytopia game map to share get the full map view and share the point of view of your game mates. It will also recognise the score and use this information accross funtionalities.
 
@@ -42,7 +42,7 @@ To trigger a map patching, add a picture reaction 🖼️ to the selected image.
 
 The bot will answer with a map patching of all messages with the picture reaction 🖼️.
 
-### Score tracking
+__Score tracking__
 
 Polytopia helper allows you to recognise the score of a screenshot of the polytopia score screen, and track player score accross the game. 
 
@@ -53,14 +53,14 @@ To see an overview of past scores, type `:scores`.
 
 To see the detailed progression of a player, add the player name to the `:scores` command.
 
-## Feedback
+**Feedback**
 
 In the polytopia helper team, we love feedback! 
 
 As we can't get enough of your opinion, we have setup a channel for that: #polytopia-helper-feedback
 You can post any thoughts, comment, frustration, request for improvement or even encouragement there :)
 
-## Improvement voting
+**Improvement voting**
 
 We are actively improving the bot as you read this message, and you can expect the next version of the polytopia helper bot very soon. Every time we think about undertaking a new task, we look for your feedback and opinion to see what you would want the most. 
 

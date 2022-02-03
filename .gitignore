@@ -8,5 +8,9 @@
 /image_recognition/
 *.log
 *.zip
+*.png
+*.jpg
 **/__pycache__/
 /src/resources/
+.env
+jupyter_notebooks/
