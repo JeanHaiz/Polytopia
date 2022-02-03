@@ -9,4 +9,4 @@
 *.log
 *.zip
 **/__pycache__/
-/python/resources/
+/src/resources/

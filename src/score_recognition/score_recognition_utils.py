@@ -18,7 +18,6 @@ def is_score_reconition_request(reactions, attachment, filename):
 
 
 def read_scores(image):
-    # image = cv2.imread(path)
     cropped = crop(image)
     clear = clear_noise(cropped)
     scores_you = get_scores(clear, only_you=True)

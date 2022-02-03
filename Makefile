@@ -13,3 +13,6 @@ database:
 	docker-compose down
 	docker image rm polytopia_database
 	docker-compose up --build --detach database
+
+tests:
+	pytest -v tests/py_test.py 

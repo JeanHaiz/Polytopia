@@ -63,7 +63,7 @@ async def save_attachment(attachment, channel_name, operation, filename, allow_r
     file_path = __get_file_path(channel_name, operation, filename)
     try:
         await attachment.save(file_path)
-    except:
+    except BaseException:
         if allow_retry:
             time.sleep(3)
             await save_attachment(attachment, channel_name, operation, filename, False)
