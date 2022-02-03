@@ -10,3 +10,4 @@ SQLAlchemy-Utils==0.35.0
 discord.py
 psycopg2-binary
 matplotlib
+nest_asyncio

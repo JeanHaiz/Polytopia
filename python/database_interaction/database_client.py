@@ -143,7 +143,6 @@ class DatabaseClient:
                 FROM message_resources
                 WHERE source_channel_id = {channel_id}
                 AND operation = {ImageOp.MAP_INPUT.value};""").fetchall()
-        print("pre filenames", filenames)
         return [dict(row)["filename"] for row in filenames]
 
     def get_resource_number(self, filename):
@@ -164,7 +163,7 @@ class DatabaseClient:
         latest_turn = self.engine.execute(
             f"""SELECT latest_turn FROM polytopia_game
                 WHERE channel_discord_id = {channel_id};""").fetchone()
-        if len(latest_turn) > 0:
+        if latest_turn is not None and len(latest_turn) > 0:
             return latest_turn[0]
 
     def set_new_last_turn(self, channel_id, turn):
@@ -174,13 +173,9 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""")
 
     def get_game_map_size(self, channel_id):
-        print("something")
         map_size = self.engine.execute(
             f"""SELECT map_size FROM polytopia_game
-                WHERE channel_discord_id = {channel_id};""")
-        print("between", map_size)
-        map_size = map_size.fetchone()
-        print("after", len(map_size))
+                WHERE channel_discord_id = {channel_id};""").fetchone()
         if len(map_size) > 0:
             return map_size[0]
 

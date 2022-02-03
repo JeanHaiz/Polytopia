@@ -191,9 +191,9 @@ async def get_attachments(bot_client, channel_id, message_id):
     return message.attachments
 
 
-async def wrap_errors(ctx, guild_id, fct, is_async, *params):
+async def wrap_errors(ctx, guild_id, fct, is_async, *params, **kwparams):
     print("params", len(params), params)
-    if True:
+    try:
         is_test_server = str(guild_id) == "918195469245628446"
         is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
         print("environment", is_test_server, is_dev_env, os.getenv("POLYTOPIA_TEST_SERVER", "0"),
@@ -204,16 +204,16 @@ async def wrap_errors(ctx, guild_id, fct, is_async, *params):
             else:
                 return fct(*params)
         print("out")
-    else:
+    except BaseException:
         error = sys.exc_info()[0]
         logger.error("##### ERROR #####")
         logger.error(error)
-        # logger.error(traceback.format_exc())
+        logger.error(traceback.format_exc())
         print("##### ERROR #####")
         print(error)
         traceback.print_exc()
-        # myid = '<@338067113639936003>'  # Jean's id
-        # await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
+        myid = '<@338067113639936003>'  # Jean's id
+        await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
 
 
 async def get_scores(database_client, ctx):

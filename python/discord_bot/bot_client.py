@@ -150,7 +150,6 @@ async def drop_score(ctx, turn):
 
 @bot_client.command(name="patch")
 async def patch_map(ctx):
-    print("in")
     turn = database_client.get_last_turn(ctx.channel.id)
     turn, patch = await bot_utils.generate_patched_map(
         database_client, ctx.channel.id, ctx.channel.name, ctx.message, turn)
@@ -158,9 +157,6 @@ async def patch_map(ctx):
         return await ctx.channel.send(file=patch, content="map patched for turn %s" % turn)
     else:
         return await ctx.channel.send("patch failed")
-    # await bot_utils.process_map_patching(ctx.message, ctx.channel, database_client)
-    # await bot_utils.wrap_errors(ctx.message, ctx.guild.id, bot_utils.process_map_patching, True, ctx.message,
-    # ctx.channel, database_client)
 
 
 @bot_client.command(name="hello")

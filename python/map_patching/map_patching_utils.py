@@ -2,6 +2,7 @@ import re
 import cv2
 import math
 import discord
+import asyncio
 import pytesseract
 import numpy as np
 import pandas as pd
@@ -9,6 +10,9 @@ import pandas as pd
 from common import image_utils
 from common.image_utils import ImageOp
 from database_interaction import database_client
+
+import nest_asyncio
+nest_asyncio.apply()
 
 DEBUG = 1
 
@@ -386,7 +390,7 @@ async def process_raw_map(
 
 
 async def transform_image(
-        image_i, vertices_i, is_vertical, reference_position, reference_size, channel_name, filename_i):
+        image_i, vertices_i, is_vertical, reference_position, reference_size, channel_name, filename_i, loop):
     transformation_dimensions = get_transformation_dimensions(
         vertices_i, is_vertical, reference_position, reference_size)
     padding, scale_factor, padded_and_scaled = transformation_dimensions
@@ -397,8 +401,11 @@ async def transform_image(
 
     scaled_image = scale_image(image_i, channel_name, scale_factor, filename_i)
     cropped_image, padding = crop_padding_(scaled_image, padding, filename_i, channel_name)
-    oppacity = remove_clouds_scaled(cropped_image)
 
+    coroutine = remove_clouds(cropped_image, ksize=7, sigma=15)
+    # loop.create_task(coroutine)
+    oppacity = loop.run_until_complete(coroutine)
+    print(coroutine)
     padding = np.flip(padding)
 
     return cropped_image, oppacity, padding, scale_factor, padded_and_scaled
@@ -460,13 +467,14 @@ async def patch_partial_maps(
         vertical.append(is_vertical_i)
 
     reference_position, reference_size = get_references(vertices)
+    loop = asyncio.get_running_loop()
 
     for i in range(len(images)):
         image_i = images[i]
         vertices_i = vertices[i]
         is_vertical_i = vertical[i]
         transformation = await transform_image(
-            image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name, filename_i)
+            image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name, filename_i, loop)
         scaled_image, oppacity, padding, scale_factor, padded_and_scaled = transformation
 
         transparency_masks.append(oppacity)
@@ -528,7 +536,7 @@ def is_map_patching_request(message, attachment, filename):
     return "🖼️" in [r.emoji for r in message.reactions]
 
 
-def remove_clouds(img, ouptut_prefix=None, ksize=31, sigma=25):
+async def remove_clouds(img, ouptut_prefix=None, ksize=31, sigma=25):
     # read chessboard image
     # img = cv2.imread(image_path)
     img_alpha = np.ones((img.shape[0:2]))

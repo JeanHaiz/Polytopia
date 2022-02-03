@@ -46,7 +46,7 @@ GRANT ALL PRIVILEGES ON TABLE polytopia_game TO discordBot;
 
 CREATE TABLE IF NOT EXISTS polytopia_player(
 	game_player_uuid uuid DEFAULT uuid_generate_v4() UNIQUE NOT NULL,
-	discord_player_id BIGINT UNIQUE NOT NULL,
+	discord_player_id BIGINT UNIQUE,
 	discord_player_name VARCHAR(40),
 	polytopia_player_name VARCHAR(40),
 	PRIMARY KEY (game_player_uuid)
