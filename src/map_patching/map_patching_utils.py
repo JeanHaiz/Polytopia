@@ -9,6 +9,7 @@ import pandas as pd
 
 from common import image_utils
 from common.image_utils import ImageOp
+from common import image_processing_utils
 from database_interaction import database_client
 
 import nest_asyncio
@@ -17,17 +18,9 @@ nest_asyncio.apply()
 DEBUG = 1
 
 
-def get_one_color_edges(image, channel=None, filename=None, low=50, high=150):
-    edges = cv2.Canny(image, low, high, apertureSize=3)
-    if filename and channel:
-        image_utils.save_image(edges, channel.name, filename, ImageOp.ONE_COLOR_EDGES)
-        # image_utils.write_img(edges, filename, 'one_colour_edges_%d_%d' % (low, high))
-    return edges
-
-
 def getLines(image, minLineLength=500, channel=None, filename=None):
     processed = image.copy()
-    edges = get_one_color_edges(image, channel=channel)
+    edges = image_processing_utils.get_one_color_edges(image, channel=channel)
     lines = cv2.HoughLinesP(image=edges, rho=0.1, theta=np.pi/180, threshold=150, lines=np.array([]),
                             minLineLength=minLineLength, maxLineGap=100)
 
@@ -39,25 +32,6 @@ def getLines(image, minLineLength=500, channel=None, filename=None):
             image_utils.save_image(image, channel.name, filename, ImageOp.HOUGH_LINES)
             # image_utils.write_img(image, filename, "houghlines5")
     return processed
-
-
-def get_three_color_edges(image, channel_name=None, filename=None):
-    img = cv2.copyMakeBorder(image, 50, 50, 50, 50, cv2.BORDER_CONSTANT)
-
-    # Split out each channel
-    blue, green, red = cv2.split(img)
-
-    # Run canny edge detection on each channel
-    blue_edges = cv2.Canny(blue, 200, 250)
-    green_edges = cv2.Canny(green, 200, 250)
-    red_edges = cv2.Canny(red, 200, 250)
-
-    # Join edges back into image
-    edges = blue_edges | green_edges | red_edges
-    if filename is not None:
-        image_utils.save_image(edges, channel_name, filename, ImageOp.THREE_COLOR_EDGES)
-        # image_utils.write_img(edges, filename, 'three_color_edges_200_250')
-    return edges
 
 
 def select_contours(image, filename=None):
@@ -347,7 +321,7 @@ async def process_raw_map(
         print("EXIT LOOP")
         return
 
-    edges = get_three_color_edges(image, channel_name, filename_i)
+    edges = image_processing_utils.get_three_color_edges(image, channel_name, filename_i, border=50)
     blur = cv2.GaussianBlur(edges, (kernel_size, kernel_size), sigmaX=sigma)
     contour = select_contours(blur, filename_i)
     polygon = draw_contour(edges, contour, channel_name, filename=filename_i)
@@ -672,6 +646,31 @@ def get_turn(image, channel_name):
 
     contours, _ = cv2.findContours(selected_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
 
+    rows, row_mins, row_maxes = split_in_rows(contours)
+
+    delta = 15
+    turn = None
+    for i in rows.keys():
+        row_min_i = max(row_mins[i] - delta, 0)
+        row_max_i = min(row_maxes[i] + delta, selected_image.shape[0])
+        row_image = selected_image[row_min_i:row_max_i]
+        image_utils.save_image(row_image, channel_name, "binary_%d" % i, ImageOp.TURN_PIECES)
+        row_text = pytesseract.image_to_string(row_image, config='--psm 6')
+
+        cleared_row_text = row_text.replace("\n", "").replace("\x0c", "")
+        cleared_row_text = re.sub(r"[^a-zA-Z0-9 ]", "", cleared_row_text)
+        if 'Scores' not in cleared_row_text and 'Stars' not in cleared_row_text:
+            cleared_row_text_split = cleared_row_text.split(" ")
+            if len(cleared_row_text_split) > 2 and cleared_row_text_split[2].isnumeric():
+                turn = cleared_row_text_split[2]
+    if turn is None:
+        print("turn not recognised")
+    else:
+        print("turn %s" % turn)
+    return turn
+
+
+def split_in_rows(contours):
     rows = {}
     row_mins = {}
     row_maxes = {}
@@ -706,24 +705,4 @@ def get_turn(image, channel_name):
                 rows[new_i] = [c]
                 row_mins[new_i] = x
                 row_maxes[new_i] = x + w
-
-    delta = 15
-    turn = None
-    for i in rows.keys():
-        row_min_i = max(row_mins[i] - delta, 0)
-        row_max_i = min(row_maxes[i] + delta, selected_image.shape[0])
-        row_image = selected_image[row_min_i:row_max_i]
-        image_utils.save_image(row_image, channel_name, "binary_%d" % i, ImageOp.TURN_PIECES)
-        row_text = pytesseract.image_to_string(row_image, config='--psm 6')
-
-        cleared_row_text = row_text.replace("\n", "").replace("\x0c", "")
-        cleared_row_text = re.sub(r"[^a-zA-Z0-9 ]", "", cleared_row_text)
-        if 'Scores' not in cleared_row_text and 'Stars' not in cleared_row_text:
-            cleared_row_text_split = cleared_row_text.split(" ")
-            if len(cleared_row_text_split) > 2 and cleared_row_text_split[2].isnumeric():
-                turn = cleared_row_text_split[2]
-    if turn is None:
-        print("turn not recognised")
-    else:
-        print("turn %s" % turn)
-    return turn
+    return rows, row_mins, row_maxes

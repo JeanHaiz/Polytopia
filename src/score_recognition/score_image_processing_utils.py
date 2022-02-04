@@ -23,9 +23,10 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-import time
 import cv2
 import numpy as np
+
+from common import image_processing_utils
 
 DEBUG = 0
 
@@ -210,26 +211,27 @@ def clear_noise(orig_img, border_width=50, low_threshold=200, high_threshold=250
     if DEBUG:
         print("Image is " + str(len(img)) + "x" + str(len(img[0])))
 
-    # Split out each channel
-    blue, green, red = cv2.split(img)
-
-    # Run canny edge detection on each channel
-    blue_edges = cv2.Canny(blue, low_threshold, high_threshold)
-    green_edges = cv2.Canny(green, low_threshold, high_threshold)
-    red_edges = cv2.Canny(red, low_threshold, high_threshold)
-
-    # Join edges back into image
-    edges = blue_edges | green_edges | red_edges
+    edges = image_processing_utils.get_three_color_edges(img, low_thresh=low_threshold, high_thresh=high_threshold)
 
     # Find the contours
     contours, hierarchy = cv2.findContours(edges.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
 
     hierarchy = hierarchy[0]
 
-    if DEBUG:
-        processed = edges.copy()
-        rejected = edges.copy()
+    processed = edges.copy() if DEBUG else None
+    rejected = edges.copy() if DEBUG else None
 
+    keepers = select_contours(hierarchy, min_size, processed, rejected)
+
+    new_image = invert_bg_fg_if_needed(edges, keepers)
+
+    # blur a bit to improve ocr accuracy
+    if blur_kernel is not None:
+        new_image = cv2.blur(new_image, (blur_kernel, blur_kernel))
+    return new_image
+
+
+def select_contours(hierarchy, min_size, processed=None, rejected=None):
     # These are the boxes that we are determining
     keepers = []
 
@@ -245,14 +247,17 @@ def clear_noise(orig_img, border_width=50, low_threshold=200, high_threshold=250
         if keep(contour_, min_size) and include_box(index_, hierarchy, contour_, min_size):
             # It's a winner!
             keepers.append([contour_, [x, y, w, h]])
-            if DEBUG:
+            if DEBUG and processed is not None:
                 cv2.rectangle(processed, (x, y), (x + w, y + h), (100, 100, 100), 1)
                 cv2.putText(processed, str(index_), (x, y - 5), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))
         else:
-            if DEBUG:
+            if DEBUG and rejected is not None:
                 cv2.rectangle(rejected, (x, y), (x + w, y + h), (100, 100, 100), 1)
                 cv2.putText(rejected, str(index_), (x, y - 5), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255))
+    return keepers
 
+
+def invert_bg_fg_if_needed(edges, keepers):
     # Make a white copy of our image
     new_image = edges.copy()
     new_image.fill(255)
@@ -262,11 +267,8 @@ def clear_noise(orig_img, border_width=50, low_threshold=200, high_threshold=250
 
         # Find the average intensity of the edge pixels to
         # determine the foreground intensity
-        fg_int = 0.0
-        for p in contour_:
-            fg_int += ii(p[0][0], p[0][1])
+        fg_int = sum(ii(p[0][0], p[0][1]) for p in contour_) / len(contour_)
 
-        fg_int /= len(contour_)
         if DEBUG:
             print("FG Intensity for #%d = %d" % (index_, fg_int))
 
@@ -291,8 +293,8 @@ def clear_noise(orig_img, border_width=50, low_threshold=200, high_threshold=250
             fg = 0
             bg = 255
 
-            # Loop through every pixel in the box and color the
-            # pixel accordingly
+        # Loop through every pixel in the box and color the
+        # pixel accordingly
         for x in range(x_, x_ + width):
             for y in range(y_, y_ + height):
                 if y >= img_y or x >= img_x:
@@ -303,16 +305,4 @@ def clear_noise(orig_img, border_width=50, low_threshold=200, high_threshold=250
                     new_image[y][x] = bg
                 else:
                     new_image[y][x] = fg
-
-    # blur a bit to improve ocr accuracy
-    if blur_kernel is not None:
-        new_image = cv2.blur(new_image, (blur_kernel, blur_kernel))
-    if False:
-        # cv2.imwrite(input_file + "debug.jpg", new_image)
-        print("writing images")
-        cv2.imwrite('/Users/jean/Documents/Coding/Polytopia/resources/cleared.png', new_image)
-        cv2.imwrite('/Users/jean/Documents/Coding/Polytopia/resources/edges.png', edges)
-        # cv2.imwrite('/Users/jean/Documents/Coding/Polytopia/resources/processed.png', processed)
-        # cv2.imwrite('/Users/jean/Documents/Coding/Polytopia/resources/rejected.png', rejected)
-        time.sleep(4)
     return new_image

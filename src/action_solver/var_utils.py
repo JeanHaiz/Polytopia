@@ -121,7 +121,8 @@ def addStars(turn):
         for item, cost in cost_dict.items():
             if topic == 'units':
                 if item != 'giant':
-                    stars[turn + "_" + item + "_" + "stars"] = model.NewIntVar(0, 200, turn + "_" + item + "_" + "stars")
+                    stars[turn + "_" + item + "_" + "stars"] = \
+                        model.NewIntVar(0, 200, turn + "_" + item + "_" + "stars")
             if topic == 'techs':
                 stars[turn + "_" + item + "_" + "cost"] = model.NewIntVar(0, 25, turn + "_" + item + "_" + "cost")
                 stars[turn + "_" + item + "_" + "stars"] = model.NewIntVar(0, 25, turn + "_" + item + "_" + "stars")

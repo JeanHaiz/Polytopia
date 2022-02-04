@@ -4,9 +4,10 @@ from __future__ import print_function
 
 import re
 
-from python.action_solver.file_utils import getValues, getTribes, getRuins
-from python.action_solver.file_utils import MAX_CITY_LEVEL, dic, model, getTechList
-from python.action_solver.var_utils import addMoves, addTechs, addVars, addTribes, addScore, addSpecial, addPop, addCity, addStars
+from src.action_solver.file_utils import getValues, getTribes, getRuins
+from src.action_solver.file_utils import MAX_CITY_LEVEL, dic, model, getTechList
+from src.action_solver.var_utils import addMoves, addTechs, addVars, addTribes, addScore, addSpecial
+from src.action_solver.var_utils import addPop, addCity, addStars
 
 
 def setTribe(turn, tribe):
@@ -41,7 +42,7 @@ def buildDictionnaries(turn, stars, moves):
     if moves:
         dic.update(addMoves(turn))
 
-
+# flake8: noqa: C901
 def addInitialState(turn, stars, moves):
     if turn == "start":
         model.Add(dic[turn + "_" + "claimed"] == 9)

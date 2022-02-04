@@ -10,12 +10,6 @@ from common.logger_utils import logger
 
 # REPO_ROOT = "/Users/jean/Documents/Coding/Polytopia/"
 REPO_ROOT = pathlib.Path(__file__).parent.parent.absolute()
-print(REPO_ROOT)
-INPUT_ROOT = os.path.join(REPO_ROOT, "resources")
-OUTPUT_ROOT = os.path.join(REPO_ROOT, "output")
-
-# os.makedirs(INPUT_ROOT, exist_ok=True)
-# os.makedirs(OUTPUT_ROOT, exist_ok=True)
 
 
 class ImageOp(Enum):
@@ -106,20 +100,6 @@ def move_back_input_image(channel, filename, source_operation):
     image = cv2.imread(file_path)
     if image is not None:
         return save_image(image, channel.name, filename, ImageOp.INPUT)
-
-
-def __read_img(filename):
-    return cv2.imread(os.path.join(INPUT_ROOT, filename))
-
-
-def __write_img(image, filename, transformation_name):
-    split_name = filename.split(".")
-    filename_part = split_name[0] if (len(split_name) == 1) else ".".join(split_name[:-1])
-    return cv2.imwrite(os.path.join(OUTPUT_ROOT, filename_part + "_" + transformation_name + ".png"), image)
-
-
-def __get_path(filename):
-    return os.path.join(INPUT_ROOT, filename)
 
 
 def __get_parent_path(channel_name, operation):
