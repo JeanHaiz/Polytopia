@@ -1,4 +1,5 @@
 .PHONY: database
+.PHONY: tests
 
 up:
 	docker-compose up --detach python
@@ -15,4 +16,4 @@ database:
 	docker-compose up --build --detach database
 
 tests:
-	pytest -v tests/py_test.py 
+	pytest -v tests/score_test.py

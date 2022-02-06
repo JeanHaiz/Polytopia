@@ -1,4 +1,5 @@
 import re
+import os
 import cv2
 import math
 import discord
@@ -15,7 +16,7 @@ from database_interaction import database_client
 import nest_asyncio
 nest_asyncio.apply()
 
-DEBUG = 1
+DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
 
 def getLines(image, minLineLength=500, channel=None, filename=None):
@@ -640,8 +641,7 @@ def remove_clouds_scaled(img, ksize=7, sigma=15):
 def get_turn(image, channel_name):
     crop = image[:int(image.shape[0] / 6), :]
     grayImage = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    (_, blackAndWhiteImage) = cv2.threshold(grayImage, 100, 255, cv2.THRESH_BINARY)
-    selected_image = blackAndWhiteImage
+    (_, selected_image) = cv2.threshold(grayImage, 100, 255, cv2.THRESH_BINARY)
     # map_text = pytesseract.image_to_string(selected_image, config='--oem 3 --psm 6').split("\n")
 
     contours, _ = cv2.findContours(selected_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)

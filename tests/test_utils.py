@@ -2,7 +2,7 @@ import os
 import cv2
 import pathlib
 
-REPO_ROOT = pathlib.Path(__file__).parent.parent.absolute()
+REPO_ROOT = pathlib.Path(__file__).parent.absolute()
 
 
 def get_resource(folder, filename):
@@ -13,3 +13,7 @@ def get_resource(folder, filename):
 
 def get_score_resource(filename):
     return get_resource("score_recognition", filename + ".png")
+
+
+def get_map_resource(filename):
+    return get_resource("map_patching", filename + ".png")

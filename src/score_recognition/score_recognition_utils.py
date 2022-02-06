@@ -5,7 +5,7 @@ import pytesseract
 import numpy as np
 from common.logger_utils import logger
 
-from .score_image_processing_utils import clear_noise
+# from .score_image_processing_utils import clear_noise
 
 
 def is_score_reconition_request(reactions, attachment, filename):
@@ -18,11 +18,9 @@ def is_score_reconition_request(reactions, attachment, filename):
 
 
 def read_scores(image):
-    cropped = crop(image)
-    clear = clear_noise(cropped)
-    scores_you = get_scores(clear, only_you=True)
-    scores = get_scores(image)
-    return scores + scores_you
+    clear = clear_noise_optimised(image)
+    scores_you = get_scores(clear)
+    return scores_you
 
 
 def read(image, config=''):
@@ -42,9 +40,10 @@ def get_scores(image, only_you=False):
     logger.debug("read image scores")
     image_reading = read(image)
     logger.debug("image reading: %s" % image_reading)
-    image_text = image_reading.replace("¢", "c").split('\n')
+    image_text = image_reading.split('\n')
     print("image text", only_you, image_text)
-    scores = [read_line(t) for t in image_text if "score" in t and (not only_you or "Ruled by you" in t)]
+    # scores = [read_line(t) for t in image_text if "score" in t and (not only_you or "Ruled by you" in t)]
+    scores = [read_line(t) for t in image_text if "score" in t]
     logger.debug(scores)
     print("scores", only_you, scores)
     return scores
@@ -52,9 +51,11 @@ def get_scores(image, only_you=False):
 
 def read_line(line):
     print("line", line)
-    line = line.replace(".", "").replace(" ", "")
-
+    # line = line.replace(".", "").replace(" ", "")
+    line = re.sub(r"[^a-zA-Z0-9,:]", "", line)
+    print("re-line", line)
     s1 = line.split(",")
+
     if len(s1) >= 2:
         if "Unknownruler" in s1[0]:
             player = "Unknown ruler"
@@ -76,3 +77,41 @@ def read_line(line):
         print("s1 error", line)
         return
     return (player, score)
+
+
+def clear_noise_optimised(image):
+    value = (np.array(0.3 * image[:, :, 2] + 0.59 * image[:, :, 1] + 0.11 * image[:, :, 0])).astype(np.uint8)
+    return cv2.threshold(value, 170, 255, cv2.THRESH_BINARY_INV)[1]
+
+
+def ii(image, xx, yy, img_x, img_y):
+    if yy >= img_y or xx >= img_x:
+        # print "pixel out of bounds ("+str(y)+","+str(x)+")"
+        return 0
+    pixel = image[yy][xx]
+    return 0.30 * pixel[2] + 0.59 * pixel[1] + 0.11 * pixel[0]
+
+
+def clear_noise_slow(image):
+    # pixel intensity = 0.30R + 0.59G + 0.11B
+    img_y = len(image)
+    img_x = len(image[0])
+    new_image = image.copy()
+    new_image.fill(255)
+    width = image.shape[1]
+    height = image.shape[0]
+
+    fg = 255
+    bg = 0
+    fg_int = 170
+
+    # Loop through every pixel in the box and color the
+    # pixel accordingly
+    for x in range(width):
+        for y in range(height):
+            if ii(image, x, y, img_x, img_y) > fg_int:
+                new_image[y][x] = bg
+            else:
+                new_image[y][x] = fg
+    # new_image = [[ii(pixel) for pixel in row] for row in image]
+    return new_image

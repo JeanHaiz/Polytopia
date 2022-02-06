@@ -23,12 +23,13 @@
 # WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import os
 import cv2
 import numpy as np
 
 from common import image_processing_utils
 
-DEBUG = 0
+DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
 
 # Determine pixel intensity
