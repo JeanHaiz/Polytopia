@@ -10,7 +10,7 @@ then
 	git pull
 	chmod +x /Users/jean/Documents/Coding/Polytopia/post-receive.sh
 	docker-compose down
-	docker-compose up --build --detach helper
+	docker-compose up --detach helper
 	crontab crontab.txt
 else
 	echo Current branch is up to date with origin/master.

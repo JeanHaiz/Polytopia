@@ -162,4 +162,4 @@ async def patch_map(ctx):
 
 @bot_client.command(name="hello")
 async def say_hello(ctx):
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, ctx.send, True, "hello")
+    await bot_utils.wrap_errors(ctx, ctx.guild.id, ctx.send, True, "hello my friend")
