@@ -1,5 +1,5 @@
-from python.action_solver.file_utils import getMoves, getValues, getTechs, getTribes, getRuins, getPopulation, getCost
-from python.action_solver.file_utils import MAX_CITY_LEVEL, model, name
+from src.action_solver.file_utils import getMoves, getValues, getTechs, getTribes, getRuins, getPopulation, getCost
+from src.action_solver.file_utils import MAX_CITY_LEVEL, model, name
 
 
 def addMoves(turn):

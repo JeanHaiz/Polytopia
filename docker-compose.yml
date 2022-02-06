@@ -19,13 +19,13 @@ services:
             # - ./database/1_init_sql.sql:/docker-entrypoint-initdb.d/1_init.sql
             # - ./db-data/:/var/lib/postgresql/data/
 
-    python:
+    helper:
         build:
-            context: "./python/"
+            context: "/Users/jean/Documents/Coding/Polytopia/src/"
             dockerfile: Dockerfile
         restart: "always"
         volumes:
-            - /Users/jean/Documents/Coding/Polytopia/python:/app
+            - /Users/jean/Documents/Coding/Polytopia/src:/app
         env_file:
             - .env
         depends_on:

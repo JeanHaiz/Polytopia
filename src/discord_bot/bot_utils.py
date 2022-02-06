@@ -120,7 +120,7 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
     if payload.emoji == discord.PartialEmoji(name="📈"):
         channel = bot_client.get_channel(payload.channel_id)
         message = await channel.fetch_message(payload.message_id)
-        return await process_score_recognition()
+        return await process_score_recognition(database_client, channel, message)
 
     elif payload.emoji == discord.PartialEmoji(name="🖼️"):
         channel = bot_client.get_channel(payload.channel_id)
@@ -146,7 +146,8 @@ async def process_score_recognition(database_client, channel, message):
         output = ""
         for i, attachment in enumerate(message.attachments):
             if score_recognition_utils.is_score_reconition_request(message.reactions, attachment, "filename"):
-                filename = prepare_attachment(database_client, channel, message, attachment, i, ImageOp.SCORE_INPUT)
+                filename = await prepare_attachment(
+                    database_client, channel, message, attachment, i, ImageOp.SCORE_INPUT)
                 score_text = await score_recognition_routine(database_client, message, filename)
                 print("score text:", score_text)
                 if score_text is not None:
@@ -163,7 +164,7 @@ async def process_map_patching(message, channel, database_client):
     if len(message.attachments) > 0:
         for i, attachment in enumerate(message.attachments):
             if map_patching_utils.is_map_patching_request(message, attachment, "filename"):
-                filename = prepare_attachment(database_client, channel, message, attachment, i, ImageOp.MAP_INPUT)
+                filename = await prepare_attachment(database_client, channel, message, attachment, i, ImageOp.MAP_INPUT)
                 turn, patch = await map_patching_routine(database_client, attachment, message, filename)
                 if patch is not None:
                     return await channel.send(file=patch, content="map patched for turn %s" % turn)

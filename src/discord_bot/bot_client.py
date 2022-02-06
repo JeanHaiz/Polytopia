@@ -53,8 +53,9 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
     is_active = database_client.is_channel_active(payload.channel_id)
     if is_active:
         channel = bot_client.get_channel(payload.channel_id)
+        message = await channel.fetch_message(payload.message_id)
         await bot_utils.wrap_errors(
-            channel, channel.guild.id, bot_utils.reaction_added_routine, True, *(payload, bot_client, database_client))
+            message, channel.guild.id, bot_utils.reaction_added_routine, True, *(payload, bot_client, database_client))
 
 
 @bot_client.event
