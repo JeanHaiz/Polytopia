@@ -1,6 +1,10 @@
 echo $(pwd)
 echo Start of post-receive
 
+source /etc/profile
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
+export PATH
+
 git fetch git@github.com:JeanHaiz/Polytopia.git master
 
 HEADHASH=$(git rev-parse FETCH_HEAD)
