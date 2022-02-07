@@ -3,7 +3,7 @@ echo Start of post-receive
 
 git fetch git@github.com:JeanHaiz/Polytopia.git master
 
-HEADHASH=$(git rev-parse HEAD)
+HEADHASH=$(git rev-parse FETCH_HEAD)
 UPSTREAMHASH=$(git rev-parse master@{upstream})
 
 echo $HEADHASH $UPSTREAMHASH
