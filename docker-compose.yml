@@ -12,7 +12,6 @@ services:
             POSTGRES_USER: discordBot
             POSTGRES_PASSWORD: password123
             POSTGRES_DB: polytopiaHelper_dev
-            DOCKER_DEFAULT_PLATFORM: linux/amd64
         #env_file:
         #    - .env
         # volumes:
