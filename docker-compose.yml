@@ -14,9 +14,9 @@ services:
             POSTGRES_DB: polytopiaHelper_dev
         #env_file:
         #    - .env
-        # volumes:
+        volumes:
             # - ./database/1_init_sql.sql:/docker-entrypoint-initdb.d/1_init.sql
-            # - ./db-data/:/var/lib/postgresql/data/
+            - ./db-data/:/var/lib/postgresql/data/
 
     helper:
         build:
