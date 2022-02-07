@@ -17,8 +17,8 @@ then
 	echo Not up to date with origin. Pulling and Restarting.
 	git pull git@github.com:JeanHaiz/Polytopia.git master
 	chmod +x /Users/jean/Documents/Coding/Polytopia/post-receive.sh
-	docker-compose down
-	docker-compose up --detach helper
+	/usr/local/bin/docker-compose down
+	/usr/local/bin/docker-compose up --detach helper
 	crontab crontab.txt
 	echo End of Pulling
 else
