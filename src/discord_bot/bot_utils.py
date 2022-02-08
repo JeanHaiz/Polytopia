@@ -225,7 +225,7 @@ async def get_scores(database_client, ctx):
     scores = database_client.get_channel_scores(ctx.channel.id)
     if scores is not None:
         scores = scores[scores['turn'] != -1]
-        score_plt = await score_visualisation.plotScores(scores, ctx.channel.name, str(ctx.message.id))
+        score_plt = score_visualisation.plotScores(scores, ctx.channel.name, str(ctx.message.id))
         await ctx.message.channel.send(file=score_plt, content="score recognition")
         await ctx.send(str(scores))
     else:
