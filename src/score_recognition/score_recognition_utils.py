@@ -17,12 +17,6 @@ def is_score_reconition_request(reactions, attachment, filename):
     # return true  # discord.PartialEmoji(name="📈") in [r.emoji for r in message.reactions]
 
 
-def read_scores(image):
-    clear = clear_noise_optimised(image)
-    scores_you = get_scores(clear)
-    return scores_you
-
-
 def read(image, config=''):
     return pytesseract.image_to_string(image, config=config)
 
@@ -36,25 +30,29 @@ def crop(image):
     return image[heights[0]:heights[-1], :]
 
 
-def get_scores(image, only_you=False):
+def read_scores(image):
+    clear = clear_noise_optimised(image)
     logger.debug("read image scores")
-    image_reading = read(image)
+    image_reading = read(clear)
     logger.debug("image reading: %s" % image_reading)
     image_text = image_reading.split('\n')
-    print("image text", only_you, image_text)
+    print("image text", image_text)
     # scores = [read_line(t) for t in image_text if "score" in t and (not only_you or "Ruled by you" in t)]
     scores = [read_line(t) for t in image_text if "score" in t]
     logger.debug(scores)
-    print("scores", only_you, scores)
+    print("scores", scores)
     return scores
 
 
 def read_line(line):
     print("line", line)
     # line = line.replace(".", "").replace(" ", "")
+    line = re.sub(r"(\\[a-zA-Z0-9]*)", "", line)
     line = re.sub(r"[^a-zA-Z0-9,:]", "", line)
     print("re-line", line)
     s1 = line.split(",")
+
+    s1 = [s1_i for s1_i in s1 if s1_i != '' and len(s1_i) > 1]
 
     if len(s1) >= 2:
         if "Unknownruler" in s1[0]:

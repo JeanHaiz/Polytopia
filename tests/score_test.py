@@ -33,3 +33,14 @@ def test_score_recognition_with_6_players():
     assert score[3] == ("Unknown ruler", 1445)
     assert score[4] == ("Ruled by you", 1290)
     assert score[5] == ("Unknown ruler", 1015)
+
+
+def test_score_recognition_with_4_players_bis():
+    image = test_utils.get_score_resource("image_4")
+    assert image is not None
+    score = score_recognition_utils.read_scores(image)
+    assert len(score) == 4
+    assert score[0] == ("Player1", 2035)
+    assert score[1] == ("Nuupi", 1530)
+    assert score[2] == ("Unknown ruler", 1515)
+    assert score[3] == ("Npico", 1240)

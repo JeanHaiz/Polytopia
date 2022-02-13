@@ -47,27 +47,28 @@ class DatabaseClient:
     # TODO: result should be modified: result = [dict(row) for row in resultproxy]
     def get_game_players(self, channel_id):
         result_proxy = self.engine.execute(
-            f"""SELECT game_players.discord_player_id,
+            f"""SELECT polytopia_player.game_player_uuid,
                        polytopia_player.polytopia_player_name,
                        polytopia_player.discord_player_name
                 FROM game_players
                 JOIN polytopia_player
-                ON game_players.discord_player_id = polytopia_player.discord_player_id
+                ON game_players.game_player_uuid = polytopia_player.game_player_uuid
                 WHERE channel_discord_id = {channel_id};""").fetchall()
         return [dict(row) for row in result_proxy]
 
     def add_score(self, channel_id, player_id, score, turn):
+        player_id = ("'" + str(player_id) + "'") if player_id is not None else 'NULL'
         return self.engine.execute(
             f"""INSERT INTO game_player_scores
-                (channel_discord_id, discord_player_id, turn, score, confirmed)
-                VALUES ({channel_id}, {player_id or 'NULL'}, {turn}, {score}, false);""")
+                (channel_discord_id, game_player_uuid, turn, score, confirmed)
+                VALUES ({channel_id}, {player_id}, {turn}, {score}, false);""")
 
     def get_channel_scores(self, channel_id):
         scores = self.engine.execute(
-            f"""SELECT discord_player_name, turn, score
+            f"""SELECT polytopia_player_name, turn, score
                 FROM game_player_scores
                 LEFT JOIN polytopia_player
-                ON game_player_scores.discord_player_id = polytopia_player.discord_player_id
+                ON game_player_scores.game_player_uuid = polytopia_player.game_player_uuid
                 WHERE channel_discord_id = {channel_id}
                 ORDER BY turn ASC;""")
         score_entries = scores.fetchall()
@@ -78,10 +79,10 @@ class DatabaseClient:
 
     def get_channel_scores_gb(self, channel_id):
         return self.engine.execute(
-            f"""SELECT discord_player_id, array_agg(turn), array_agg(score)
+            f"""SELECT game_player_uuid, array_agg(turn), array_agg(score)
                 FROM game_player_scores
                 WHERE channel_discord_id = {channel_id}
-                GROUP BY discord_player_id;""").fetchall()
+                GROUP BY game_player_uuid;""").fetchall()
 
     def list_active_channels(self, server_id):
         return self.engine.execute(
@@ -159,6 +160,12 @@ class DatabaseClient:
                 SET discord_player_name = '{str(discord_player_name)}',
                 polytopia_player_name = '{str(polytopia_player_name)}';""")
 
+    def set_player_game_name(self, game_player_uuid, polytopia_player_name):
+        return self.engine.execute(
+            f"""UPDATE polytopia_player
+                SET polytopia_player_name = '{polytopia_player_name}'
+                WHERE game_player_uuid = '{game_player_uuid}';""")
+
     def get_last_turn(self, channel_id):
         latest_turn = self.engine.execute(
             f"""SELECT latest_turn FROM polytopia_game
@@ -186,22 +193,38 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""")
 
     def add_player_n_game(self, message, author):
-        return self.engine.execute(
+        game_player_uuid = self.engine.execute(
             f"""INSERT INTO polytopia_player
                 (discord_player_id, discord_player_name)
                 VALUES ({author.id}, '{str(author.name)}')
                 ON CONFLICT (discord_player_id) DO UPDATE
-                SET discord_player_name = '{author.name}';
+                SET discord_player_name = '{author.name}'
+                RETURNING game_player_uuid::text;""").fetchone()
+        if game_player_uuid is not None and len(game_player_uuid) > 0:
+            return self.engine.execute(
+                f"""INSERT INTO polytopia_game
+                    (server_discord_id, channel_discord_id)
+                    VALUES ({message.guild.id}, {message.channel.id})
+                    ON CONFLICT (channel_discord_id) DO NOTHING;
 
-                INSERT INTO polytopia_game
-                (server_discord_id, channel_discord_id)
-                VALUES ({message.guild.id}, {message.channel.id})
-                ON CONFLICT (channel_discord_id) DO NOTHING;
+                    INSERT INTO game_players
+                    (game_player_uuid, channel_discord_id, is_alive)
+                    VALUES ('{game_player_uuid[0]}', {message.channel.id}, true)
+                    ON CONFLICT (game_player_uuid, channel_discord_id) DO NOTHING;""")
 
-                INSERT INTO game_players
-                (discord_player_id, channel_discord_id, is_alive)
-                VALUES ({author.id}, {message.channel.id}, true)
-                ON CONFLICT (discord_player_id, channel_discord_id) DO NOTHING;""")
+    def add_missing_player(self, player_name, channel_id):
+        game_player_uuid = self.engine.execute(
+            f"""INSERT INTO polytopia_player
+                (polytopia_player_name)
+                VALUES ('{str(player_name)}')
+                RETURNING game_player_uuid::text;""").fetchone()
+        if game_player_uuid is not None and len(game_player_uuid) > 0:
+            self.engine.execute(
+                f"""INSERT INTO game_players
+                    (game_player_uuid, channel_discord_id, is_alive)
+                    VALUES ('{game_player_uuid[0]}', {channel_id}, true)
+                    ON CONFLICT (game_player_uuid, channel_discord_id) DO NOTHING;""")
+            return game_player_uuid[0]
 
     def drop_score(self, channel_id, turn):
         return self.engine.execute(

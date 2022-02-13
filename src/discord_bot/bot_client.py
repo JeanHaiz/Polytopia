@@ -1,5 +1,6 @@
 
 import discord
+import pandas as pd
 
 from discord.ext import commands
 
@@ -175,3 +176,12 @@ async def patch_map(ctx):
 @bot_client.command(name="hello")
 async def say_hello(ctx):
     await bot_utils.wrap_errors(ctx, ctx.guild.id, ctx.send, True, "Welcome to my botifull world!")
+
+
+@bot_client.command(name="players")
+async def get_channel_players(ctx):
+    async def inner():
+        game_players = database_client.get_game_players(ctx.channel.id)
+        player_frame = pd.DataFrame(game_players)
+        await ctx.send(player_frame.to_string())
+    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)

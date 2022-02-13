@@ -3,6 +3,7 @@ import sys
 import datetime
 import discord
 import traceback
+import numpy as np
 
 from difflib import SequenceMatcher
 
@@ -15,6 +16,50 @@ from score_recognition import score_recognition_utils
 from score_recognition import score_visualisation
 
 
+def find_matching(game_players, scores, author_name):
+    def get_game_player_name(game_player):
+        return game_player["polytopia_player_name"] or game_player["discord_player_name"] or ""
+
+    score_players = [
+        (None, s[1]) if s[0] == "Unknown ruler"
+        else ((author_name, s[1]) if s[0] == "Ruled by you" else s)
+        for s in scores]
+
+    similarity = np.zeros((len(score_players), len(game_players)))
+
+    for i in range(len(score_players)):
+        for j in range(len(game_players)):
+            print("pre-text matching", score_players[i], game_players[j])
+            print("text matching", score_players[i][0], get_game_player_name(game_players[j]))
+            if score_players[i][0] is None:
+                sim_ij = 0
+            else:
+                sim_ij = SequenceMatcher(None, score_players[i][0], get_game_player_name(game_players[j])).ratio()
+            similarity[i, j] = sim_ij
+
+    output = []
+    while len(similarity) > 0 and len(similarity[0]) > 0:
+        index = np.where(similarity == np.amax(similarity))
+        index_max = index[0][0], index[1][0]
+
+        if similarity[index_max[0], index_max[1]] == 0:
+            if len(game_players) != 1 or len(score_players) != 1:
+                break
+
+        output.append((
+            game_players[index_max[1]]["game_player_uuid"],
+            score_players[index_max[0]][0],
+            score_players[index_max[0]][1]))
+        game_players.pop(index_max[1])
+        score_players.pop(index_max[0])
+
+        similarity = np.delete(np.delete(similarity, index_max[0], 0), index_max[1], 1)
+
+    # Handle the case where there are more than 1 Unknown ruler
+
+    return output, score_players
+
+
 async def score_recognition_routine(database_client: DatabaseClient, message, filename):
     # TODO remove attachment from params
     channel_name = message.channel.name
@@ -24,32 +69,33 @@ async def score_recognition_routine(database_client: DatabaseClient, message, fi
     if image is None:
         return
 
-    # path = "./attachments/" + now() + str(message.id) + ".png"
-    # await attachment.save(path)
     scores = score_recognition_utils.read_scores(image)
     turn = database_client.get_last_turn(channel_id)
+
     if scores is not None:
-        for player, player_score in scores:
-            if player == "Unknown ruler":
-                database_client.add_score(channel_id, None, player_score, turn)
+        game_players = database_client.get_game_players(channel_id)
+        # game_players = [p["polytopia_player_name"] or p["discord_player_name"] or "" for p in game_players_raw]
+        print("game players", game_players)
+        # score_players = [s[0] for s in scores]
+
+        # similarity = np.zeros((n_players, n_players))
+        # for i in range(n_players):
+        #     for j in range(n_players):
+        #         similarity[i][j] = SequenceMatcher(None, score_players[i], game_players_other[j]).ratio()
+
+        matching, remaining_scores = find_matching(game_players, scores, message.author.name)
+
+        for player_uuid, player_name, player_score in matching:
+            database_client.set_player_game_name(player_uuid, player_name)
+            database_client.add_score(channel_id, player_uuid, player_score, turn)
+
+        for player_name, player_score in remaining_scores:
+            if player_name is not None and player_name != '':
+                player_uuid = database_client.add_missing_player(player_name, channel_id)
             else:
-                if player == "Ruled by you":
-                    player = message.author.name
+                player_uuid = None
+            database_client.add_score(channel_id, player_uuid, player_score, turn)
 
-                game_players = database_client.get_game_players(channel_id)
-                print(game_players)
-                name_proximity = [(
-                    player_entry["discord_player_id"],
-                    SequenceMatcher(
-                        None,
-                        player_entry["polytopia_player_name"] or player_entry["discord_player_name"] or "",
-                        player).ratio())
-                    for player_entry in game_players]
-                print("name proximity", name_proximity)
-
-                discord_player_id = sorted(name_proximity, key=lambda x: -x[1])[0][0]
-                if discord_player_id is not None:
-                    database_client.add_score(channel_id, discord_player_id, player_score, turn)
         score_text = "Scores for turn %d:\n" % turn
         score_text += "\n".join([(s[0] or "Unknown ruler") + ": " + str(s[1]) for s in scores])
         return score_text
