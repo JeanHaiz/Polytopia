@@ -4,6 +4,7 @@ import datetime
 import discord
 import traceback
 import numpy as np
+import pandas as pd
 
 from difflib import SequenceMatcher
 
@@ -270,9 +271,9 @@ async def wrap_errors(ctx, guild_id, fct, is_async, *params, **kwparams):
 async def get_scores(database_client, ctx):
     scores = database_client.get_channel_scores(ctx.channel.id)
     if scores is not None:
-        scores = scores[scores['turn'] != -1]
+        scores: pd.DataFrame = scores[scores['turn'] != -1]
         score_plt = score_visualisation.plotScores(scores, ctx.channel.name, str(ctx.message.id))
         await ctx.message.channel.send(file=score_plt, content="score recognition")
-        await ctx.send(str(scores))
+        await ctx.send(scores.to_string(index=False))
     else:
         await ctx.send("No score found")

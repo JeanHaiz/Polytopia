@@ -63,7 +63,7 @@ class DatabaseClient:
                 (channel_discord_id, game_player_uuid, turn, score, confirmed)
                 VALUES ({channel_id}, {player_id}, {turn}, {score}, false);""")
 
-    def get_channel_scores(self, channel_id):
+    def get_channel_scores(self, channel_id) -> pd.DataFrame:
         scores = self.engine.execute(
             f"""SELECT polytopia_player_name, turn, score
                 FROM game_player_scores
