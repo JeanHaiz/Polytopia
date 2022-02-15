@@ -365,7 +365,7 @@ async def process_raw_map(
 
 
 async def transform_image(
-        image_i, vertices_i, is_vertical, reference_position, reference_size, channel_name, filename_i, loop):
+        image_i, vertices_i, is_vertical, reference_position, reference_size, channel_name, filename_i, i, loop):
     transformation_dimensions = get_transformation_dimensions(
         vertices_i, is_vertical, reference_position, reference_size)
     padding, scale_factor, padded_and_scaled = transformation_dimensions
@@ -377,10 +377,11 @@ async def transform_image(
     scaled_image = scale_image(image_i, channel_name, scale_factor, filename_i)
     cropped_image, padding = crop_padding_(scaled_image, padding, filename_i, channel_name)
 
-    coroutine = remove_clouds(cropped_image, ksize=7, sigma=15)
-    # loop.create_task(coroutine)
-    oppacity = loop.run_until_complete(coroutine)
-    print(coroutine)
+    if i == 0:
+        oppacity = np.zeros_like(cropped_image).astype(np.uint8)
+    else:
+        coroutine = remove_clouds_scaled(cropped_image, ksize=7, sigma=15)
+        oppacity = loop.run_until_complete(coroutine)
     padding = np.flip(padding)
 
     return cropped_image, oppacity, padding, scale_factor, padded_and_scaled
@@ -417,7 +418,6 @@ async def patch_partial_maps(
         message=None):
     # reference_size = (2028, 1259)
     # reference_positions = [(1121 - 56, 274 - 221), (105 - 56, 880 - 221)]
-    print("begin")
     # reference_positions = [(2242, 548), (210, 1760)]
 
     files.insert(0, "background")
@@ -449,7 +449,7 @@ async def patch_partial_maps(
         vertices_i = vertices[i]
         is_vertical_i = vertical[i]
         transformation = await transform_image(
-            image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name, filename_i, loop)
+            image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name, filename_i, i, loop)
         scaled_image, oppacity, padding, scale_factor, padded_and_scaled = transformation
 
         transparency_masks.append(oppacity)
@@ -461,7 +461,6 @@ async def patch_partial_maps(
 
         print("sizes:", scaled_image.shape, oppacity.shape)
 
-    print("middle")
     output_size = np.max(np.array(scaled_paddings) + np.array(sizes), axis=0)
     if DEBUG:
         print("output size:", output_size)
@@ -492,7 +491,6 @@ async def patch_partial_maps(
                 # image = cv2.polylines(patch_work, [scaled_vertices], True, (255, 255, 255), 10)
         image_utils.save_image(vertex_lines, channel_name, 'map_patching_debut', ImageOp.DEBUG_VERTICES)
 
-    print("end")
     if message is not None and database_client is not None:
         filename = database_client.add_resource(message, message.author, ImageOp.MAP_PATCHING_OUTPUT)
     else:
@@ -572,7 +570,7 @@ async def remove_clouds(img, ouptut_prefix=None, ksize=31, sigma=25):
     return mask
 
 
-def remove_clouds_scaled(img, ksize=7, sigma=15):
+async def remove_clouds_scaled(img, ksize=7, sigma=15):
     template = image_utils.get_cloud_template()
     hh, ww = template.shape[:2]
 

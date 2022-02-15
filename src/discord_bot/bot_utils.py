@@ -244,18 +244,18 @@ async def get_attachments(bot_client, channel_id, message_id):
 
 
 async def wrap_errors(ctx, guild_id, fct, is_async, *params, **kwparams):
-    print("params", len(params), params)
+    # print("params", len(params), params)
     try:
         is_test_server = str(guild_id) == "918195469245628446"
         is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
-        print("environment", is_test_server, is_dev_env, os.getenv("POLYTOPIA_TEST_SERVER", "0"),
-              os.getenv("POLYTOPIA_ENVIRONMENT", ""))
+        # print("environment", is_test_server, is_dev_env, os.getenv("POLYTOPIA_TEST_SERVER", "0"),
+        #       os.getenv("POLYTOPIA_ENVIRONMENT", ""))
         if (is_dev_env and is_test_server) or ((not is_test_server) and (not is_dev_env)):
             if is_async:
                 return await fct(*params)
             else:
                 return fct(*params)
-        print("out")
+        # print("out")
     except BaseException:
         error = sys.exc_info()[0]
         logger.error("##### ERROR #####")
