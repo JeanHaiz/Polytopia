@@ -365,7 +365,8 @@ async def process_raw_map(
 
 
 async def transform_image(
-        image_i, vertices_i, is_vertical, reference_position, reference_size, channel_name, filename_i, i, loop):
+        image_i, vertices_i, is_vertical, reference_position, reference_size, channel_name, filename_i, i, loop,
+        map_size):
     transformation_dimensions = get_transformation_dimensions(
         vertices_i, is_vertical, reference_position, reference_size)
     padding, scale_factor, padded_and_scaled = transformation_dimensions
@@ -377,10 +378,12 @@ async def transform_image(
     scaled_image = scale_image(image_i, channel_name, scale_factor, filename_i)
     cropped_image, padding = crop_padding_(scaled_image, padding, filename_i, channel_name)
 
-    if i == 0:
+    if False:  # i == 0:
         oppacity = np.zeros_like(cropped_image).astype(np.uint8)
     else:
-        coroutine = remove_clouds_scaled(cropped_image, ksize=7, sigma=15)
+        scale = reference_size[1] / math.sqrt(int(map_size))
+        print("scale", scale)
+        coroutine = remove_clouds(cropped_image, ksize=7, sigma=15, template_height=scale)
         oppacity = loop.run_until_complete(coroutine)
     padding = np.flip(padding)
 
@@ -449,7 +452,8 @@ async def patch_partial_maps(
         vertices_i = vertices[i]
         is_vertical_i = vertical[i]
         transformation = await transform_image(
-            image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name, filename_i, i, loop)
+            image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name, filename_i, i, loop,
+            map_size)
         scaled_image, oppacity, padding, scale_factor, padded_and_scaled = transformation
 
         transparency_masks.append(oppacity)
@@ -509,13 +513,22 @@ def is_map_patching_request(message, attachment, filename):
     return "🖼️" in [r.emoji for r in message.reactions]
 
 
-async def remove_clouds(img, ouptut_prefix=None, ksize=31, sigma=25):
+async def remove_clouds(img, ouptut_prefix=None, ksize=31, sigma=25, template_height=1):
     # read chessboard image
     # img = cv2.imread(image_path)
     img_alpha = np.ones((img.shape[0:2]))
 
     # read pawn image template
     template = image_utils.get_cloud_template()
+    template_shape = template.shape
+
+    scale = template_height / template_shape[1] * math.sqrt(2)
+
+    new_dim = (int(template_shape[1] * scale), int(template_shape[0] * scale))
+
+    template = cv2.resize(template, new_dim, interpolation=cv2.INTER_AREA)
+    print("template new dim", template_shape, template.shape)
+
     hh, ww = template.shape[:2]
 
     # extract pawn base image and alpha channel and make alpha 3 channels
@@ -530,7 +543,7 @@ async def remove_clouds(img, ouptut_prefix=None, ksize=31, sigma=25):
     blur = cv2.GaussianBlur(correlation_raw, (ksize, ksize), sigmaX=sigma)
     blur_copy = blur.copy()
 
-    threshold = 40
+    threshold = 60
     result = img.copy()
     max_val = np.max(blur)
     rad = int(math.sqrt(hh * hh + ww * ww) / 4)
