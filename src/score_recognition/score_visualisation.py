@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+import pandas as pd
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.axisartist.axislines import SubplotZero
@@ -42,4 +43,31 @@ def plotScores(scores, channel_name, filename):
 
     plt.savefig(file_path)
     plt.show()
-    return image_utils.load_attachment(file_path, "Score recognition")
+    return image_utils.load_attachment(file_path, "Score visualisation")
+
+
+def augment_scores(scores: pd.DataFrame):
+    for player in scores['polytopia_player_name'].drop_duplicates():
+        player_scores = scores[scores['polytopia_player_name'] == player]
+        player_scores.sort_values(by="turn", ascending=False)
+        scores.loc[scores['polytopia_player_name'] == player, "delta"] = player_scores["score"].diff()
+    # scores.delta = pd.to_numeric(scores.delta, errors='coerce')
+    return scores
+
+
+def print_scores(scores: pd.DataFrame):
+    return augment_scores(scores).to_string(index=False)
+
+
+def print_player_scores(scores: pd.DataFrame, player):
+    scores = augment_scores(scores)
+    player_scores = scores[scores['polytopia_player_name'] == player]
+    player_scores.sort_values(by="turn")
+
+    header = ['Player', 'Turn', 'Score', 'Delta']
+    s = []
+    s.append('   '.join([str(item).ljust(7, ' ') for item in header]))
+    for data in player_scores.to_numpy().tolist():
+        s.append('   '.join([str(item).center(7, ' ') for item in data]))
+    d = '```'+'\n'.join(s) + '```'
+    return d

@@ -130,8 +130,12 @@ async def set_self_discord_name(ctx, polytopia_name):
 
 
 @bot_client.command(name="scores")
-async def get_channel_scores(ctx):
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, bot_utils.get_scores, True, *(database_client, ctx))
+async def get_channel_player_scores(ctx, player=None):
+    if player is None:
+        await bot_utils.wrap_errors(ctx, ctx.guild.id, bot_utils.get_scores, True, *(database_client, ctx))
+    else:
+        await bot_utils.wrap_errors(
+            ctx, ctx.guild.id, bot_utils.get_player_scores, True, *(database_client, ctx, player))
 
 
 @bot_client.command(name="turn")

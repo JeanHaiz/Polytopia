@@ -274,6 +274,19 @@ async def get_scores(database_client, ctx):
         scores: pd.DataFrame = scores[scores['turn'] != -1]
         score_plt = score_visualisation.plotScores(scores, ctx.channel.name, str(ctx.message.id))
         await ctx.message.channel.send(file=score_plt, content="score recognition")
-        await ctx.send(scores.to_string(index=False))
+        score_text = score_visualisation.print_scores(scores)
+        await ctx.send(score_text)
     else:
         await ctx.send("No score found")
+
+
+async def get_player_scores(database_client, ctx, player):
+    scores = database_client.get_channel_scores(ctx.channel.id)
+    if player is not None and player not in scores["polytopia_player_name"].unique():
+        players = scores["polytopia_player_name"].unique()
+        players.pop(None)
+        await ctx.send("Player %s not recognised. Available players: %s" % (str(player), str(players)))
+    else:
+        score_text = score_visualisation.print_player_scores(scores, player)
+        embed = discord.Embed(title='%s scores' % str(player), description=score_text)
+        await ctx.send(embed=embed)
