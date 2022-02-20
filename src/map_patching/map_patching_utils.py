@@ -26,7 +26,7 @@ def getLines(image, minLineLength=500, channel=None, filename=None):
     for i in range(lines.shape[0]):
         cv2.line(processed, (lines[i][0][0], lines[i][0][1]), (lines[i][0][2], lines[i][0][3]), (0, 0, 255), 3,
                  cv2.LINE_AA)
-        if filename:
+        if DEBUG and filename:
             image_utils.save_image(image, channel.name, filename, ImageOp.HOUGH_LINES)
     return processed
 
@@ -357,8 +357,10 @@ async def transform_image(
     scaled_image = scale_image(image_i, channel_name, scale_factor, filename_i)
     cropped_image, padding = crop_padding_(scaled_image, padding, filename_i, channel_name)
 
-    scale = reference_size[1] / math.sqrt(int(map_size))
+    # scale = reference_size[1] / math.sqrt(int(map_size))
+    scale = (reference_size[1] + 100) / math.sqrt(int(map_size))
     coroutine = remove_clouds(cropped_image, ksize=7, sigma=15, template_height=scale)
+
     oppacity = loop.run_until_complete(coroutine)
     padding = np.flip(padding)
 
@@ -478,21 +480,39 @@ def is_map_patching_request(message, attachment, filename):
 
 
 async def remove_clouds(img, ksize=31, sigma=25, template_height=1):
-    # read chessboard image
-    # img = cv2.imread(image_path)
-    img_alpha = np.ones((img.shape[0:2]))
 
-    # read pawn image template
-    template = image_utils.get_cloud_template()
-    template_shape = template.shape
+    print("img shape", img.shape)
+    original_template = image_utils.get_cloud_template()
+
+    template_shape = original_template.shape
 
     scale = template_height / template_shape[1] * math.sqrt(2)
+    template_width = int(template_shape[0] * scale)
+    template_height = int(template_shape[1] * scale)
 
-    new_dim = (int(template_shape[1] * scale), int(template_shape[0] * scale))
+    new_dim = (template_height, template_width)
+    scaled_template = cv2.resize(original_template, new_dim, interpolation=cv2.INTER_AREA)
 
-    template = cv2.resize(template, new_dim, interpolation=cv2.INTER_AREA)
-    print("template new dim", template_shape, template.shape)
+    img_border_width = max(template_width, template_height)
 
+    result = cv2.copyMakeBorder(
+        img, img_border_width, img_border_width, img_border_width, img_border_width, cv2.BORDER_CONSTANT, value=0)
+
+    img_alpha = np.ones((result.shape[0:2]))
+
+    left_template = scaled_template[:, :int(template_height / 2), :]
+    right_template = scaled_template[:, int(template_height / 2):, :]
+
+    for i, template in enumerate([scaled_template, left_template, right_template]):  # , ]:
+        img_alpha = match_cloud(result, template, img_alpha, ksize, sigma, 50 + img_border_width, i)
+
+    img_alpha_c = img_alpha.clip(0, 1).astype(np.uint8)
+    mask = cv2.merge([img_alpha_c, img_alpha_c, img_alpha_c]).astype(np.uint8)
+    cropped_mask = mask[img_border_width:-img_border_width, img_border_width:-img_border_width, :]
+    return cropped_mask
+
+
+def match_cloud(result, template, img_alpha, ksize, sigma, border_width, i):
     hh, ww = template.shape[:2]
 
     # extract pawn base image and alpha channel and make alpha 3 channels
@@ -501,37 +521,48 @@ async def remove_clouds(img, ksize=31, sigma=25, template_height=1):
     alpha = cv2.merge([alpha_template, alpha_template, alpha_template])
 
     # do masked template matching and save correlation image
-    corr_img = cv2.matchTemplate(img, pawn, cv2.TM_CCOEFF_NORMED, mask=alpha)
+    corr_img = cv2.matchTemplate(result, pawn, cv2.TM_CCOEFF_NORMED, mask=alpha)
     correlation_raw = (255 * corr_img).clip(0, 255).astype(np.uint8)
+    corr_shape = corr_img.shape
 
     blur = cv2.GaussianBlur(correlation_raw, (ksize, ksize), sigmaX=sigma)
 
-    threshold = 60
+    threshold = {
+        0: 80,
+        1: 110,
+        2: 110
+    }
+    border_threshold = {
+        0: 60,
+        1: 40,
+        2: 40
+    }
+
     max_val = np.max(blur)
     rad = int(math.sqrt(hh * hh + ww * ww) / 4)
 
-    while max_val > threshold:
+    while max_val > border_threshold[i]:  # TODO replace with > threshold
 
-        # find max value of correlation image
+        # TODO use on_border criteria to only take the borders of the blur
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(blur)
-        # print(max_val, max_loc)
 
-        if max_val > threshold:
-            # draw match on copy of input
-            # cv2.rectangle(result, max_loc, (max_loc[0]+ww, max_loc[1]+hh), (0, 0, 255), 2)
+        if max_val > threshold[i] or (max_val > border_threshold[i] and on_border(max_loc, corr_shape, border_width)):
             img_alpha[max_loc[1]: max_loc[1]+hh, max_loc[0]: max_loc[0]+ww] = \
                 img_alpha[max_loc[1]: max_loc[1]+hh, max_loc[0]: max_loc[0]+ww] - alpha_template / 255.0
 
-            # write black circle at max_loc in corr_img
-            cv2.circle(blur, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
+        cv2.circle(blur, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
 
-        else:
-            break
+        # else:
+        #     break
 
-    img_alpha_c = img_alpha.clip(0, 1).astype(np.uint8)
-    mask = cv2.merge([img_alpha_c, img_alpha_c, img_alpha_c]).astype(np.uint8)
+    return img_alpha
 
-    return mask
+
+def on_border(loc, shape, width):
+    if shape[0] > shape[1]:
+        return ((loc[0] < width) or ((shape[1] - loc[0]) < width))
+    else:
+        return ((loc[1] < width) or ((shape[0] - loc[1]) < width))
 
 
 async def remove_clouds_scaled(img, ksize=7, sigma=15, template_height=None):
@@ -564,8 +595,6 @@ async def remove_clouds_scaled(img, ksize=7, sigma=15, template_height=None):
 
         blur = cv2.GaussianBlur(correlation_raw, (ksize, ksize), sigmaX=sigma)
         threshold = 100
-
-        # cv2.imwrite('./cloud/blur_%.2f.png' % scale, blur)
 
         maximum = np.max(blur)
 
