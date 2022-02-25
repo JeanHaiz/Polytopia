@@ -121,6 +121,8 @@ async def generate_patched_map(database_client: DatabaseClient, channel_id, chan
     logger.debug("files_log %s" % str(files))
     map_size = database_client.get_game_map_size(channel_id)
     print("map size", map_size)
+    if map_size is None:
+        return turn, None
     output_file_path, filename = await map_patching_utils.patch_partial_maps(
         channel_name, files, map_size, database_client, message)
     print("output path", output_file_path)
@@ -207,7 +209,6 @@ async def process_score_recognition(database_client, channel, message):
 
 
 async def process_map_patching(message, channel, database_client):
-    print("in here")
     if len(message.attachments) > 0:
         for i, attachment in enumerate(message.attachments):
             if map_patching_utils.is_map_patching_request(message, attachment, "filename"):
@@ -244,7 +245,6 @@ async def get_attachments(bot_client, channel_id, message_id):
 
 
 async def wrap_errors(ctx, guild_id, fct, is_async, *params, **kwparams):
-    # print("params", len(params), params)
     try:
         is_test_server = str(guild_id) == "918195469245628446"
         is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
@@ -255,7 +255,6 @@ async def wrap_errors(ctx, guild_id, fct, is_async, *params, **kwparams):
                 return await fct(*params)
             else:
                 return fct(*params)
-        # print("out")
     except BaseException:
         error = sys.exc_info()[0]
         logger.error("##### ERROR #####")
@@ -268,9 +267,9 @@ async def wrap_errors(ctx, guild_id, fct, is_async, *params, **kwparams):
         await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
 
 
-async def get_scores(database_client, ctx):
+async def get_scores(database_client: DatabaseClient, ctx):
     scores = database_client.get_channel_scores(ctx.channel.id)
-    if scores is not None:
+    if scores is not None and len(scores[scores['turn'] != -1]) > 0:
         scores: pd.DataFrame = scores[scores['turn'] != -1]
         score_plt = score_visualisation.plotScores(scores, ctx.channel.name, str(ctx.message.id))
         await ctx.message.channel.send(file=score_plt, content="score recognition")

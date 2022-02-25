@@ -231,3 +231,29 @@ class DatabaseClient:
             f"""DELETE FROM game_player_scores
                 WHERE channel_discord_id = {channel_id}
                 AND turn = {turn};""")
+
+    def get_channel_resource_messages(self, channel_id, operation):
+        resources = self.engine.execute(
+            f"""SELECT source_message_id
+                FROM message_resources
+                WHERE source_channel_id = {channel_id}
+                AND operation = {operation.value};""").fetchall()
+        return [dict(row) for row in resources]
+
+    def add_player_to_game(self, game_player_uuid, channel_id):
+        return self.engine.execute(
+            f"""INSERT INTO game_players
+                (game_player_uuid, channel_discord_id, is_alive)
+                VALUES ('{game_player_uuid}', {channel_id}, true)
+                ON CONFLICT (game_player_uuid, channel_discord_id) DO NOTHING""")
+
+    def set_player_score(self, game_player_uuid, turn, score):
+        return self.engine.execute(
+            f"""UPDATE game_player_scores
+                SET game_player_uuid = '{game_player_uuid}'
+                WHERE score_uuid = (
+                    SELECT score_uuid
+                    FROM game_player_scores
+                    WHERE turn = {turn}
+                    AND score = {score}
+                    LIMIT 1);""")

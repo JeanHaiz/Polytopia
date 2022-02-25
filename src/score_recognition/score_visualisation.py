@@ -11,8 +11,13 @@ from common import image_utils
 
 def plotScores(scores, channel_name, filename):
 
+    print("scores", scores)
+
     x = list(scores[scores['polytopia_player_name'].isna()]['turn'])
     y = list(scores[scores['polytopia_player_name'].isna()]['score'])
+
+    print("x", x)
+    print("y", y)
 
     fig = plt.figure()
     ax = SubplotZero(fig, 111)
@@ -25,14 +30,15 @@ def plotScores(scores, channel_name, filename):
         player_scores = score_series["score"]
         ax.plot(player_turns, player_scores, '-o', label=player_name)
 
-    ax.scatter(x, y)
-    for i in range(len(x)):
-        ax.text(x[i], y[i], i, color="red", fontsize=14)
+    if len(x) > 0 and len(y) > 0:
+        ax.scatter(x, y)
+        for i in range(len(x)):
+            ax.text(x[i], y[i], i, color="red", fontsize=14)
+
+        ax.set_xticks(np.arange(np.min(x), np.max(x) + 1))
 
     ax.tick_params(axis='x', colors='#FFFFFF')
     ax.tick_params(axis='y', colors='#FFFFFF')
-
-    ax.set_xticks(np.arange(np.min(x), np.max(x) + 1))
 
     plt.legend()
     plt.tight_layout()
