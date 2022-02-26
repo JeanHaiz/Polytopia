@@ -274,7 +274,9 @@ async def get_scores(database_client: DatabaseClient, ctx):
         score_plt = score_visualisation.plotScores(scores, ctx.channel.name, str(ctx.message.id))
         await ctx.message.channel.send(file=score_plt, content="score recognition")
         score_text = score_visualisation.print_scores(scores)
-        await ctx.send(score_text)
+        # await ctx.send(score_text)
+        embed = discord.Embed(title='Game scores', description=score_text)
+        await ctx.send(embed=embed)
     else:
         await ctx.send("No score found")
 

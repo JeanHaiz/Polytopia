@@ -11,13 +11,8 @@ from common import image_utils
 
 def plotScores(scores, channel_name, filename):
 
-    print("scores", scores)
-
     x = list(scores[scores['polytopia_player_name'].isna()]['turn'])
     y = list(scores[scores['polytopia_player_name'].isna()]['score'])
-
-    print("x", x)
-    print("y", y)
 
     fig = plt.figure()
     ax = SubplotZero(fig, 111)
@@ -62,18 +57,40 @@ def augment_scores(scores: pd.DataFrame):
 
 
 def print_scores(scores: pd.DataFrame):
-    return augment_scores(scores).to_string(index=False)
+    scores = augment_scores(scores)
+    return __print_scores(scores)
+    # return augment_scores(scores).to_string(index=False)
 
 
 def print_player_scores(scores: pd.DataFrame, player):
     scores = augment_scores(scores)
     player_scores = scores[scores['polytopia_player_name'] == player]
-    player_scores.sort_values(by="turn")
+    return __print_scores(player_scores)
+
+
+def __print_scores(scores):
+    score_list = scores.to_numpy().tolist()
+    player_width = np.max([len(d) if type(d) == str else 0 for data in score_list for d in data])
+    print("player_width", player_width)
+
+    def width(i):
+        return player_width if i == 0 else 5
+
+    def align(i, item):
+        if i == 0:
+            if item is None:
+                item = "  ?"
+            return item.ljust(width(i), ' ')
+        else:
+            return str(item).rjust(width(i), ' ')
+
+    scores.sort_values(by="turn")
 
     header = ['Player', 'Turn', 'Score', 'Delta']
     s = []
-    s.append('   '.join([str(item).ljust(7, ' ') for item in header]))
-    for data in player_scores.to_numpy().tolist():
-        s.append('   '.join([str(item).center(7, ' ') for item in data]))
+    s.append('   '.join([str(item).ljust(width(i), ' ') for i, item in enumerate(header)]))
+
+    for data in score_list:
+        s.append('   '.join([align(i, item) for i, item in enumerate(data)]))
     d = '```'+'\n'.join(s) + '```'
     return d
