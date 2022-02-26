@@ -189,3 +189,28 @@ async def get_channel_players(ctx):
         player_frame = pd.DataFrame(game_players)
         await ctx.send(player_frame.to_string())
     await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+
+
+@bot_client.command(name="trace")
+async def get_map_trace(ctx):
+    async def inner():
+        messages = database_client.get_channel_resource_messages(ctx.channel.id, ImageOp.MAP_INPUT)
+        print("messages", messages)
+        for m in messages:
+            print(m)
+    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+
+
+@bot_client.command(name="setscore")
+async def set_player_score(ctx, player_name, turn, score):
+    async def inner():
+        players = database_client.get_game_players(ctx.channel.id)
+        matching_players = [p for p in players if p["polytopia_player_name"] == player_name]
+        if len(matching_players) > 0:
+            player_id = matching_players[0]["game_player_uuid"]
+        else:
+            player_id = database_client.add_missing_player(player_name, ctx.channel.id)
+            # player_id = database_client.set_player_game_name(None, None, player_name)
+            # database_client.add_player_to_game(player_id, ctx.channel.id)
+        database_client.set_player_score(player_id, turn, score)
+    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
