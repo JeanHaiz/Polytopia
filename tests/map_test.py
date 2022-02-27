@@ -2,6 +2,7 @@ import cv2
 import pytest
 
 from map_patching import map_patching_utils
+from map_patching import header_recognition
 from tests import test_utils
 
 
@@ -18,7 +19,7 @@ async def test_map_patchin_with_1_map():
 async def test_turn_recognition_t0():
     image = test_utils.get_map_resource("image_0")
     assert image is not None
-    turn = map_patching_utils.get_turn(image)
+    turn = header_recognition.get_turn(image)
     assert turn == "0"
 
 
@@ -26,7 +27,7 @@ async def test_turn_recognition_t0():
 async def test_turn_recognition_t1():
     image = test_utils.get_map_resource("image_1")
     assert image is not None
-    turn = map_patching_utils.get_turn(image)
+    turn = header_recognition.get_turn(image)
     assert turn == "1"
 
 
@@ -34,7 +35,7 @@ async def test_turn_recognition_t1():
 async def test_turn_recognition_t5():
     image = test_utils.get_map_resource("image_5")
     assert image is not None
-    turn = map_patching_utils.get_turn(image)
+    turn = header_recognition.get_turn(image)
     assert turn == "5"
 
 
@@ -42,7 +43,7 @@ async def test_turn_recognition_t5():
 async def test_turn_recognition_t7():
     image = test_utils.get_map_resource("image_7")
     assert image is not None
-    turn = map_patching_utils.get_turn(image)
+    turn = header_recognition.get_turn(image)
     assert turn == "7"
 
 
@@ -50,7 +51,7 @@ async def test_turn_recognition_t7():
 async def test_turn_recognition_t8():
     image = test_utils.get_map_resource("image_8")
     assert image is not None
-    turn = map_patching_utils.get_turn(image)
+    turn = header_recognition.get_turn(image)
     assert turn == "8"
 
 
@@ -58,7 +59,7 @@ async def test_turn_recognition_t8():
 async def test_turn_recognition_t9():
     image = test_utils.get_map_resource("image_9")
     assert image is not None
-    turn = map_patching_utils.get_turn(image)
+    turn = header_recognition.get_turn(image)
     assert turn == "9"
 
 
@@ -66,7 +67,7 @@ async def test_turn_recognition_t9():
 async def test_turn_recognition_t10():
     image = test_utils.get_map_resource("image_10")
     assert image is not None
-    turn = map_patching_utils.get_turn(image)
+    turn = header_recognition.get_turn(image)
     assert turn == "10"
 
 
@@ -74,7 +75,7 @@ async def test_turn_recognition_t10():
 async def test_turn_recognition_t11():
     image = test_utils.get_map_resource("image_11")
     assert image is not None
-    turn = map_patching_utils.get_turn(image)
+    turn = header_recognition.get_turn(image)
     assert turn == "11"
 
 
@@ -82,7 +83,7 @@ async def test_turn_recognition_t11():
 async def test_turn_recognition_t12():
     image = test_utils.get_map_resource("image_12")
     assert image is not None
-    turn = map_patching_utils.get_turn(image)
+    turn = header_recognition.get_turn(image)
     assert turn == "12"
 
 
@@ -90,7 +91,7 @@ async def test_turn_recognition_t12():
 async def test_turn_recognition_t13():
     image = test_utils.get_map_resource("image_13")
     assert image is not None
-    turn = map_patching_utils.get_turn(image)
+    turn = header_recognition.get_turn(image)
     assert turn == "13"
 
 
@@ -98,7 +99,7 @@ async def test_turn_recognition_t13():
 async def test_turn_recognition_t14():
     image = test_utils.get_map_resource("image_14")
     assert image is not None
-    turn = map_patching_utils.get_turn(image)
+    turn = header_recognition.get_turn(image)
     assert turn == "14"
 
 
@@ -106,5 +107,5 @@ async def test_turn_recognition_t14():
 async def test_turn_recognition_t15():
     image = test_utils.get_map_resource("image_15")
     assert image is not None
-    turn = map_patching_utils.get_turn(image)
+    turn = header_recognition.get_turn(image)
     assert turn == "15"

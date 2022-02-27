@@ -1,10 +1,8 @@
-import re
 import os
 import cv2
 import math
 import discord
 import asyncio
-import pytesseract
 import numpy as np
 import pandas as pd
 
@@ -25,13 +23,11 @@ def getLines(image, minLineLength=500, channel=None, filename=None):
     lines = cv2.HoughLinesP(image=edges, rho=0.1, theta=np.pi/180, threshold=150, lines=np.array([]),
                             minLineLength=minLineLength, maxLineGap=100)
 
-    a, b, c = lines.shape
-    for i in range(a):
+    for i in range(lines.shape[0]):
         cv2.line(processed, (lines[i][0][0], lines[i][0][1]), (lines[i][0][2], lines[i][0][3]), (0, 0, 255), 3,
                  cv2.LINE_AA)
         if filename:
             image_utils.save_image(image, channel.name, filename, ImageOp.HOUGH_LINES)
-            # image_utils.write_img(image, filename, "houghlines5")
     return processed
 
 
@@ -84,10 +80,10 @@ def draw_contour(image, contour_, channel_name=None, epsilon=None, epsilonFactor
 
         image_utils.save_image(processed, channel_name, filename, ImageOp.OVERLAY)
         image_utils.save_image(mask, channel_name, filename, ImageOp.MASK)
-        # image_utils.write_img(processed, filename, "overlay")
-        # image_utils.write_img(mask, filename, "mask")
-        if DEBUG:
-            print("mask area: %d M" % (mask.sum() / 10e6))
+
+    if DEBUG:
+        print("mask area: %d M" % (mask.sum() / 10e6))
+
     return approx
 
 
@@ -116,14 +112,9 @@ def compute_vertices(c):
 
 def get_transformation_dimensions(vertices, is_vertical, reference_position, reference_size):
 
-    # ratio = reference_size[0] / reference_size[1]  # width / heigth = 1.6108...
-
     d_h = vertices[1][1] - vertices[0][1]
     d_w = vertices[3][0] - vertices[2][0]
 
-    # print(i, "%.2f" % (d_w / d_h), estimated_size)
-
-    # print("here", d_w / d_h < ratio, d_w, d_h, ratio)
     if is_vertical:  # d_w / d_h < ratio:  # smaller width or larger height proportionally
         # missing width; scale on height
         scale_factor = d_h / reference_size[1]  # then divide by scale factor to find right size
@@ -141,14 +132,10 @@ def get_transformation_dimensions(vertices, is_vertical, reference_position, ref
     padded_and_scaled_vertices = vertices / scale_factor + scaled_padding
     padded_and_scaled_vertices = [[int(a) for a in b] for b in padded_and_scaled_vertices]
 
-    # scaled_padding = np.flip(scaled_padding)
     if DEBUG:
         print("scale factor:", scale_factor)
         print("padding:", scaled_padding)
-        print("cropped and scaled vertices:\n",
-              # (vertices + padding - reference_positions[0]) / scale_factor + reference_positions[0])
-              # (vertices + padding) / scale_factor)
-              padded_and_scaled_vertices)
+        print("cropped and scaled vertices:\n", padded_and_scaled_vertices)
     return scaled_padding, scale_factor, padded_and_scaled_vertices
 
 
@@ -176,9 +163,8 @@ def crop_padding(image, padding):
 
 def scale_image(image, channel_name, scale_factor, filename=None):
     new_dim = (int(image.shape[1] / scale_factor), int(image.shape[0] / scale_factor))
-    # print("new dimenstion", new_dim, np.flip(image.shape))
     scaled_image = cv2.resize(image, new_dim, interpolation=cv2.INTER_AREA)
-    # print("image shape", np.flip(scaled_bit.shape[0:2]), reference_padding)
+
     if DEBUG and filename is not None and channel_name is not None:
         image_utils.save_image(scaled_image, channel_name, filename, ImageOp.SCALE)
     return scaled_image
@@ -332,7 +318,8 @@ async def process_raw_map(
     lines = get_lines([p[0] for p in polygon])
 
     if lines is None or len(lines) != 4:
-        print("lines not detected for file:", filename_i)
+        if DEBUG:
+            print("lines not detected for file:", filename_i)
         return
 
     intersections = get_intersection(lines)
@@ -348,11 +335,6 @@ async def process_raw_map(
         return
 
     vertices_i = np.array(intersections)
-
-    # if is_vertical_i:
-    #     vertices_i = np.array(intersections)  # np.concatenate((vertices_i[0:2], intersections[0:2]))
-    # else:
-    #     vertices_i = np.concatenate((intersections[0:2], vertices_i[2:4]))
 
     if DEBUG:
         print("vertices after:\n", vertices_i)
@@ -387,15 +369,15 @@ async def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
     background = patch_work[
         scaled_padding[0]:scaled_padding[0]+size[0],
         scaled_padding[1]:scaled_padding[1]+size[1], :]
-    print(background.shape, oppacity.shape)
-    print("scaled_padding", scaled_padding)
-    print("size", size)
-    print("bit size", bit.shape)
+    if DEBUG:
+        print(background.shape, oppacity.shape)
+        print("scaled_padding", scaled_padding)
+        print("size", size)
+        print("bit size", bit.shape)
     if i == 0:  # background
         result = bit
     else:
         result = cv2.multiply(background, 1 - oppacity) + cv2.multiply(bit, oppacity)
-    # result = cv2.multiply(bit, oppacity)
     patch_work[scaled_padding[0]:scaled_padding[0]+size[0], scaled_padding[1]:scaled_padding[1]+size[1], :] = result
     return patch_work
 
@@ -412,9 +394,6 @@ async def patch_partial_maps(
         map_size: str,
         database_client: database_client.DatabaseClient = None,
         message=None):
-    # reference_size = (2028, 1259)
-    # reference_positions = [(1121 - 56, 274 - 221), (105 - 56, 880 - 221)]
-    # reference_positions = [(2242, 548), (210, 1760)]
 
     files.insert(0, "background")
 
@@ -453,21 +432,15 @@ async def patch_partial_maps(
         bits.append(scaled_image)
         scaled_paddings.append(padding)
         scaled_vertices.append(padded_and_scaled)
-        # scaled_vertices.append([[int(a) for a in b] for b in (vertices_i / scale_factor).tolist()])
         sizes.append(scaled_image.shape[0:2])
 
-        print("sizes:", scaled_image.shape, oppacity.shape)
-
     output_size = np.max(np.array(scaled_paddings) + np.array(sizes), axis=0)
-    if DEBUG:
-        print("output size:", output_size)
+
     patch_work = np.zeros([output_size[0], output_size[1], 3], np.uint8)
 
     for i in range(len(bits)):
         bit = bits[i]
         scaled_padding = scaled_paddings[i]
-        # scaled_padding = [scaled_padding[1], scaled_padding[0]]
-        # scaled_padding = np.clip(scaled_padding, 0, None)
         size = sizes[i]
         oppacity = transparency_masks[i]
         patch_work = await patch_output(patch_work, scaled_padding, oppacity, size, bit, i)
@@ -484,8 +457,6 @@ async def patch_partial_maps(
                 cv2.putText(vertex_lines, "%s, %s" % (j, i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
                             (255, 255, 255), 3, cv2.LINE_AA)
 
-                # cv2.line(patch_work, vertices[i], vertices[i+1])
-                # image = cv2.polylines(patch_work, [scaled_vertices], True, (255, 255, 255), 10)
         image_utils.save_image(vertex_lines, channel_name, 'map_patching_debut', ImageOp.DEBUG_VERTICES)
 
     if message is not None and database_client is not None:
@@ -628,93 +599,3 @@ async def remove_clouds_scaled(img, ksize=7, sigma=15, template_height=None):
     print("selected_scaling", selected_scaling[:5])
     resized_original = cv2.resize(selected_scaling[5], (img.shape[1], img.shape[0]), interpolation=cv2.INTER_AREA)
     return resized_original
-
-
-def prepare_turn_image(image, low_thresh):
-    crop = image[:int(image.shape[0] / 4), :]
-    grayImage = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    (_, thresh) = cv2.threshold(grayImage, low_thresh, 255, cv2.THRESH_BINARY)
-    cnts = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)[-2]
-    for cnt in cnts:
-        if cv2.contourArea(cnt) < 15:
-            cv2.fillPoly(thresh, [cnt], color=(0, 0, 0))
-    return thresh
-
-
-def get_turn(image, low_thresh=130, channel_name=None):
-    selected_image = prepare_turn_image(image, low_thresh)
-    cv2.imwrite('./bin.png', 255 - selected_image)
-    # map_text = pytesseract.image_to_string(selected_image, config='--oem 3 --psm 6').split("\n")
-
-    contours, _ = cv2.findContours(selected_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-
-    rows, row_mins, row_maxes = split_in_rows(contours)
-
-    delta = 15
-    turn = None
-    for i in rows.keys():
-        row_min_i = max(row_mins[i] - delta, 0)
-        row_max_i = min(row_maxes[i] + delta, selected_image.shape[0])
-        row_image = selected_image[row_min_i:row_max_i]
-        if DEBUG and channel_name is not None:
-            image_utils.save_image(row_image, channel_name, "binary_%d" % i, ImageOp.TURN_PIECES)
-        row_text = pytesseract.image_to_string(
-            255 - row_image, config='--psm 6 -c load_system_dawg=0 load_freq_dawg=0 load_punc_dawg=0')
-        print(row_text)
-        cleared_row_text = row_text.replace("\n", "").replace("\x0c", "")
-        cleared_row_text = re.sub(r"[^a-zA-Z0-9 ]", "", cleared_row_text)
-        if 'Scores' not in cleared_row_text and 'Stars' not in cleared_row_text:
-            cleared_row_numbers = re.sub(r"[^0-9 ]", "", cleared_row_text).replace("  ", " ").strip()
-            print(i, cleared_row_numbers)
-            cleared_row_text_split = cleared_row_numbers.split(" ")
-            if len(cleared_row_text_split) > 2 and cleared_row_text_split[2].isnumeric():
-                turn = cleared_row_text_split[2]
-
-    if turn is None:
-        if low_thresh > 160:
-            if DEBUG:
-                print("turn not recognised")
-        else:
-            return get_turn(image, low_thresh + 10)
-    else:
-        if DEBUG:
-            print("turn %s" % turn)
-    return turn
-
-
-def split_in_rows(contours):
-    rows = {}
-    row_mins = {}
-    row_maxes = {}
-
-    for c in contours:
-        (y, x, h, w) = cv2.boundingRect(c)
-        if w > 10 and h > 10:
-            found_row = False
-            for i in rows.keys():
-                if not found_row:
-                    row_min_i = row_mins[i]
-                    row_max_i = row_maxes[i]
-                    if x >= row_min_i and x + w <= row_max_i:
-                        found_row = True
-                        rows[i] = rows[i] + [c]
-                    elif x >= row_min_i and x <= row_max_i and x + w >= row_max_i:
-                        row_max_i = x + w
-                        found_row = True
-                        rows[i] = rows[i] + [c]
-                    elif x <= row_min_i and x + w >= row_min_i and x + w <= row_max_i:
-                        row_min_i = x
-                        found_row = True
-                        rows[i] = rows[i] + [c]
-                    elif x <= row_min_i and x + w >= row_max_i:
-                        row_min_i = x
-                        row_max_i = x + w
-                        found_row = True
-                        rows[i] = rows[i] + [c]
-
-            if not found_row:
-                new_i = len(rows.keys())
-                rows[new_i] = [c]
-                row_mins[new_i] = x
-                row_maxes[new_i] = x + w
-    return rows, row_mins, row_maxes

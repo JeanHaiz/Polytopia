@@ -12,6 +12,7 @@ from common import image_utils
 from common.logger_utils import logger
 from common.image_utils import ImageOp
 from map_patching import map_patching_utils
+from map_patching import header_recognition
 from database_interaction.database_client import DatabaseClient
 from score_recognition import score_recognition_utils
 from score_recognition import score_visualisation
@@ -106,7 +107,7 @@ async def map_patching_routine(database_client: DatabaseClient, attachment, mess
     channel_name = message.channel.name
     channel_id = message.channel.id
     image = await image_utils.load_image(database_client, channel_name, message, filename, ImageOp.INPUT)
-    turn = map_patching_utils.get_turn(image, channel_name)
+    turn = header_recognition.get_turn(image, channel_name)
     last_turn = database_client.get_last_turn(channel_id)
     if turn is None:
         turn = last_turn
