@@ -44,7 +44,6 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""")
 
     # TODO: add create_if_missing=True param
-    # TODO: result should be modified: result = [dict(row) for row in resultproxy]
     def get_game_players(self, channel_id):
         result_proxy = self.engine.execute(
             f"""SELECT polytopia_player.game_player_uuid,
