@@ -20,6 +20,7 @@ def get_three_color_edges(img, channel_name=None, filename=None, border=None, lo
     blue, green, red = cv2.split(img)
 
     # Run canny edge detection on each channel
+    # TODO improve efficiency!
     blue_edges = cv2.Canny(blue, low_thresh, high_thresh)
     green_edges = cv2.Canny(green, low_thresh, high_thresh)
     red_edges = cv2.Canny(red, low_thresh, high_thresh)

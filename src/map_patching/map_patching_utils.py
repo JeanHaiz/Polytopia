@@ -35,27 +35,27 @@ def getLines(image, minLineLength=500, channel=None, filename=None):
     return processed
 
 
-def select_contours(image, filename=None):
-    contours, hierarchy = cv2.findContours(image.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+def select_contours(image):
+    contours, hierarchy = cv2.findContours(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     hierarchy = hierarchy[0]
 
-    keepers = []
+    max_half_perimeter = 0
+    output = None
 
     for contour_ in contours:
 
         x, y, w, h = cv2.boundingRect(contour_)
 
         if w > int(image.shape[0] / 7) and h > int(image.shape[1] / 7):
-            keepers.append([contour_, [x, y, w, h]])
+            if w + h > max_half_perimeter:
+                max_half_perimeter = w + h
+                output = contour_
 
-    # print("#contours kept: %d" % len(keepers))
-    keepers.sort(key=lambda k: -(k[1][2] + k[1][3]))
-    return keepers[0][0]
+    return output
 
 
 # image: edges
 def draw_contour(image, contour_, channel_name=None, epsilon=None, epsilonFactor=0.005, filename=None):
-    processed = image.copy()
     mask = np.zeros(image.shape[:2], np.uint8)
 
     convex_hull = cv2.convexHull(contour_, returnPoints=True)
@@ -77,7 +77,8 @@ def draw_contour(image, contour_, channel_name=None, epsilon=None, epsilonFactor
     if DEBUG:
         print("simplified contour has", len(approx), "points with epsilon=", epsilon)
 
-    if filename is not None and channel_name is not None:
+    if DEBUG and filename is not None and channel_name is not None:
+        processed = image.copy()
         cv2.drawContours(processed, [approx], 0, (255, 255, 255), 3)
         cv2.drawContours(mask, [approx], -1, (255, 255, 255), -1)
 
@@ -158,7 +159,7 @@ def crop_padding_(image, padding, filename, channel_name):
     if padding[1] < 0:
         image = image[-padding[1]:, :]
         padding[1] = 0
-    if filename is not None and channel_name is not None:
+    if DEBUG and filename is not None and channel_name is not None:
         image_utils.save_image(image, channel_name, filename, ImageOp.PADDING)
     return image, padding
 
@@ -178,7 +179,7 @@ def scale_image(image, channel_name, scale_factor, filename=None):
     # print("new dimenstion", new_dim, np.flip(image.shape))
     scaled_image = cv2.resize(image, new_dim, interpolation=cv2.INTER_AREA)
     # print("image shape", np.flip(scaled_bit.shape[0:2]), reference_padding)
-    if filename is not None and channel_name is not None:
+    if DEBUG and filename is not None and channel_name is not None:
         image_utils.save_image(scaled_image, channel_name, filename, ImageOp.SCALE)
     return scaled_image
 
@@ -324,7 +325,7 @@ async def process_raw_map(
 
     edges = image_processing_utils.get_three_color_edges(image, channel_name, filename_i, border=50)
     blur = cv2.GaussianBlur(edges, (kernel_size, kernel_size), sigmaX=sigma)
-    contour = select_contours(blur, filename_i)
+    contour = select_contours(blur)
     polygon = draw_contour(edges, contour, channel_name, filename=filename_i)
     vertices_i = compute_vertices(polygon)
     is_vertical_i = get_orientation(vertices_i)
@@ -371,20 +372,12 @@ async def transform_image(
         vertices_i, is_vertical, reference_position, reference_size)
     padding, scale_factor, padded_and_scaled = transformation_dimensions
 
-    # print("pre-translation padding", reference_padding, np.flip(image_i.shape[0:2]))
-    # print(np.flip(image.shape[0:2]),
-    #       (image.shape[1] + reference_padding[0], image_i.shape[0] + reference_padding[1]))
-
     scaled_image = scale_image(image_i, channel_name, scale_factor, filename_i)
     cropped_image, padding = crop_padding_(scaled_image, padding, filename_i, channel_name)
 
-    if False:  # i == 0:
-        oppacity = np.zeros_like(cropped_image).astype(np.uint8)
-    else:
-        scale = reference_size[1] / math.sqrt(int(map_size))
-        print("scale", scale)
-        coroutine = remove_clouds(cropped_image, ksize=7, sigma=15, template_height=scale)
-        oppacity = loop.run_until_complete(coroutine)
+    scale = reference_size[1] / math.sqrt(int(map_size))
+    coroutine = remove_clouds(cropped_image, ksize=7, sigma=15, template_height=scale)
+    oppacity = loop.run_until_complete(coroutine)
     padding = np.flip(padding)
 
     return cropped_image, oppacity, padding, scale_factor, padded_and_scaled
@@ -398,7 +391,7 @@ async def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
     print("scaled_padding", scaled_padding)
     print("size", size)
     print("bit size", bit.shape)
-    if i == 0:
+    if i == 0:  # background
         result = bit
     else:
         result = cv2.multiply(background, 1 - oppacity) + cv2.multiply(bit, oppacity)
@@ -445,7 +438,7 @@ async def patch_partial_maps(
         vertical.append(is_vertical_i)
 
     reference_position, reference_size = get_references(vertices)
-    loop = asyncio.get_running_loop()
+    loop = asyncio.get_running_loop()  # TODO look into timeout
 
     for i in range(len(images)):
         image_i = images[i]
@@ -513,7 +506,7 @@ def is_map_patching_request(message, attachment, filename):
     return "🖼️" in [r.emoji for r in message.reactions]
 
 
-async def remove_clouds(img, ouptut_prefix=None, ksize=31, sigma=25, template_height=1):
+async def remove_clouds(img, ksize=31, sigma=25, template_height=1):
     # read chessboard image
     # img = cv2.imread(image_path)
     img_alpha = np.ones((img.shape[0:2]))
@@ -541,10 +534,8 @@ async def remove_clouds(img, ouptut_prefix=None, ksize=31, sigma=25, template_he
     correlation_raw = (255 * corr_img).clip(0, 255).astype(np.uint8)
 
     blur = cv2.GaussianBlur(correlation_raw, (ksize, ksize), sigmaX=sigma)
-    blur_copy = blur.copy()
 
     threshold = 60
-    result = img.copy()
     max_val = np.max(blur)
     rad = int(math.sqrt(hh * hh + ww * ww) / 4)
 
@@ -569,21 +560,10 @@ async def remove_clouds(img, ouptut_prefix=None, ksize=31, sigma=25, template_he
     img_alpha_c = img_alpha.clip(0, 1).astype(np.uint8)
     mask = cv2.merge([img_alpha_c, img_alpha_c, img_alpha_c]).astype(np.uint8)
 
-    if False:
-        # image_utils.save_image(correlation_raw, channel)
-        cv2.imwrite(ouptut_prefix + '_correlation_3.png', correlation_raw)
-        cv2.imwrite(ouptut_prefix + '_blur.jpg', blur_copy)
-        cv2.imwrite(ouptut_prefix + '_correlation_2.png', corr_img)
-        cv2.imwrite(ouptut_prefix + "_img_alpha.png", (255*img_alpha).clip(0, 255).astype(np.uint8))
-        # cv2.imwrite(ouptut_prefix + "_with_alpha.png", with_alpha)
-        cv2.imwrite(ouptut_prefix + '_pawn.png', pawn)
-        cv2.imwrite(ouptut_prefix + '_alpha.png', alpha)
-        cv2.imwrite(ouptut_prefix + '_correlation.png', blur)
-        cv2.imwrite(ouptut_prefix + '_matches2.jpg', result)
     return mask
 
 
-async def remove_clouds_scaled(img, ksize=7, sigma=15):
+async def remove_clouds_scaled(img, ksize=7, sigma=15, template_height=None):
     template = image_utils.get_cloud_template()
     hh, ww = template.shape[:2]
 
@@ -593,11 +573,12 @@ async def remove_clouds_scaled(img, ksize=7, sigma=15):
 
     result_set = []
 
-    # Optimisation possibilities:
+    # TODO Optimisation possibilities:
     # - not go linear, look for the point
     # - start in the middle and go out, based on gradient
     # - stop when it goes down again
     # - change spacing
+    # - move range based on estiamted scaling
     for scale in range(90, 110, 2):
         scale = scale / 100.0
         new_dim = (int(img.shape[1] * scale), int(img.shape[0] * scale))
@@ -665,7 +646,8 @@ def get_turn(image, channel_name):
         row_min_i = max(row_mins[i] - delta, 0)
         row_max_i = min(row_maxes[i] + delta, selected_image.shape[0])
         row_image = selected_image[row_min_i:row_max_i]
-        image_utils.save_image(row_image, channel_name, "binary_%d" % i, ImageOp.TURN_PIECES)
+        if DEBUG:
+            image_utils.save_image(row_image, channel_name, "binary_%d" % i, ImageOp.TURN_PIECES)
         row_text = pytesseract.image_to_string(row_image, config='--psm 6')
 
         cleared_row_text = row_text.replace("\n", "").replace("\x0c", "")
