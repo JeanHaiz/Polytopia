@@ -51,12 +51,16 @@ async def on_message(message):
 
 @bot_client.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
+    channel = bot_client.get_channel(payload.channel_id)
+    message = await channel.fetch_message(payload.message_id)
+
     async def inner():
+        if payload.user_id == bot_client.user.id:
+            return
+
         is_active = database_client.is_channel_active(payload.channel_id)
         if is_active:
             await bot_utils.reaction_added_routine(payload, bot_client, database_client)
-    channel = bot_client.get_channel(payload.channel_id)
-    message = await channel.fetch_message(payload.message_id)
     await bot_utils.wrap_errors(message, channel.guild.id, inner, True)
 
 
@@ -150,18 +154,46 @@ async def set_turn(ctx, turn):
 @bot_client.command(name="size")
 async def set_map_size(ctx, size):
     async def inner():
-        database_client.add_player_n_game(ctx.message, ctx.author)
-        if size.isnumeric() and int(size) in [121, 196, 256, 324, 400, 900]:
-            database_client.set_game_map_size(ctx.channel.id, int(size))
-            await ctx.send("current map size now is %s" % size)
+        game_player_uuid = database_client.add_player_n_game(ctx.message, ctx.author)
+        if game_player_uuid is not None:
+            if size.isnumeric() and int(size) in [121, 196, 256, 324, 400, 900]:
+                answer = database_client.set_game_map_size(ctx.channel.id, int(size))
+                if answer.rowcount == 1:
+                    bot_utils.add_success_reaction(ctx.message)
+                else:
+                    await bot_utils.add_error_reaction(ctx.message)
+                    myid = '<@338067113639936003>'  # Jean's id
+                    await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
+            else:
+                await bot_utils.add_error_reaction(ctx.message)
+                await ctx.send(
+                    f"""Map size {str(size)} not recognised.\n"""
+                    """Valid map sizes are 121, 196, 256, 324, 400 and 900.\n"""
+                    """To to signal an error, react with ⁉️""")
         else:
-            await ctx.send("map size not recognised")
+            await bot_utils.add_error_reaction(ctx.message)
+            myid = '<@338067113639936003>'  # Jean's id
+            await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
     await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command(name="drop")
 async def drop_score(ctx, turn):
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, database_client.drop_score, False, *(ctx.channel.id, turn))
+    async def inner():
+        answer = database_client.drop_score(ctx.channel.id, turn)
+        if answer.rowcount != 0:
+            await bot_utils.add_success_reaction(ctx.message)
+            if answer.rowcount == 1:
+                await ctx.reply(
+                    "1 score entry was updated. \nTo to signal an error, react with ⁉️", mention_author=False)
+            else:
+                await ctx.reply(
+                    "%d score entries were updated. \nTo to signal an error, react with ⁉️" % answer.rowcount,
+                    mention_author=False)
+        elif answer.rowcount == 0:
+            await bot_utils.add_error_reaction(ctx.message)
+            await ctx.reply("No score entry updated. \nTo to signal an error, react with ⁉️", mention_author=False)
+    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command(name="patch")
@@ -210,7 +242,13 @@ async def set_player_score(ctx, player_name, turn, score):
             player_id = matching_players[0]["game_player_uuid"]
         else:
             player_id = database_client.add_missing_player(player_name, ctx.channel.id)
-            # player_id = database_client.set_player_game_name(None, None, player_name)
-            # database_client.add_player_to_game(player_id, ctx.channel.id)
-        database_client.set_player_score(player_id, turn, score)
+        answer = database_client.set_player_score(player_id, turn, score)
+        if answer.rowcount == 1:
+            await bot_utils.add_success_reaction(ctx.message)
+        elif answer.rowcount == 0:
+            await bot_utils.add_error_reaction(ctx.message)
+            await ctx.reply("No score entry was updated. \nTo to signal an error, react with ⁉️", mention_author=False)
+        else:
+            myid = '<@338067113639936003>'  # Jean's id
+            await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
     await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
