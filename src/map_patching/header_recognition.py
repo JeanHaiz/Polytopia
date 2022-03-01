@@ -54,7 +54,7 @@ def get_turn(image, low_thresh=130, channel_name=None):
             if DEBUG:
                 print("turn not recognised")
         else:
-            return get_turn(image, low_thresh + 10)
+            return get_turn(image, low_thresh=low_thresh + 10)
     else:
         if DEBUG:
             print("turn %s" % turn)

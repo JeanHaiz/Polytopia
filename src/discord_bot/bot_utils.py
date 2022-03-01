@@ -107,7 +107,7 @@ async def map_patching_routine(database_client: DatabaseClient, attachment, mess
     channel_name = message.channel.name
     channel_id = message.channel.id
     image = await image_utils.load_image(database_client, channel_name, message, filename, ImageOp.INPUT)
-    turn = header_recognition.get_turn(image, channel_name)
+    turn = header_recognition.get_turn(image, channel_name=channel_name)
     last_turn = database_client.get_last_turn(channel_id)
     if turn is None:
         turn = last_turn
