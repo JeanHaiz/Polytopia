@@ -292,3 +292,11 @@ async def get_player_scores(database_client, ctx, player):
         score_text = score_visualisation.print_player_scores(scores, player)
         embed = discord.Embed(title='%s scores' % str(player), description=score_text)
         await ctx.send(embed=embed)
+
+
+async def add_success_reaction(message: discord.Message):
+    await message.add_reaction("✅")
+
+
+async def add_error_reaction(message: discord.Message):
+    await message.add_reaction("🚫")

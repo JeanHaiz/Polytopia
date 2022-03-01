@@ -200,7 +200,7 @@ class DatabaseClient:
                 SET discord_player_name = '{author.name}'
                 RETURNING game_player_uuid::text;""").fetchone()
         if game_player_uuid is not None and len(game_player_uuid) > 0:
-            return self.engine.execute(
+            self.engine.execute(
                 f"""INSERT INTO polytopia_game
                     (server_discord_id, channel_discord_id)
                     VALUES ({message.guild.id}, {message.channel.id})
@@ -210,6 +210,7 @@ class DatabaseClient:
                     (game_player_uuid, channel_discord_id, is_alive)
                     VALUES ('{game_player_uuid[0]}', {message.channel.id}, true)
                     ON CONFLICT (game_player_uuid, channel_discord_id) DO NOTHING;""")
+            return game_player_uuid[0]
 
     def add_missing_player(self, player_name, channel_id):
         game_player_uuid = self.engine.execute(
