@@ -159,7 +159,7 @@ async def set_map_size(ctx, size):
             if size.isnumeric() and int(size) in [121, 196, 256, 324, 400, 900]:
                 answer = database_client.set_game_map_size(ctx.channel.id, int(size))
                 if answer.rowcount == 1:
-                    bot_utils.add_success_reaction(ctx.message)
+                    await bot_utils.add_success_reaction(ctx.message)
                 else:
                     await bot_utils.add_error_reaction(ctx.message)
                     myid = '<@338067113639936003>'  # Jean's id
