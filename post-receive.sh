@@ -10,16 +10,11 @@ git fetch git@github.com:JeanHaiz/Polytopia.git master
 HEADHASH=$(git rev-parse FETCH_HEAD)
 UPSTREAMHASH=$(git rev-parse master@{upstream})
 
-echo $HEADHASH $UPSTREAMHASH
-
 if [ "$HEADHASH" != "$UPSTREAMHASH" ]
 then
 	echo Not up to date with origin. Pulling and Restarting.
 	git pull git@github.com:JeanHaiz/Polytopia.git master
-	chmod +x /Users/jean/Documents/Coding/Polytopia/post-receive.sh
-	/usr/local/bin/docker-compose down
-	/usr/local/bin/docker-compose up --detach helper
-	crontab crontab.txt
+	/usr/local/bin/docker-compose restart helper
 	echo End of Pulling
 else
 	echo Current branch is up to date with origin/master.
