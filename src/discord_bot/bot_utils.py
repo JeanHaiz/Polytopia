@@ -187,9 +187,6 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
                 "Was there a small issue? Tell me more about it. Also %s has been notified." % myid,
                 mention_author=False)
 
-    else:
-        print("emoji not recognised:", payload.emoji, discord.PartialEmoji(name="🖼️"))
-
 
 async def process_score_recognition(database_client, channel, message):
     if len(message.attachments) > 0:
