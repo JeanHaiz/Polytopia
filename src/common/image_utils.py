@@ -8,7 +8,6 @@ from enum import Enum
 
 from common.logger_utils import logger
 
-# REPO_ROOT = "/Users/jean/Documents/Coding/Polytopia/"
 REPO_ROOT = pathlib.Path(__file__).parent.parent.absolute()
 
 
