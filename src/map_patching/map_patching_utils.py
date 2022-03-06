@@ -541,19 +541,43 @@ def match_cloud(result, template, img_alpha, ksize, sigma, border_width, i):
     max_val = np.max(blur)
     rad = int(math.sqrt(hh * hh + ww * ww) / 4)
 
-    while max_val > border_threshold[i]:  # TODO replace with > threshold
+    while max_val > threshold[i]:
 
-        # TODO use on_border criteria to only take the borders of the blur
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(blur)
 
-        if max_val > threshold[i] or (max_val > border_threshold[i] and on_border(max_loc, corr_shape, border_width)):
+        if max_val > threshold[i]:
             img_alpha[max_loc[1]: max_loc[1]+hh, max_loc[0]: max_loc[0]+ww] = \
                 img_alpha[max_loc[1]: max_loc[1]+hh, max_loc[0]: max_loc[0]+ww] - alpha_template / 255.0
 
-        cv2.circle(blur, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
+            cv2.circle(blur, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
 
-        # else:
-        #     break
+        else:
+            break
+
+    if corr_shape[0] > corr_shape[1]:
+        borders = [((0, 0), blur[:, :border_width]), ((0, corr_shape[1]-border_width), blur[:, -border_width:])]
+    else:
+        borders = [((0, 0), blur[:border_width, :]), ((corr_shape[0]-border_width, 0), blur[-border_width:, :])]
+        # ((loc[0] < width) or ((shape[1] - loc[0]) < width))
+
+    for padding, border_image in borders:
+
+        max_val = np.max(border_image)
+
+        while max_val > border_threshold[i]:
+
+            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(border_image)
+
+            padded_max_loc = max_loc[0] + padding[1], max_loc[1] + padding[0]
+
+            if max_val > border_threshold[i]:
+                img_alpha[padded_max_loc[1]: padded_max_loc[1]+hh, padded_max_loc[0]: padded_max_loc[0]+ww] = \
+                    img_alpha[padded_max_loc[1]: padded_max_loc[1]+hh, padded_max_loc[0]: padded_max_loc[0]+ww] \
+                    - alpha_template / 255.0
+
+                cv2.circle(border_image, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
+            else:
+                break
 
     return img_alpha
 
