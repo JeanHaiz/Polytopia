@@ -92,5 +92,5 @@ def __print_scores(scores):
 
     for data in score_list:
         s.append('   '.join([align(i, item) for i, item in enumerate(data)]))
-    d = '```'+'\n'.join(s) + '```'
+    d = '```' + '\n'.join(s) + '```'
     return d

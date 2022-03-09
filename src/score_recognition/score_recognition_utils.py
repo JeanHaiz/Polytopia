@@ -24,7 +24,7 @@ def read(image, config=''):
 def crop(image):
     edges = cv2.Canny(image, 50, 150, apertureSize=3)
     minLineLength = 500
-    lines = cv2.HoughLinesP(image=edges, rho=1, theta=np.pi/2, threshold=200, lines=np.array([]),
+    lines = cv2.HoughLinesP(image=edges, rho=1, theta=np.pi / 2, threshold=200, lines=np.array([]),
                             minLineLength=minLineLength, maxLineGap=10)
     heights = sorted([lines[i][0][1] for i in range(len(lines))])
     return image[heights[0]:heights[-1], :]

@@ -266,9 +266,9 @@ async def wrap_errors(ctx, guild_id, fct, is_async, *params, **kwparams):
 
 
 async def get_scores(database_client: DatabaseClient, ctx):
-    scores = database_client.get_channel_scores(ctx.channel.id)
+    scores: pd.DataFrame = database_client.get_channel_scores(ctx.channel.id)
     if scores is not None and len(scores[scores['turn'] != -1]) > 0:
-        scores: pd.DataFrame = scores[scores['turn'] != -1]
+        scores = scores[scores['turn'] != -1]
         score_plt = score_visualisation.plotScores(scores, ctx.channel.name, str(ctx.message.id))
         await ctx.message.channel.send(file=score_plt, content="score recognition")
         score_text = score_visualisation.print_scores(scores)

@@ -20,7 +20,7 @@ DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 def getLines(image, minLineLength=500, channel=None, filename=None):
     processed = image.copy()
     edges = image_processing_utils.get_one_color_edges(image, channel=channel)
-    lines = cv2.HoughLinesP(image=edges, rho=0.1, theta=np.pi/180, threshold=150, lines=np.array([]),
+    lines = cv2.HoughLinesP(image=edges, rho=0.1, theta=np.pi / 180, threshold=150, lines=np.array([]),
                             minLineLength=minLineLength, maxLineGap=100)
 
     for i in range(lines.shape[0]):
@@ -223,7 +223,7 @@ def get_lines(vertices_i):
     # very permissive: slopes of selected lines are within 0.55 < abs(slope) < 0.65
     selected_lines = sorted([(j, length, slope, sign_x, sign_y, p0, p1)
                             for (j, length, slope, sign_x, sign_y, p0, p1)
-                            in lines if abs(slope) < 10 and abs(slope) > 0.2],  key=lambda x: -x[1])
+                            in lines if abs(slope) < 10 and abs(slope) > 0.2], key=lambda x: -x[1])
 
     lines_df = pd.DataFrame(selected_lines)
 
@@ -245,7 +245,7 @@ def get_intersection(lines):
         lines.sort_values(7, inplace=True)
 
         for i in range(2):
-            points = lines[i*2:i*2+2]
+            points = lines[i * 2: i * 2 + 2]
             point_0 = np.stack(points[5].to_numpy())
 
             x1, y1 = point_0[0]
@@ -266,7 +266,7 @@ def get_intersection(lines):
         lines.sort_values(7, inplace=True)
 
         for i in range(2):
-            points = lines[i*2:i*2+2]
+            points = lines[i * 2: i * 2 + 2]
             point_0 = np.stack(points[5].to_numpy())
 
             x1, y1 = point_0[0]
@@ -367,8 +367,8 @@ async def transform_image(
 
 async def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
     background = patch_work[
-        scaled_padding[0]:scaled_padding[0]+size[0],
-        scaled_padding[1]:scaled_padding[1]+size[1], :]
+        scaled_padding[0]:scaled_padding[0] + size[0],
+        scaled_padding[1]:scaled_padding[1] + size[1], :]
     if DEBUG:
         print(background.shape, oppacity.shape)
         print("scaled_padding", scaled_padding)
@@ -378,14 +378,16 @@ async def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
         result = bit
     else:
         result = cv2.multiply(background, 1 - oppacity) + cv2.multiply(bit, oppacity)
-    patch_work[scaled_padding[0]:scaled_padding[0]+size[0], scaled_padding[1]:scaled_padding[1]+size[1], :] = result
+    patch_work[
+        scaled_padding[0]: scaled_padding[0] + size[0],
+        scaled_padding[1]: scaled_padding[1] + size[1], :] = result
     return patch_work
 
 
 def crop_output(image, position, size):
     return image[
-        (position[1] - 20).clip(0): (position[1]+size[1] + 20).clip(0, image.shape[1]),
-        (position[0] - size[0] - 20).clip(0): (position[0]+size[0] + 20).clip(0, image.shape[0])]
+        (position[1] - 20).clip(0): (position[1] + size[1] + 20).clip(0, image.shape[1]),
+        (position[0] - size[0] - 20).clip(0): (position[0] + size[0] + 20).clip(0, image.shape[0])]
 
 
 async def patch_partial_maps(
@@ -460,7 +462,9 @@ async def patch_partial_maps(
         image_utils.save_image(vertex_lines, channel_name, 'map_patching_debut', ImageOp.DEBUG_VERTICES)
 
     if message is not None and database_client is not None:
-        filename = database_client.add_resource(message, message.author, ImageOp.MAP_PATCHING_OUTPUT)
+        filename = database_client.add_resource(
+            message.guild.id, message.channel.id, message.id, message.author.id, message.author.name,
+            ImageOp.MAP_PATCHING_OUTPUT)
     else:
         filename = 'map_patching_debug'
     file_path = image_utils.save_image(cropped_patch_work, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)
@@ -519,8 +523,8 @@ async def remove_clouds(img, ksize=31, sigma=25, template_height=1):
         if max_val > threshold:
             # draw match on copy of input
             # cv2.rectangle(result, max_loc, (max_loc[0]+ww, max_loc[1]+hh), (0, 0, 255), 2)
-            img_alpha[max_loc[1]: max_loc[1]+hh, max_loc[0]: max_loc[0]+ww] = \
-                img_alpha[max_loc[1]: max_loc[1]+hh, max_loc[0]: max_loc[0]+ww] - alpha_template / 255.0
+            img_alpha[max_loc[1]: max_loc[1] + hh, max_loc[0]: max_loc[0] + ww] = \
+                img_alpha[max_loc[1]: max_loc[1] + hh, max_loc[0]: max_loc[0] + ww] - alpha_template / 255.0
 
             # write black circle at max_loc in corr_img
             cv2.circle(blur, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
@@ -581,8 +585,8 @@ async def remove_clouds_scaled(img, ksize=7, sigma=15, template_height=None):
 
             if max_val > threshold:
                 # draw match on copy of input
-                img_alpha[max_loc[1]: max_loc[1]+hh, max_loc[0]: max_loc[0]+ww] = \
-                    img_alpha[max_loc[1]: max_loc[1]+hh, max_loc[0]: max_loc[0]+ww] - alpha_template / 255.0
+                img_alpha[max_loc[1]: max_loc[1] + hh, max_loc[0]: max_loc[0] + ww] = \
+                    img_alpha[max_loc[1]: max_loc[1] + hh, max_loc[0]: max_loc[0] + ww] - alpha_template / 255.0
 
                 # write black circle at max_loc in corr_img
                 cv2.circle(blur, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
