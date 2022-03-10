@@ -111,10 +111,7 @@ class DatabaseClient:
                 VALUES ({channel_id}, {message_id}, {resource_number}, {author_id}, {operation.value})
                 RETURNING filename::text;
                 """).fetchone()
-        if len(filename) > 0:
-            return filename[0]
-        else:
-            return None
+        return filename[0] if filename is not None and len(filename) > 0 else None
 
     def get_resource(self, message_id: int, resource_number: int = 0) -> Optional[dict]:
         resource = self.execute(
@@ -133,10 +130,7 @@ class DatabaseClient:
                 WHERE source_message_id = {message_id}
                 AND resource_number = {resource_number}
                 RETURNING filename::text;""").fetchone()
-        if filename is not None and len(filename) > 0:
-            return filename[0]
-        else:
-            return None
+        return filename[0] if filename is not None and len(filename) > 0 else None
 
     def get_resource_filename(
         self, channel_id: int, message_id: int, operation: ImageOp, resource_number: int
@@ -148,10 +142,7 @@ class DatabaseClient:
                 AND source_message_id = {message_id}
                 AND resource_number = {resource_number}
                 AND operation = {operation.value};""").fetchone()
-        if filename is not None and len(filename) > 0:
-            return filename[0]
-        else:
-            return None
+        return filename[0] if filename is not None and len(filename) > 0 else None
 
     def get_map_patching_files(self, channel_id: int) -> list:
         filenames = self.execute(
@@ -166,7 +157,7 @@ class DatabaseClient:
         result = self.execute(
             f"""SELECT resource_number FROM message_resources
                 WHERE filename::text = '{filename}';""").fetchone()
-        return result[0] if len(result) > 0 else None
+        return result[0] if result is not None and len(result) > 0 else None
 
     def set_player_discord_name(
         self, discord_player_id: int, discord_player_name: str, polytopia_player_name: str
@@ -201,7 +192,7 @@ class DatabaseClient:
         map_size = self.execute(
             f"""SELECT map_size FROM polytopia_game
                 WHERE channel_discord_id = {channel_id};""").fetchone()
-        return map_size[0] if len(map_size) > 0 else None
+        return map_size[0] if map_size is not None and len(map_size) > 0 else None
 
     def set_game_map_size(self, channel_id: int, size: int) -> ResultProxy:
         return self.execute(
@@ -286,6 +277,6 @@ class DatabaseClient:
                 FROM message_resources
                 WHERE filename::text = '{filename}';""").fetchone()
         if resources is not None and len(resources) > 0:
-            return resources[0]['source_channel_id'], resources[0]['source_message_id']
+            return resources[1], resources[0]
         else:
             return None, None
