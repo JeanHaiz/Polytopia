@@ -30,6 +30,10 @@ services:
             - .env
         depends_on:
             - database
+        deploy:
+            resources:
+                limits:
+                    memory: 4000M
 
     jupyter-notebook:
         image: jupyter/datascience-notebook
