@@ -5,16 +5,10 @@ import pytesseract
 import numpy as np
 from common.logger_utils import logger
 
-# from .score_image_processing_utils import clear_noise
-
 
 def is_score_reconition_request(reactions, attachment, filename):
     # TODO: complete with image analysis heuristics
-    # if attachment.content_type.startswith("image/"):
-    # else:
-    # logger.info("content not supported: %s" % message.id)
     return "📈" in [r.emoji for r in reactions]
-    # return true  # discord.PartialEmoji(name="📈") in [r.emoji for r in message.reactions]
 
 
 def read(image, config=''):
@@ -37,7 +31,6 @@ def read_scores(image):
     logger.debug("image reading: %s" % image_reading)
     image_text = image_reading.split('\n')
     print("image text", image_text)
-    # scores = [read_line(t) for t in image_text if "score" in t and (not only_you or "Ruled by you" in t)]
     scores = [read_line(t) for t in image_text if "score" in t]
     logger.debug(scores)
     print("scores", scores)
@@ -46,7 +39,6 @@ def read_scores(image):
 
 def read_line(line):
     print("line", line)
-    # line = line.replace(".", "").replace(" ", "")
     line = re.sub(r"(\\[a-zA-Z0-9]*)", "", line)
     line = re.sub(r"[^a-zA-Z0-9,:]", "", line)
     print("re-line", line)
@@ -84,7 +76,6 @@ def clear_noise_optimised(image):
 
 def ii(image, xx, yy, img_x, img_y):
     if yy >= img_y or xx >= img_x:
-        # print "pixel out of bounds ("+str(y)+","+str(x)+")"
         return 0
     pixel = image[yy][xx]
     return 0.30 * pixel[2] + 0.59 * pixel[1] + 0.11 * pixel[0]
