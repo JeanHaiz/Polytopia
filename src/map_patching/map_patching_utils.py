@@ -2,7 +2,7 @@ import os
 import cv2
 import math
 import discord
-import asyncio
+# import asyncio
 import numpy as np
 import pandas as pd
 
@@ -297,14 +297,9 @@ def get_orientation(vertices):
     return True
 
 
-async def process_raw_map(
-        filename_i, i, channel_name, map_size, database_client, message=None, kernel_size=5, sigma=5):
+def process_raw_map(
+        image, filename_i, i, channel_name, map_size, database_client, message=None, kernel_size=5, sigma=5):
     print("map_patching_utils", filename_i)
-    if i == 0:
-        image = image_utils.get_background_template(map_size)
-    else:
-        image = await image_utils.load_image(database_client, channel_name, message, filename_i, ImageOp.INPUT)
-
     if image is None:
         if DEBUG:
             print("image not found:", filename_i)
@@ -344,12 +339,11 @@ async def process_raw_map(
             cv2.putText(edges, "%s" % (i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
                         (255, 255, 255), 3, cv2.LINE_AA)
         image_utils.save_image(edges, channel_name, filename_i, ImageOp.DEBUG_VERTICES)
-    return MapPatchingErrors.SUCCESS, (image, vertices_i, is_vertical_i)
+    return MapPatchingErrors.SUCCESS, (vertices_i, is_vertical_i)
 
 
-async def transform_image(
-        image_i, vertices_i, is_vertical, reference_position, reference_size, channel_name, filename_i, i, loop,
-        map_size):
+def transform_image(
+        image_i, vertices_i, is_vertical, reference_position, reference_size, channel_name, filename_i, map_size):
     transformation_dimensions = get_transformation_dimensions(
         vertices_i, is_vertical, reference_position, reference_size)
     padding, scale_factor, padded_and_scaled = transformation_dimensions
@@ -359,15 +353,15 @@ async def transform_image(
 
     # scale = reference_size[1] / math.sqrt(int(map_size))
     scale = (reference_size[1] + 100) / math.sqrt(int(map_size))
-    coroutine = remove_clouds(cropped_image, ksize=7, sigma=15, template_height=scale)
+    oppacity = remove_clouds(cropped_image, ksize=7, sigma=15, template_height=scale)
 
-    oppacity = loop.run_until_complete(coroutine)
+    # oppacity = loop.run_until_complete(coroutine)
     padding = np.flip(padding)
 
     return cropped_image, oppacity, padding, scale_factor, padded_and_scaled
 
 
-async def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
+def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
     background = patch_work[
         scaled_padding[0]:scaled_padding[0] + size[0],
         scaled_padding[1]:scaled_padding[1] + size[1], :]
@@ -392,14 +386,13 @@ def crop_output(image, position, size):
         (position[0] - size[0] - 20).clip(0): (position[0] + size[0] + 20).clip(0, image.shape[0])]
 
 
-async def patch_partial_maps(
+def patch_partial_maps(
         channel_name: str,
+        images: list,
         files: list,
         map_size: str,
         database_client: database_client.DatabaseClient = None,
         message=None):
-
-    files.insert(0, "background")
 
     patching_errors = []
     vertices = []
@@ -408,31 +401,32 @@ async def patch_partial_maps(
     transparency_masks = []
     scaled_paddings = []
     sizes = []
-    images = []
+    # images = []
     scaled_vertices = []
 
-    for i, filename_i in enumerate(files):
-        status, processed_raw_map = await process_raw_map(
-            filename_i, i, channel_name, map_size, database_client, message)
+    for i, image_i in enumerate(images):
+        filename_i = files[i]
+        status, processed_raw_map = process_raw_map(
+            image_i, filename_i, i, channel_name, map_size, database_client, message)
         if status != MapPatchingErrors.SUCCESS:
             patching_errors.append((status, processed_raw_map))
             continue
 
-        image, vertices_i, is_vertical_i = processed_raw_map
-        images.append(image)
+        vertices_i, is_vertical_i = processed_raw_map
+        # images.append(image)
         vertices.append(vertices_i)
         vertical.append(is_vertical_i)
 
     reference_position, reference_size = get_references(vertices)
-    loop = asyncio.get_running_loop()  # TODO look into timeout
+    # loop = asyncio.get_running_loop()  # TODO look into timeout
 
     for i in range(len(images)):
+        filename_i = files[i]
         image_i = images[i]
         vertices_i = vertices[i]
         is_vertical_i = vertical[i]
-        transformation = await transform_image(
-            image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name, filename_i, i, loop,
-            map_size)
+        transformation = transform_image(
+            image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name, filename_i, map_size)
         scaled_image, oppacity, padding, scale_factor, padded_and_scaled = transformation
 
         transparency_masks.append(oppacity)
@@ -450,7 +444,7 @@ async def patch_partial_maps(
         scaled_padding = scaled_paddings[i]
         size = sizes[i]
         oppacity = transparency_masks[i]
-        patch_work = await patch_output(patch_work, scaled_padding, oppacity, size, bit, i)
+        patch_work = patch_output(patch_work, scaled_padding, oppacity, size, bit, i)
 
     cropped_patch_work = crop_output(patch_work, reference_position, reference_size)
 
@@ -486,8 +480,7 @@ def is_map_patching_request(message, attachment, filename):
     return "🖼️" in [r.emoji for r in message.reactions]
 
 
-async def remove_clouds(img, ksize=31, sigma=25, template_height=1):
-
+def remove_clouds(img, ksize=31, sigma=25, template_height=1):
     print("img shape", img.shape)
     original_template = image_utils.get_cloud_template()
 
@@ -596,7 +589,7 @@ def on_border(loc, shape, width):
         return ((loc[1] < width) or ((shape[0] - loc[1]) < width))
 
 
-async def remove_clouds_scaled(img, ksize=7, sigma=15, template_height=None):
+def remove_clouds_scaled(img, ksize=7, sigma=15, template_height=None):
     template = image_utils.get_cloud_template()
     hh, ww = template.shape[:2]
 

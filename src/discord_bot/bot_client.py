@@ -47,9 +47,9 @@ async def on_message(message: discord.Message) -> None:
                     await image_utils.save_attachment(attachment, message.channel.name, ImageOp.INPUT, filename)
                     print("attachment saved", filename)
                     if message.reactions is not None and len(message.reactions) > 0:
-                        await bot_utils.reaction_message_routine(database_client, message, filename)
+                        await bot_utils.reaction_message_routine(bot_client, database_client, message, filename)
         await bot_client.process_commands(message)
-    await bot_utils.wrap_errors(message, message.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, message, message.guild.id, inner, True)
 
 
 @bot_client.event
@@ -64,7 +64,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         is_active = database_client.is_channel_active(payload.channel_id)
         if is_active:
             await bot_utils.reaction_added_routine(payload, bot_client, database_client)
-    await bot_utils.wrap_errors(message, channel.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, message, channel.guild.id, inner, True)
 
 
 @bot_client.event
@@ -75,7 +75,7 @@ async def on_raw_reaction_remove(payload: discord.RawReactionActionEvent):
             await bot_utils.reaction_removed_routine(payload, bot_client, database_client)
     channel = bot_client.get_channel(payload.channel_id)
     message = await channel.fetch_message(payload.message_id)
-    await bot_utils.wrap_errors(message, channel.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, message, channel.guild.id, inner, True)
 
 
 @bot_client.command()
@@ -84,7 +84,7 @@ async def activate(ctx: Context):
         logger.debug("activate channel %s" % ctx.channel)
         database_client.activate_channel(ctx.channel.id, ctx.channel.name, ctx.guild.id, ctx.guild.name)
         await ctx.send("channel activated")
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command()
@@ -93,7 +93,7 @@ async def deactivate(ctx: Context):
         logger.debug("deactivate channel %s" % ctx.channel)
         database_client.deactivate_channel(ctx.channel.id)
         await ctx.send("channel deactivated")
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command()
@@ -106,7 +106,7 @@ async def list_active_channels(ctx: Context):
         else:
             message = "no active channel"
         await ctx.send(message)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command(name="setname")
@@ -115,7 +115,7 @@ async def set_player_discord_name(ctx: Context, discord_id: str, discord_name: s
         logger.debug("set player name")
         database_client.set_player_discord_name(discord_id, discord_name, polytopia_name)
         await ctx.send("Hi %s!" % discord_name)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command(name="opponent")
@@ -124,7 +124,7 @@ async def add_game_opponent(ctx: Context, discord_name: str, polytopia_name: str
         logger.debug("set player name")
         database_client.set_player_discord_name(None, discord_name, polytopia_name)
         await ctx.send("Hi %s!" % discord_name)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command(name="setmyname")
@@ -133,16 +133,16 @@ async def set_self_discord_name(ctx: Context, polytopia_name: str):
         logger.debug("set self player name")
         database_client.set_player_discord_name(ctx.author.id, ctx.author.name, polytopia_name)
         await ctx.send("Hi %s!" % ctx.author.name)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command(name="scores")
 async def get_channel_player_scores(ctx: Context, player: str = None):
     if player is None:
-        await bot_utils.wrap_errors(ctx, ctx.guild.id, bot_utils.get_scores, True, *(database_client, ctx))
+        await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, bot_utils.get_scores, True, *(database_client, ctx))
     else:
         await bot_utils.wrap_errors(
-            ctx, ctx.guild.id, bot_utils.get_player_scores, True, *(database_client, ctx, player))
+            bot_client, ctx, ctx.guild.id, bot_utils.get_player_scores, True, *(database_client, ctx, player))
 
 
 @bot_client.command(name="turn")
@@ -151,7 +151,7 @@ async def set_turn(ctx: Context, turn: str):
         database_client.add_player_n_game(ctx.channel.id, ctx.guild.id, ctx.author.id, ctx.author.name)
         database_client.set_new_last_turn(ctx.channel.id, turn)
         await ctx.send("current turn is now %s" % str(turn))
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command(name="size")
@@ -178,7 +178,7 @@ async def set_map_size(ctx: Context, size: str = None):
             await bot_utils.add_error_reaction(ctx.message)
             myid = '<@338067113639936003>'  # Jean's id
             await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command(name="drop")
@@ -197,7 +197,7 @@ async def drop_score(ctx: Context, turn: str):
         elif answer.rowcount == 0:
             await bot_utils.add_error_reaction(ctx.message)
             await ctx.reply("No score entry updated. \nTo to signal an error, react with ⁉️", mention_author=False)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command(name="patch")
@@ -205,18 +205,18 @@ async def patch_map(ctx: Context):
     async def inner():
         turn = database_client.get_last_turn(ctx.channel.id)
         turn, patch, patching_errors = await bot_utils.generate_patched_map(
-            database_client, ctx.channel.id, ctx.channel.name, ctx.message, turn)
+            database_client, ctx.channel.id, ctx.channel.name, ctx.message, turn, bot_client.loop)
         await bot_utils.manage_patching_errors(ctx.channel, ctx.message, database_client, patching_errors)
         if patch is not None:
             return await ctx.channel.send(file=patch, content="map patched for turn %s" % turn)
         else:
             return await ctx.channel.send("patch failed")
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command(name="hello")
 async def say_hello(ctx: Context):
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, ctx.send, True, "Welcome to my botifull world!")
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, ctx.send, True, "Welcome to my botifull world!")
 
 
 @bot_client.command(name="players")
@@ -225,7 +225,7 @@ async def get_channel_players(ctx: Context):
         game_players = database_client.get_game_players(ctx.channel.id)
         player_frame = pd.DataFrame(game_players)
         await ctx.send(player_frame.to_string())
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command(name="trace")
@@ -235,7 +235,7 @@ async def get_map_trace(ctx: Context):
         print("messages", messages)
         for m in messages:
             print(m)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
 @bot_client.command(name="setscore")
@@ -256,4 +256,4 @@ async def set_player_score(ctx: Context, player_name: str, turn: str, score: str
         else:
             myid = '<@338067113639936003>'  # Jean's id
             await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
