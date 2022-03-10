@@ -4,6 +4,7 @@ import sqlalchemy
 import pandas as pd
 
 from typing import Optional
+from typing import Tuple
 from sqlalchemy.engine.result import ResultProxy
 from common.image_utils import ImageOp
 
@@ -278,3 +279,13 @@ class DatabaseClient:
                     WHERE turn = {turn}
                     AND score = {score}
                     LIMIT 1);""")
+
+    def get_resource_message(self, filename: str) -> Optional[Tuple]:
+        resources = self.execute(
+            f"""SELECT source_message_id, source_channel_id
+                FROM message_resources
+                WHERE filename::text = '{filename}';""").fetchone()
+        if resources is not None and len(resources) > 0:
+            return resources[0]['source_channel_id'], resources[0]['source_message_id']
+        else:
+            return None, None

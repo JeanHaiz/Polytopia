@@ -12,6 +12,8 @@ from common import image_processing_utils
 from database_interaction import database_client
 
 import nest_asyncio
+
+from map_patching.map_patching_errors import MapPatchingErrors
 nest_asyncio.apply()
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
@@ -306,21 +308,20 @@ async def process_raw_map(
     if image is None:
         if DEBUG:
             print("image not found:", filename_i)
-        print("EXIT LOOP")
-        return
+        return MapPatchingErrors.MISSING_MAP_INPUT, filename_i
 
     edges = image_processing_utils.get_three_color_edges(image, channel_name, filename_i, border=50)
     blur = cv2.GaussianBlur(edges, (kernel_size, kernel_size), sigmaX=sigma)
     contour = select_contours(blur)
     polygon = draw_contour(edges, contour, channel_name, filename=filename_i)
+    if polygon is None:
+        return MapPatchingErrors.MAP_NOT_RECOGNIZED, filename_i
     vertices_i = compute_vertices(polygon)
     is_vertical_i = get_orientation(vertices_i)
     lines = get_lines([p[0] for p in polygon])
 
     if lines is None or len(lines) != 4:
-        if DEBUG:
-            print("lines not detected for file:", filename_i)
-        return
+        return MapPatchingErrors.MAP_NOT_RECOGNIZED, filename_i
 
     intersections = get_intersection(lines)
 
@@ -331,8 +332,7 @@ async def process_raw_map(
         print(vertices_i.shape, type(vertices_i))
 
     if len(intersections) < 2:
-        print("intersections not detected for file:", filename_i)
-        return
+        return MapPatchingErrors.MAP_NOT_RECOGNIZED, filename_i
 
     vertices_i = np.array(intersections)
 
@@ -344,7 +344,7 @@ async def process_raw_map(
             cv2.putText(edges, "%s" % (i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
                         (255, 255, 255), 3, cv2.LINE_AA)
         image_utils.save_image(edges, channel_name, filename_i, ImageOp.DEBUG_VERTICES)
-    return image, vertices_i, is_vertical_i
+    return MapPatchingErrors.SUCCESS, (image, vertices_i, is_vertical_i)
 
 
 async def transform_image(
@@ -399,6 +399,7 @@ async def patch_partial_maps(
 
     files.insert(0, "background")
 
+    patching_errors = []
     vertices = []
     vertical = []
     bits = []
@@ -409,8 +410,10 @@ async def patch_partial_maps(
     scaled_vertices = []
 
     for i, filename_i in enumerate(files):
-        processed_raw_map = await process_raw_map(filename_i, i, channel_name, map_size, database_client, message)
-        if processed_raw_map is None:
+        status, processed_raw_map = await process_raw_map(
+            filename_i, i, channel_name, map_size, database_client, message)
+        if status != MapPatchingErrors.SUCCESS:
+            patching_errors.append(processed_raw_map)
             continue
 
         image, vertices_i, is_vertical_i = processed_raw_map
@@ -468,7 +471,7 @@ async def patch_partial_maps(
     else:
         filename = 'map_patching_debug'
     file_path = image_utils.save_image(cropped_patch_work, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)
-    return file_path, filename
+    return file_path, filename, patching_errors
 
 
 def is_map_patching_request(message, attachment, filename):

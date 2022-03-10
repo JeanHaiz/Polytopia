@@ -8,9 +8,9 @@ from tests import test_utils
 
 @pytest.mark.asyncio
 async def test_map_patchin_with_1_map():
-    output_file_path, filename = await map_patching_utils.patch_partial_maps(
+    output_file_path, filename, patching_errors = await map_patching_utils.patch_partial_maps(
         "testing-resources", ["image_1"], 400, None)
-
+    assert patching_errors == []
     output = cv2.imread(output_file_path)
     assert output.shape == (1303, 2143, 3)
 

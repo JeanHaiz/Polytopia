@@ -3,7 +3,7 @@ import discord
 import pandas as pd
 
 from discord.ext import commands
-from discord.ext import context
+from discord.ext.commands import Context
 
 from discord_bot import bot_utils
 from database_interaction.database_client import DatabaseClient
@@ -79,7 +79,7 @@ async def on_raw_reaction_remove(payload: discord.RawReactionActionEvent):
 
 
 @bot_client.command()
-async def activate(ctx: context):
+async def activate(ctx: Context):
     async def inner():
         logger.debug("activate channel %s" % ctx.channel)
         database_client.activate_channel(ctx.channel.id, ctx.channel.name, ctx.guild.id, ctx.guild.name)
@@ -88,7 +88,7 @@ async def activate(ctx: context):
 
 
 @bot_client.command()
-async def deactivate(ctx: context):
+async def deactivate(ctx: Context):
     async def inner():
         logger.debug("deactivate channel %s" % ctx.channel)
         database_client.deactivate_channel(ctx.channel.id)
@@ -97,7 +97,7 @@ async def deactivate(ctx: context):
 
 
 @bot_client.command()
-async def list_active_channels(ctx: context):
+async def list_active_channels(ctx: Context):
     async def inner():
         logger.debug("list active channels")
         active_channels = database_client.list_active_channels(ctx.guild.id)
@@ -110,7 +110,7 @@ async def list_active_channels(ctx: context):
 
 
 @bot_client.command(name="setname")
-async def set_player_discord_name(ctx: context, discord_id: str, discord_name: str, polytopia_name: str):
+async def set_player_discord_name(ctx: Context, discord_id: str, discord_name: str, polytopia_name: str):
     async def inner():
         logger.debug("set player name")
         database_client.set_player_discord_name(discord_id, discord_name, polytopia_name)
@@ -119,7 +119,7 @@ async def set_player_discord_name(ctx: context, discord_id: str, discord_name: s
 
 
 @bot_client.command(name="opponent")
-async def add_game_opponent(ctx: context, discord_name: str, polytopia_name: str):
+async def add_game_opponent(ctx: Context, discord_name: str, polytopia_name: str):
     async def inner():
         logger.debug("set player name")
         database_client.set_player_discord_name(None, discord_name, polytopia_name)
@@ -128,7 +128,7 @@ async def add_game_opponent(ctx: context, discord_name: str, polytopia_name: str
 
 
 @bot_client.command(name="setmyname")
-async def set_self_discord_name(ctx: context, polytopia_name: str):
+async def set_self_discord_name(ctx: Context, polytopia_name: str):
     async def inner():
         logger.debug("set self player name")
         database_client.set_player_discord_name(ctx.author.id, ctx.author.name, polytopia_name)
@@ -137,7 +137,7 @@ async def set_self_discord_name(ctx: context, polytopia_name: str):
 
 
 @bot_client.command(name="scores")
-async def get_channel_player_scores(ctx: context, player: str = None):
+async def get_channel_player_scores(ctx: Context, player: str = None):
     if player is None:
         await bot_utils.wrap_errors(ctx, ctx.guild.id, bot_utils.get_scores, True, *(database_client, ctx))
     else:
@@ -146,7 +146,7 @@ async def get_channel_player_scores(ctx: context, player: str = None):
 
 
 @bot_client.command(name="turn")
-async def set_turn(ctx: context, turn: str):
+async def set_turn(ctx: Context, turn: str):
     async def inner():
         database_client.add_player_n_game(ctx.channel.id, ctx.guild.id, ctx.author.id, ctx.author.name)
         database_client.set_new_last_turn(ctx.channel.id, turn)
@@ -155,7 +155,7 @@ async def set_turn(ctx: context, turn: str):
 
 
 @bot_client.command(name="size")
-async def set_map_size(ctx: context, size: str):
+async def set_map_size(ctx: Context, size: str = None):
     async def inner():
         game_player_uuid = database_client.add_player_n_game(
             ctx.channel.id, ctx.guild.id, ctx.author.id, ctx.author.name)
@@ -182,7 +182,7 @@ async def set_map_size(ctx: context, size: str):
 
 
 @bot_client.command(name="drop")
-async def drop_score(ctx: context, turn: str):
+async def drop_score(ctx: Context, turn: str):
     async def inner():
         answer = database_client.drop_score(ctx.channel.id, turn)
         if answer.rowcount != 0:
@@ -201,11 +201,12 @@ async def drop_score(ctx: context, turn: str):
 
 
 @bot_client.command(name="patch")
-async def patch_map(ctx: context):
+async def patch_map(ctx: Context):
     async def inner():
         turn = database_client.get_last_turn(ctx.channel.id)
-        turn, patch = await bot_utils.generate_patched_map(
+        turn, patch, patching_errors = await bot_utils.generate_patched_map(
             database_client, ctx.channel.id, ctx.channel.name, ctx.message, turn)
+        await bot_utils.manage_patching_errors(ctx.channel, ctx.message, database_client, patching_errors)
         if patch is not None:
             return await ctx.channel.send(file=patch, content="map patched for turn %s" % turn)
         else:
@@ -214,12 +215,12 @@ async def patch_map(ctx: context):
 
 
 @bot_client.command(name="hello")
-async def say_hello(ctx: context):
+async def say_hello(ctx: Context):
     await bot_utils.wrap_errors(ctx, ctx.guild.id, ctx.send, True, "Welcome to my botifull world!")
 
 
 @bot_client.command(name="players")
-async def get_channel_players(ctx: context):
+async def get_channel_players(ctx: Context):
     async def inner():
         game_players = database_client.get_game_players(ctx.channel.id)
         player_frame = pd.DataFrame(game_players)
@@ -228,7 +229,7 @@ async def get_channel_players(ctx: context):
 
 
 @bot_client.command(name="trace")
-async def get_map_trace(ctx: context):
+async def get_map_trace(ctx: Context):
     async def inner():
         messages = database_client.get_channel_resource_messages(ctx.channel.id, ImageOp.MAP_INPUT)
         print("messages", messages)
@@ -238,7 +239,7 @@ async def get_map_trace(ctx: context):
 
 
 @bot_client.command(name="setscore")
-async def set_player_score(ctx: context, player_name: str, turn: str, score: str):
+async def set_player_score(ctx: Context, player_name: str, turn: str, score: str):
     async def inner():
         players = database_client.get_game_players(ctx.channel.id)
         matching_players = [p for p in players if p["polytopia_player_name"] == player_name]

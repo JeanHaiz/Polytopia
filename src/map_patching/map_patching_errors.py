@@ -1,0 +1,25 @@
+from enum import Enum
+
+
+class MapPatchingErrors(Enum):
+    SUCCESS = 0
+    MISSING_MAP_SIZE = 1
+    MISSING_MAP_INPUT = 5
+    ATTACHMEMENT_NOT_LOADED = 2
+    ATTACHMEMENT_NOT_SAVED = 3
+    MAP_NOT_RECOGNIZED = 4
+
+
+MAP_PATCHING_ERROR_MESSAGES = {
+    MapPatchingErrors.SUCCESS: "",
+    MapPatchingErrors.MISSING_MAP_SIZE:
+        "Missing map size. Please use the ´:size 196´ command.",
+    MapPatchingErrors.MISSING_MAP_INPUT:
+        "We couldn't find your image. <@338067113639936003> has been notified.",
+    MapPatchingErrors.ATTACHMEMENT_NOT_LOADED:
+        "We couldn't find our map patching. <@338067113639936003> has been notified.",
+    MapPatchingErrors.ATTACHMEMENT_NOT_SAVED:
+        "We couldn't save our map patching. <@338067113639936003> has been notified.",
+    MapPatchingErrors.MAP_NOT_RECOGNIZED:
+        "The map couldn't be recognised. Please try again with another screenshot. To to signal an error, react with ⁉️"
+}
