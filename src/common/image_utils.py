@@ -28,6 +28,7 @@ class ImageOp(Enum):
     PADDING = 4096
     TURN_PIECES = 8192
     SCORE_PLT = 16384
+    CORRELATION_BLUR = 32768
 
 
 async def load_image(database_client, channel_name, message, filename, operation):
