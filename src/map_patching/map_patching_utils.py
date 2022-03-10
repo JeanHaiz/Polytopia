@@ -415,7 +415,7 @@ async def patch_partial_maps(
         status, processed_raw_map = await process_raw_map(
             filename_i, i, channel_name, map_size, database_client, message)
         if status != MapPatchingErrors.SUCCESS:
-            patching_errors.append(processed_raw_map)
+            patching_errors.append((status, processed_raw_map))
             continue
 
         image, vertices_i, is_vertical_i = processed_raw_map

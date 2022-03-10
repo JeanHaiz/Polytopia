@@ -1,7 +1,6 @@
 import os
 import sys
 import datetime
-from typing import Tuple
 import discord
 import traceback
 import numpy as np
@@ -120,7 +119,7 @@ async def map_patching_routine(database_client: DatabaseClient, attachment, mess
 
 
 async def manage_patching_errors(
-    channel: discord.channel, message: discord.message, database_client: DatabaseClient, patching_errors: Tuple
+    channel: discord.channel, message: discord.message, database_client: DatabaseClient, patching_errors: list
 ):
     for cause, error_filename in patching_errors:
         if error_filename is None:

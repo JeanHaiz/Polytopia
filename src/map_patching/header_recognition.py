@@ -39,12 +39,10 @@ def get_turn(image, low_thresh=130, channel_name=None):
             image_utils.save_image(row_image, channel_name, "binary_%d" % i, ImageOp.TURN_PIECES)
         row_text = pytesseract.image_to_string(
             255 - row_image, config='--psm 6 -c load_system_dawg=0 load_freq_dawg=0 load_punc_dawg=0')
-        print(row_text)
         cleared_row_text = row_text.replace("\n", "").replace("\x0c", "")
         cleared_row_text = re.sub(r"[^a-zA-Z0-9 ]", "", cleared_row_text)
         if 'Scores' not in cleared_row_text and 'Stars' not in cleared_row_text:
             cleared_row_numbers = re.sub(r"[^0-9 ]", "", cleared_row_text).replace("  ", " ").strip()
-            print(i, cleared_row_numbers)
             cleared_row_text_split = cleared_row_numbers.split(" ")
             if len(cleared_row_text_split) > 2 and cleared_row_text_split[2].isnumeric():
                 turn = cleared_row_text_split[2]
