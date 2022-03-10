@@ -1,5 +1,6 @@
 [flake8]
 # ignore = D203
+ignore = ANN101, T499
 exclude =
     .git,
     __pycache__,
