@@ -43,13 +43,13 @@ async def on_message(message: discord.Message) -> None:
                 for i, attachment in enumerate(message.attachments):
                     filename = database_client.add_resource(
                         message.guild.id, message.channel.id, message.id, message.author.id, message.author.name,
-                        message.author, ImageOp.INPUT, i)
+                        ImageOp.INPUT, i)
                     await image_utils.save_attachment(attachment, message.channel.name, ImageOp.INPUT, filename)
                     print("attachment saved", filename)
                     if message.reactions is not None and len(message.reactions) > 0:
                         await bot_utils.reaction_message_routine(database_client, message, filename)
         await bot_client.process_commands(message)
-    await bot_utils.wrap_errors(message.channel, message.guild.id, inner, True)
+    await bot_utils.wrap_errors(message, message.guild.id, inner, True)
 
 
 @bot_client.event
