@@ -1,16 +1,28 @@
 import cv2
 import pytest
+import numpy
 
 from map_patching import map_patching_utils
 from map_patching import header_recognition
+
 from tests import test_utils
 
 
 @pytest.mark.asyncio
 async def test_map_patchin_with_1_map():
-    output_file_path, filename, patching_errors = await map_patching_utils.patch_partial_maps(
-        "testing-resources", ["image_1"], 400, None)
+    channel_name = "testing-resources"
+    files = ["image_1"]
+    map_size = 400
+    images = await test_utils.prepare_test_images(files, channel_name, map_size)
+    assert len(images) == 2
+    assert images[0] is not None and type(images[0]) == numpy.ndarray
+    assert images[1] is not None and type(images[0]) == numpy.ndarray
+
+    output_file_path, filename, patching_errors = map_patching_utils.patch_partial_maps(
+        channel_name, images, files, map_size)
+
     assert patching_errors == []
+    assert filename == "map_patching_debug"
     output = cv2.imread(output_file_path)
     assert output.shape == (1303, 2143, 3)
 
