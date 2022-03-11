@@ -11,10 +11,7 @@ from common.image_utils import ImageOp
 from common import image_processing_utils
 from database_interaction import database_client
 
-import nest_asyncio
-
 from map_patching.map_patching_errors import MapPatchingErrors
-nest_asyncio.apply()
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 

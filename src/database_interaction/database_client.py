@@ -247,7 +247,7 @@ class DatabaseClient:
 
     def get_channel_resource_messages(self, channel_id: int, operation: ImageOp) -> list:
         resources = self.execute(
-            f"""SELECT source_message_id
+            f"""SELECT source_message_id, operation
                 FROM message_resources
                 WHERE source_channel_id = {channel_id}
                 AND operation = {operation.value};""").fetchall()

@@ -120,15 +120,18 @@ async def map_patching_routine(database_client: DatabaseClient, attachment, mess
 
 
 async def manage_patching_errors(
-    channel: discord.channel, message: discord.message, database_client: DatabaseClient, patching_errors: list
+    channel: discord.channel, original_message: discord.message, database_client: DatabaseClient, patching_errors: list
 ):
     for cause, error_filename in patching_errors:
         if error_filename is None:
-            await message.reply(MAP_PATCHING_ERROR_MESSAGES[cause])
+            await original_message.reply(MAP_PATCHING_ERROR_MESSAGES[cause])
         else:
             channel_id, message_id = database_client.get_resource_message(error_filename)
             if channel_id is not None and message_id is not None:
-                message = await channel.fetch_message(message_id)
+                try:
+                    message = await channel.fetch_message(message_id)
+                except discord.errors.NotFound:
+                    message = original_message
                 await message.reply(MAP_PATCHING_ERROR_MESSAGES[cause], mention_author=False)
 
 
@@ -298,16 +301,7 @@ async def wrap_errors(bot_client: Bot, ctx, guild_id, fct, is_async, *params, **
         #       os.getenv("POLYTOPIA_ENVIRONMENT", ""))
         if (is_dev_env and is_test_server) or ((not is_test_server) and (not is_dev_env)):
             if is_async:
-                # asyncio.ensure_future(fct(*params, **kwparams))
-                # bot_client.loop.run_forever()
-                print("here")
                 await fct(*params, **kwparams)
-                # await bot_client.loop.run_in_executor(None, fct, *params, **kwparams)
-                # bot_client.loop.run_until_complete(fct(*params, **kwparams))
-                # await (await asyncio.to_thread(fct, *params, **kwparams))()
-                # func = functools.partial(fct, *params, **kwparams)
-                # await bot_client.loop.run_in_executor(None, func)
-                # return await fct(*params)
             else:
                 fct(*params, **kwparams)
     except BaseException:

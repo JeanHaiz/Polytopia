@@ -1,5 +1,6 @@
 
 import discord
+import nest_asyncio
 import pandas as pd
 
 from discord.ext import commands
@@ -11,6 +12,7 @@ from common import image_utils
 from common.logger_utils import logger
 from common.image_utils import ImageOp
 
+nest_asyncio.apply()
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
 
 bot_client = commands.Bot(":")
@@ -233,8 +235,12 @@ async def get_map_trace(ctx: Context):
     async def inner():
         messages = database_client.get_channel_resource_messages(ctx.channel.id, ImageOp.MAP_INPUT)
         print("messages", messages)
-        for m in messages:
-            print(m)
+        for i, m in enumerate(messages):
+            try:
+                message = await ctx.fetch_message(m['source_message_id'])
+                await message.reply("%s %d" % (ImageOp(m['operation']).name, i), mention_author=False)
+            except discord.errors.NotFound:
+                await ctx.send("Message not found")
     await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
