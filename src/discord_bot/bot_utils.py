@@ -233,7 +233,7 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
 
 
 async def process_score_recognition(database_client, channel, message):
-    if len(message.attachments) > 0:
+    if len(message.attachments) == 1:
         output = ""
         for i, attachment in enumerate(message.attachments):
             if score_recognition_utils.is_score_reconition_request(message.reactions, attachment, "filename"):
@@ -248,10 +248,12 @@ async def process_score_recognition(database_client, channel, message):
         if len(output) > 0:
             await channel.send(output)
         print("output", output)
+    elif len(message.attachments) > 1:
+        await message.reply("Only one image per message is currently supported.", mention_author=False)
 
 
 async def process_map_patching(bot_client, message, channel, database_client):
-    if len(message.attachments) > 0:
+    if len(message.attachments) == 1:
         for i, attachment in enumerate(message.attachments):
             if map_patching_utils.is_map_patching_request(message, attachment, "filename"):
                 filename = await prepare_attachment(database_client, channel, message, attachment, i, ImageOp.MAP_INPUT)
@@ -266,6 +268,8 @@ async def process_map_patching(bot_client, message, channel, database_client):
                 elif len(patching_errors) == 0 and patch is None:
                     myid = '<@338067113639936003>'  # Jean's id
                     await message.reply('There was an error. %s has been notified.' % myid, mention_author=False)
+    elif len(message.attachments) > 1:
+        await message.reply("Only one image per message is currently supported.", mention_author=False)
 
 
 async def prepare_attachment(database_client: DatabaseClient, channel, message, attachment, i, imageOp):

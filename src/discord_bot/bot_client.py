@@ -39,7 +39,7 @@ async def on_message(message: discord.Message) -> None:
         if message.author.bot:
             return
 
-        if message.attachments is not None and len(message.attachments) != 0:
+        if message.attachments is not None and len(message.attachments) == 1:
             is_active = database_client.is_channel_active(message.channel.id)
             if is_active:
                 for i, attachment in enumerate(message.attachments):
