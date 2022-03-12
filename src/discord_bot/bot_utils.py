@@ -258,7 +258,7 @@ async def process_map_patching(bot_client, message, channel, database_client):
             if map_patching_utils.is_map_patching_request(message, attachment, "filename"):
                 filename = await prepare_attachment(database_client, channel, message, attachment, i, ImageOp.MAP_INPUT)
                 image = await image_utils.load_image(
-                    database_client, channel.name, message, filename, ImageOp.INPUT, bot_client.loop)
+                    database_client, channel.name, message, filename, ImageOp.INPUT)
                 turn, patch, patching_errors = await map_patching_routine(database_client, attachment, message, image)
                 # func = functools.partial(map_patching_routine, database_client, attachment, message, image)
                 # turn, patch, patching_errors = await bot_client.loop.run_in_executor(None, func)
