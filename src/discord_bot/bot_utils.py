@@ -207,7 +207,7 @@ async def reaction_removed_routine(payload, bot_client, database_client: Databas
         filename = database_client.get_resource_filename(channel.id, message.id, source_operation, 0)
         if filename is not None:
             image_utils.move_back_input_image(message.channel, filename, source_operation)
-        # database_client.remove_resource(payload.message_id)
+        database_client.set_resource_operation(payload.message_id, ImageOp.INPUT, 0)
 
 
 async def reaction_added_routine(payload, bot_client, database_client: DatabaseClient):
@@ -230,6 +230,16 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
             await message.reply(
                 "Was there a small issue? Tell me more about it. Also %s has been notified." % myid,
                 mention_author=False)
+    elif payload.emoji == discord.PartialEmoji(name="🗑"):
+        channel = bot_client.get_channel(payload.channel_id)
+        message = await channel.fetch_message(payload.message_id)
+        if message.author.id == bot_client.user.id:
+            if message.reference is not None and message.reference.message_id is not None \
+                    and message.content.startswith("MAP_INPUT"):
+                database_client.remove_resource(message.reference.message_id)
+            elif message.content.startswith("Message not found: "):
+                database_client.remove_resource(message.content[len("Message not found: "):])
+            await message.delete()
 
 
 async def process_score_recognition(database_client, channel, message):
@@ -356,3 +366,7 @@ async def add_success_reaction(message: discord.Message):
 
 async def add_error_reaction(message: discord.Message):
     await message.add_reaction("🚫")
+
+
+async def add_delete_reaction(message: discord.Message):
+    await message.add_reaction("🗑")
