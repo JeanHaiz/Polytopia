@@ -237,10 +237,13 @@ async def get_map_trace(ctx: Context):
         print("messages", messages)
         for i, m in enumerate(messages):
             try:
-                message = await ctx.fetch_message(m['source_message_id'])
-                await message.reply("%s %d" % (ImageOp(m['operation']).name, i), mention_author=False)
+                message: discord.Message = await ctx.fetch_message(m['source_message_id'])
+                sent_message = await message.reply("%s %d" % (ImageOp(m['operation']).name, i), mention_author=False)
             except discord.errors.NotFound:
-                await ctx.send("Message not found")
+                sent_message = await ctx.send("Message not found: %d" % m['source_message_id'])
+            await bot_utils.add_delete_reaction(sent_message)
+        if len(messages) == 0:
+            await ctx.send("Trace empty")
     await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
