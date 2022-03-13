@@ -204,10 +204,13 @@ async def reaction_removed_routine(payload, bot_client, database_client: Databas
             source_operation = ImageOp.MAP_INPUT
         channel = bot_client.get_channel(payload.channel_id)
         message = await channel.fetch_message(payload.message_id)
-        filename = database_client.get_resource_filename(channel.id, message.id, source_operation, 0)
-        if filename is not None:
-            image_utils.move_back_input_image(message.channel, filename, source_operation)
-        database_client.set_resource_operation(payload.message_id, ImageOp.INPUT, 0)
+        reset_resource(database_client, channel, message.id, source_operation)
+
+
+def reset_resource(database_client: DatabaseClient, channel, message_id, source_operation):
+    filename = database_client.set_resource_operation(message_id, ImageOp.INPUT, 0)
+    if filename is not None:
+        image_utils.move_back_input_image(channel, filename, source_operation)
 
 
 async def reaction_added_routine(payload, bot_client, database_client: DatabaseClient):
@@ -236,9 +239,10 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
         if message.author.id == bot_client.user.id:
             if message.reference is not None and message.reference.message_id is not None \
                     and message.content.startswith("MAP_INPUT"):
-                database_client.remove_resource(message.reference.message_id)
+                reset_resource(database_client, message.channel.id, message.reference.message_id, ImageOp.MAP_INPUT)
             elif message.content.startswith("Message not found: "):
-                database_client.remove_resource(message.content[len("Message not found: "):])
+                reset_message_id = message.content[len("Message not found: "):]
+                reset_resource(database_client, message.channel.id, reset_message_id, ImageOp.MAP_INPUT)
             await message.delete()
 
 
