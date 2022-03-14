@@ -247,6 +247,14 @@ async def get_map_trace(ctx: Context):
     await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
 
 
+@bot_client.command(name="clear_maps")
+async def clear_map_reactions(ctx):
+    async def inner():
+        await bot_utils.clear_channel_map_reactions(bot_client, database_client, ctx.channel)
+        bot_utils.add_success_reaction(ctx.message)
+    await bot_utils.wrap_errors(bot_client, ctx, ctx.guild.id, inner, True)
+
+
 @bot_client.command(name="setscore")
 async def set_player_score(ctx: Context, player_name: str, turn: str, score: str):
     async def inner():
