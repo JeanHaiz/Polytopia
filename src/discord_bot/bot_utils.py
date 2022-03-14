@@ -229,9 +229,8 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
         message = await channel.fetch_message(payload.message_id)
         print("users", message.author, bot_client.user)
         if message.author == bot_client.user:
-            myid = '<@338067113639936003>'  # Jean's id
             await message.reply(
-                "Was there a small issue? Tell me more about it. Also %s has been notified." % myid,
+                "Was there a small issue? Tell me more about it. Also <@338067113639936003> has been notified.",
                 mention_author=False)
     elif payload.emoji == discord.PartialEmoji(name="🗑"):
         channel = bot_client.get_channel(payload.channel_id)
@@ -240,6 +239,9 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
             if message.reference is not None and message.reference.message_id is not None \
                     and message.content.startswith("MAP_INPUT"):
                 reset_resource(database_client, message.channel.id, message.reference.message_id, ImageOp.MAP_INPUT)
+                reset_message: discord.Message = await channel.fetch_message(message.reference.message_id)
+                clear_map_reaction(reset_message)
+
             elif message.content.startswith("Message not found: "):
                 reset_message_id = message.content[len("Message not found: "):]
                 reset_resource(database_client, message.channel.id, reset_message_id, ImageOp.MAP_INPUT)
@@ -323,6 +325,8 @@ async def wrap_errors(bot_client: Bot, ctx, guild_id, fct, is_async, *params, **
                 await fct(*params, **kwparams)
             else:
                 fct(*params, **kwparams)
+    except discord.errors.Forbidden:
+        await ctx.reply("Missing permission. <@338067113639936003> has been notified.", mention_author=False)
     except BaseException:
         error = sys.exc_info()[0]
         logger.error("##### ERROR #####")
@@ -331,8 +335,7 @@ async def wrap_errors(bot_client: Bot, ctx, guild_id, fct, is_async, *params, **
         print("##### ERROR #####")
         print(error)
         traceback.print_exc()
-        myid = '<@338067113639936003>'  # Jean's id
-        await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
+        await ctx.reply('There was an error. <@338067113639936003> has been notified.', mention_author=False)
 
 
 async def get_scores(database_client: DatabaseClient, ctx):
@@ -374,3 +377,19 @@ async def add_error_reaction(message: discord.Message):
 
 async def add_delete_reaction(message: discord.Message):
     await message.add_reaction("🗑")
+
+
+async def clear_channel_map_reactions(
+        bot_client: discord.ext.commands.Bot, database_client: DatabaseClient, channel: discord.TextChannel):
+    messages_ids = database_client.get_channel_resource_messages(channel.id, ImageOp.MAP_INPUT)
+
+    for m_id in messages_ids:
+        message: discord.Message = await channel.fetch_message(m_id['source_message_id'])
+        clear_map_reaction(message)
+        database_client.set_resource_operation(m_id['source_message_id'], ImageOp.INPUT, 0)
+
+
+async def clear_map_reaction(message: discord.Message):
+    for reaction in message.reactions:
+        if reaction.emoji == "🖼️":
+            await reaction.clear()
