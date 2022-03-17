@@ -238,13 +238,13 @@ async def reaction_added_routine(payload, bot_client, database_client: DatabaseC
         if message.author.id == bot_client.user.id:
             if message.reference is not None and message.reference.message_id is not None \
                     and message.content.startswith("MAP_INPUT"):
-                reset_resource(database_client, message.channel.id, message.reference.message_id, ImageOp.MAP_INPUT)
+                reset_resource(database_client, message.channel, message.reference.message_id, ImageOp.MAP_INPUT)
                 reset_message: discord.Message = await channel.fetch_message(message.reference.message_id)
                 clear_map_reaction(reset_message)
 
             elif message.content.startswith("Message not found: "):
                 reset_message_id = message.content[len("Message not found: "):]
-                reset_resource(database_client, message.channel.id, reset_message_id, ImageOp.MAP_INPUT)
+                reset_resource(database_client, message.channel, reset_message_id, ImageOp.MAP_INPUT)
             await message.delete()
 
 
