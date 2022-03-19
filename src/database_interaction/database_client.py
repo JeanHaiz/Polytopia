@@ -1,21 +1,23 @@
 import re
 
+import os
 import sqlalchemy
 import pandas as pd
 
 from common.image_utils import ImageOp
 
+from database_interaction import database_temp
+
 
 class DatabaseClient:
 
     def __init__(self, user, password, port, database, host):
-        # db_url = 'postgresql://discordBot:password123@polytopia_database_1:5432/polytopiaHelper_dev'
-        # db_url = 'postgresql://discordBot:password123@172.25.0.2:5432/polytopiaHelper_dev'
-
         self.database = database
         self.database_url = f"""postgresql://{user}:{password}@{host}:{port}/{database}"""
         self.engine = sqlalchemy.create_engine(self.database_url, echo=True)
-
+        if 1:
+            self.engine = database_in_memory.new_db()
+            
     def is_channel_active(self, channel_id: int):
         is_active = self.engine.execute(
             f"""SELECT is_active FROM discord_channel
