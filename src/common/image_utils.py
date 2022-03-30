@@ -1,4 +1,5 @@
 import os
+import re
 import cv2
 import sys
 import time
@@ -103,7 +104,7 @@ def move_back_input_image(channel, filename, source_operation):
 
 
 def __get_parent_path(channel_name, operation):
-    return os.path.join(REPO_ROOT, "resources", channel_name, operation.name)
+    return os.path.join(REPO_ROOT, "resources", __clean(channel_name), operation.name)
 
 
 def __get_file_path(channel_name, operation, filename):
@@ -131,3 +132,7 @@ def get_plt_path(channel_name, filename):
     parent_path = __get_parent_path(channel_name, ImageOp.SCORE_PLT)
     file_path = __get_file_path(channel_name, ImageOp.SCORE_PLT, filename)
     return parent_path, file_path
+
+
+def __clean(path: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_-]", "", path)
