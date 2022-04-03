@@ -142,6 +142,11 @@ async def generate_patched_map(database_client: DatabaseClient, channel_id, chan
         return turn, None, [(MapPatchingErrors.MISSING_MAP_SIZE, None)]
 
     files = database_client.get_map_patching_files(channel_id)
+    if len(files) == 0:
+        return turn, None, [(MapPatchingErrors.NO_FILE_FOUND, None)]
+    elif len(files) == 1:
+        return turn, None, [(MapPatchingErrors.ONLY_ONE_FILE, None)]
+
     images = [
         await image_utils.load_image(database_client, channel_name, message, filename_i, ImageOp.INPUT)
         for filename_i in files]
