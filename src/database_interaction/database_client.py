@@ -26,7 +26,8 @@ class DatabaseClient:
         return is_active is not None and len(is_active) > 0 and is_active[0]
 
     def activate_channel(self, channel_id: int, channel_name: str, server_id: int, server_name: str) -> bool:
-        channel_name = re.sub(r"[^a-zA-Z0-9 ]", "", channel_name)[:40]
+        channel_name = re.sub(r"[^a-zA-Z0-9]", "", channel_name)[:40]
+        server_name = re.sub(r"[^a-zA-Z0-9]", "", server_name)[:40]
         result = self.execute(
             f"""INSERT INTO discord_server
                 (server_discord_id, server_name)
