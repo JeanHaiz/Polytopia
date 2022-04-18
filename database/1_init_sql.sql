@@ -9,11 +9,11 @@ CREATE DATABASE polytopiaHelper_dev;
 GRANT ALL PRIVILEGES ON DATABASE polytopiaHelper_dev TO discordBot;
 
 /* 
-psql --dbname=polytopiaHelper_dev -U discordBot
+ * psql --dbname=polytopiaHelper_dev -U discordBot
  */
 /* 
-CREATE DATABASE polytopiaHelper_test;
-GRANT ALL PRIVILEGES ON DATABASE polytopiaHelper_dev TO discordBot;
+ * CREATE DATABASE polytopiaHelper_test;
+ * GRANT ALL PRIVILEGES ON DATABASE polytopiaHelper_dev TO discordBot;
  */
 
 CREATE TABLE IF NOT EXISTS discord_server(

@@ -1,4 +1,5 @@
 import re
+import uuid
 
 import sqlalchemy
 import pandas as pd
@@ -281,3 +282,67 @@ class DatabaseClient:
             return resources[1], resources[0]
         else:
             return None, None
+
+    def add_patching_process(self, channel_id: str, author_id: str) -> ResultProxy:
+        patch_uuid = self.execute(
+            f"""INSERT INTO map_patching_process
+                (channel_discord_id, process_author_discord_id, status)
+                VALUES ('{channel_id}', '{author_id}', 'STARTED')
+                RETURNING patch_uuid::text;""").fetchone()
+        if patch_uuid is not None and len(patch_uuid) > 0:
+            return patch_uuid[0]
+        else:
+            return None
+
+    def add_patching_process_input(self, patch_uuid: str, input_filename: str, order: int) -> ResultProxy:
+        return self.execute(
+            f"""INSERT INTO map_patching_process_input
+                (patch_uuid, input_filename, input_order)
+                VALUES ('{uuid.UUID(patch_uuid)}', '{input_filename}', {order});""")
+
+    def get_patching_processes(self, channel_id: str) -> list:
+        processes = self.execute(
+            f"""SELECT * FROM map_patching_process
+                WHERE channel_discord_id = '{channel_id}'
+                ORDER BY started_on DSC;""").fetchall()
+        return [dict(row) for row in processes]
+
+    def get_patching_process(self, patch_uuid: str) -> Optional[dict]:
+        process = self.execute(
+            f"""SELECT * FROM map_patching_process
+                WHERE patch_uuid::text = '{patch_uuid}';""").fetchall()
+        if process is not None and len(process) > 0:
+            return dict(process[0])
+        else:
+            return None
+
+    def get_patching_inputs(self, patch_uuid: str) -> list:
+        process_inputs = self.execute(
+            f"""SELECT * FROM map_patching_process_input
+                WHERE patch_uuid::text = '{patch_uuid}';""").fetchall()
+        return [dict(row) for row in process_inputs]
+
+    def update_patching_process_status(self, patch_uuid: str, status: str) -> bool:
+        patch_uuid = self.execute(
+            f"""UPDATE map_patching_process
+                SET status = '{status}'
+                WHERE patch_uuid::text = '{patch_uuid}'
+                RETURNING patch_uuid::text;""").fetchone()
+        return patch_uuid is not None and len(patch_uuid) > 0
+
+    def update_patching_process_output_filename(self, patch_uuid: str, filename: str) -> bool:
+        patch_uuid = self.execute(
+            f"""UPDATE map_patching_process
+                SET output_filename = '{filename}', ended_on = now()
+                WHERE patch_uuid::text = '{patch_uuid}'
+                RETURNING patch_uuid::text;""").fetchone()
+        return patch_uuid is not None and len(patch_uuid) > 0
+
+    def update_patching_process_input_status(self, patch_uuid: str, filename: str, status: str) -> bool:
+        patch_input_uuid = self.execute(
+            f"""UPDATE map_patching_process_input
+                SET status = '{status}'
+                WHERE patch_uuid::text = '{patch_uuid}'
+                AND input_filename = '{filename}'
+                RETURNING patch_input_uuid::text;""").fetchone()
+        return patch_input_uuid is not None and len(patch_input_uuid) > 0

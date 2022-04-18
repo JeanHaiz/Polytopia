@@ -2,14 +2,15 @@ import os
 import cv2
 import math
 import discord
-# import asyncio
 import numpy as np
 import pandas as pd
+
+from typing import Tuple
 
 from common import image_utils
 from common.image_utils import ImageOp
 from common import image_processing_utils
-from database_interaction import database_client
+from database_interaction.database_client import DatabaseClient
 
 from map_patching.map_patching_errors import MapPatchingErrors
 
@@ -170,6 +171,7 @@ def scale_image(image, channel_name, scale_factor, filename=None):
 
 
 def get_references(vertices):
+    vertices = [v for v in vertices if v is not None]
     reference_position = [0, 0]
     reference_size = [0, 0]
 
@@ -388,8 +390,9 @@ def patch_partial_maps(
         images: list,
         files: list,
         map_size: str,
-        database_client: database_client.DatabaseClient = None,
-        message=None):
+        patch_uuid: str,
+        database_client: DatabaseClient = None,
+        message: discord.Message = None) -> Tuple[str, str, list]:
 
     patching_errors = []
     vertices = []
@@ -398,39 +401,42 @@ def patch_partial_maps(
     transparency_masks = []
     scaled_paddings = []
     sizes = []
-    # images = []
     scaled_vertices = []
 
     for i, image_i in enumerate(images):
         filename_i = files[i]
         status, processed_raw_map = process_raw_map(
             image_i, filename_i, i, channel_name, map_size, database_client, message)
-        if status != MapPatchingErrors.SUCCESS:
-            patching_errors.append((status, processed_raw_map))
-            continue
 
-        vertices_i, is_vertical_i = processed_raw_map
-        # images.append(image)
-        vertices.append(vertices_i)
-        vertical.append(is_vertical_i)
+        if status == MapPatchingErrors.SUCCESS:
+            vertices_i, is_vertical_i = processed_raw_map
+            vertices.append(vertices_i)
+            vertical.append(is_vertical_i)
+        else:
+            if database_client is not None:
+                database_client.update_patching_process_input_status(patch_uuid, filename_i, status)
+            patching_errors.append((status, processed_raw_map))
+            vertices.append(None)
+            vertical.append(None)
 
     reference_position, reference_size = get_references(vertices)
-    # loop = asyncio.get_running_loop()  # TODO look into timeout
 
     for i in range(len(images)):
         filename_i = files[i]
         image_i = images[i]
         vertices_i = vertices[i]
         is_vertical_i = vertical[i]
-        transformation = transform_image(
-            image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name, filename_i, map_size)
-        scaled_image, oppacity, padding, scale_factor, padded_and_scaled = transformation
+        if vertices_i is not None:
+            transformation = transform_image(
+                image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name,
+                filename_i, map_size)
+            scaled_image, oppacity, padding, scale_factor, padded_and_scaled = transformation
 
-        transparency_masks.append(oppacity)
-        bits.append(scaled_image)
-        scaled_paddings.append(padding)
-        scaled_vertices.append(padded_and_scaled)
-        sizes.append(scaled_image.shape[0:2])
+            transparency_masks.append(oppacity)
+            bits.append(scaled_image)
+            scaled_paddings.append(padding)
+            scaled_vertices.append(padded_and_scaled)
+            sizes.append(scaled_image.shape[0:2])
 
     output_size = np.max(np.array(scaled_paddings) + np.array(sizes), axis=0)
 
@@ -446,16 +452,7 @@ def patch_partial_maps(
     cropped_patch_work = crop_output(patch_work, reference_position, reference_size)
 
     if DEBUG:
-        print(scaled_vertices)
-        vertex_lines = np.zeros_like(patch_work)
-        for j, vertices in enumerate(scaled_vertices):
-            print_vertices = [vertices[0], vertices[3], vertices[1], vertices[2], vertices[0]]
-            for i in range(len(print_vertices) - 1):
-                cv2.line(vertex_lines, print_vertices[i], print_vertices[i + 1], (255, 255, 255), 2)
-                cv2.putText(vertex_lines, "%s, %s" % (j, i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
-                            (255, 255, 255), 3, cv2.LINE_AA)
-
-        image_utils.save_image(vertex_lines, channel_name, 'map_patching_debut', ImageOp.DEBUG_VERTICES)
+        debug_patch_partial_maps(scaled_vertices, patch_work, channel_name)
 
     if message is not None and database_client is not None:
         filename = database_client.add_resource(
@@ -467,13 +464,20 @@ def patch_partial_maps(
     return file_path, filename, patching_errors
 
 
+def debug_patch_partial_maps(scaled_vertices, patch_work, channel_name):
+    print(scaled_vertices)
+    vertex_lines = np.zeros_like(patch_work)
+    for j, vertices in enumerate(scaled_vertices):
+        print_vertices = [vertices[0], vertices[3], vertices[1], vertices[2], vertices[0]]
+        for i in range(len(print_vertices) - 1):
+            cv2.line(vertex_lines, print_vertices[i], print_vertices[i + 1], (255, 255, 255), 2)
+            cv2.putText(vertex_lines, "%s, %s" % (j, i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
+                        (255, 255, 255), 3, cv2.LINE_AA)
+
+    image_utils.save_image(vertex_lines, channel_name, 'map_patching_debut', ImageOp.DEBUG_VERTICES)
+
+
 def is_map_patching_request(message, attachment, filename):
-    print(
-        "is_map_patching_request",
-        discord.PartialEmoji(name="🖼️") in [r.emoji for r in message.reactions],
-        "🖼️" in [r.emoji for r in message.reactions],
-        [r.emoji for r in message.reactions],
-        message.reactions)
     return "🖼️" in [r.emoji for r in message.reactions]
 
 

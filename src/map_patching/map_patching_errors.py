@@ -28,6 +28,6 @@ MAP_PATCHING_ERROR_MESSAGES = {
     MapPatchingErrors.NO_FILE_FOUND:
         "No image has been found for your patching. Please add 🖼️ to the image to patch.",
     MapPatchingErrors.ONLY_ONE_FILE:
-        "Thank you for saving your first picture." +
+        "Thank you for saving your first picture. " +
         "When the second map screenshot will be posted, a patching will be generated."
 }

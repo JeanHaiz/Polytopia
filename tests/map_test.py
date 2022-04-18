@@ -19,7 +19,7 @@ async def test_map_patchin_with_1_map():
     assert images[1] is not None and type(images[0]) == numpy.ndarray
 
     output_file_path, filename, patching_errors = map_patching_utils.patch_partial_maps(
-        channel_name, images, files, map_size)
+        channel_name, images, files, map_size, 0)
 
     assert patching_errors == []
     assert filename == "map_patching_debug"
