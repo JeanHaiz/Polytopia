@@ -9,7 +9,7 @@ from tests import test_utils
 
 
 @pytest.mark.asyncio
-async def test_map_patchin_with_1_map():
+async def test_map_patchin_with_1_map() -> None:
     channel_name = "testing-resources"
     files = ["image_1"]
     map_size = 400
@@ -28,7 +28,7 @@ async def test_map_patchin_with_1_map():
 
 
 @pytest.mark.asyncio
-async def test_turn_recognition_t0():
+async def test_turn_recognition_t0() -> None:
     image = test_utils.get_map_resource("image_0")
     assert image is not None
     turn = header_recognition.get_turn(image)
@@ -36,7 +36,7 @@ async def test_turn_recognition_t0():
 
 
 @pytest.mark.asyncio
-async def test_turn_recognition_t1():
+async def test_turn_recognition_t1() -> None:
     image = test_utils.get_map_resource("image_1")
     assert image is not None
     turn = header_recognition.get_turn(image)
@@ -44,7 +44,7 @@ async def test_turn_recognition_t1():
 
 
 @pytest.mark.asyncio
-async def test_turn_recognition_t5():
+async def test_turn_recognition_t5() -> None:
     image = test_utils.get_map_resource("image_5")
     assert image is not None
     turn = header_recognition.get_turn(image)
@@ -52,7 +52,7 @@ async def test_turn_recognition_t5():
 
 
 @pytest.mark.asyncio
-async def test_turn_recognition_t7():
+async def test_turn_recognition_t7() -> None:
     image = test_utils.get_map_resource("image_7")
     assert image is not None
     turn = header_recognition.get_turn(image)
@@ -60,7 +60,7 @@ async def test_turn_recognition_t7():
 
 
 @pytest.mark.asyncio
-async def test_turn_recognition_t8():
+async def test_turn_recognition_t8() -> None:
     image = test_utils.get_map_resource("image_8")
     assert image is not None
     turn = header_recognition.get_turn(image)
@@ -68,7 +68,7 @@ async def test_turn_recognition_t8():
 
 
 @pytest.mark.asyncio
-async def test_turn_recognition_t9():
+async def test_turn_recognition_t9() -> None:
     image = test_utils.get_map_resource("image_9")
     assert image is not None
     turn = header_recognition.get_turn(image)
@@ -76,7 +76,7 @@ async def test_turn_recognition_t9():
 
 
 @pytest.mark.asyncio
-async def test_turn_recognition_t10():
+async def test_turn_recognition_t10() -> None:
     image = test_utils.get_map_resource("image_10")
     assert image is not None
     turn = header_recognition.get_turn(image)
@@ -84,7 +84,7 @@ async def test_turn_recognition_t10():
 
 
 @pytest.mark.asyncio
-async def test_turn_recognition_t11():
+async def test_turn_recognition_t11() -> None:
     image = test_utils.get_map_resource("image_11")
     assert image is not None
     turn = header_recognition.get_turn(image)
@@ -92,7 +92,7 @@ async def test_turn_recognition_t11():
 
 
 @pytest.mark.asyncio
-async def test_turn_recognition_t12():
+async def test_turn_recognition_t12() -> None:
     image = test_utils.get_map_resource("image_12")
     assert image is not None
     turn = header_recognition.get_turn(image)
@@ -100,7 +100,7 @@ async def test_turn_recognition_t12():
 
 
 @pytest.mark.asyncio
-async def test_turn_recognition_t13():
+async def test_turn_recognition_t13() -> None:
     image = test_utils.get_map_resource("image_13")
     assert image is not None
     turn = header_recognition.get_turn(image)
@@ -108,7 +108,7 @@ async def test_turn_recognition_t13():
 
 
 @pytest.mark.asyncio
-async def test_turn_recognition_t14():
+async def test_turn_recognition_t14() -> None:
     image = test_utils.get_map_resource("image_14")
     assert image is not None
     turn = header_recognition.get_turn(image)
@@ -116,7 +116,7 @@ async def test_turn_recognition_t14():
 
 
 @pytest.mark.asyncio
-async def test_turn_recognition_t15():
+async def test_turn_recognition_t15() -> None:
     image = test_utils.get_map_resource("image_15")
     assert image is not None
     turn = header_recognition.get_turn(image)

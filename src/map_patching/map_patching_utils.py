@@ -5,7 +5,10 @@ import discord
 import numpy as np
 import pandas as pd
 
+from typing import List
+from typing import Union
 from typing import Tuple
+from typing import Optional
 
 from common import image_utils
 from common.image_utils import ImageOp
@@ -17,7 +20,7 @@ from map_patching.map_patching_errors import MapPatchingErrors
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
 
-def getLines(image, minLineLength=500, channel=None, filename=None):
+""" def getLines(image, minLineLength=500, channel: discord.TextChannel = None, filename: str = None):
     processed = image.copy()
     edges = image_processing_utils.get_one_color_edges(image, channel=channel)
     lines = cv2.HoughLinesP(image=edges, rho=0.1, theta=np.pi / 180, threshold=150, lines=np.array([]),
@@ -26,12 +29,12 @@ def getLines(image, minLineLength=500, channel=None, filename=None):
     for i in range(lines.shape[0]):
         cv2.line(processed, (lines[i][0][0], lines[i][0][1]), (lines[i][0][2], lines[i][0][3]), (0, 0, 255), 3,
                  cv2.LINE_AA)
-        if DEBUG and filename:
+        if DEBUG and filename is not None and channel is not None:
             image_utils.save_image(image, channel.name, filename, ImageOp.HOUGH_LINES)
-    return processed
+    return processed """
 
 
-def select_contours(image):
+def select_contours(image: np.ndarray) -> Optional[np.ndarray]:
     contours, hierarchy = cv2.findContours(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     hierarchy = hierarchy[0]
 
@@ -50,8 +53,13 @@ def select_contours(image):
     return output
 
 
-# image: edges
-def draw_contour(image, contour_, channel_name=None, epsilon=None, epsilonFactor=0.005, filename=None):
+def draw_contour(
+        image: np.ndarray,  # image: edges
+        contour_: np.ndarray,
+        channel_name: str = None,
+        epsilon: float = None,
+        epsilonFactor: float = 0.005,
+        filename: str = None) -> Optional[np.ndarray]:
     mask = np.zeros(image.shape[:2], np.uint8)
 
     convex_hull = cv2.convexHull(contour_, returnPoints=True)
@@ -68,7 +76,7 @@ def draw_contour(image, contour_, channel_name=None, epsilon=None, epsilonFactor
         approx = cv2.approxPolyDP(contour_, epsilon, True)
 
     if len(approx) < 4:
-        return
+        return None
 
     if DEBUG:
         print("simplified contour has", len(approx), "points with epsilon=", epsilon)
@@ -87,11 +95,11 @@ def draw_contour(image, contour_, channel_name=None, epsilon=None, epsilonFactor
     return approx
 
 
-def compute_vertices(c):
+def compute_vertices(vertices: np.ndarray) -> np.ndarray:
     """
     Returns the vertices of the approximate diamond: up, down, left, right
     """
-    c = [i[0] for i in c]
+    c = [i[0] for i in vertices]
 
     up_y = np.min(c, axis=0)[1]
     up = sorted([pair for pair in c if pair[1] == up_y], key=lambda p: p[0])[0]
@@ -110,7 +118,11 @@ def compute_vertices(c):
     return np.array([up, down, left, right])
 
 
-def get_transformation_dimensions(vertices, is_vertical, reference_position, reference_size):
+def get_transformation_dimensions(
+        vertices: np.ndarray,
+        is_vertical: bool,
+        reference_position: Tuple[np.int64, np.int64],
+        reference_size: Tuple[np.int64, np.int64]) -> Tuple[Tuple[int, int], float, np.ndarray]:
 
     d_h = vertices[1][1] - vertices[0][1]
     d_w = vertices[3][0] - vertices[2][0]
@@ -118,17 +130,17 @@ def get_transformation_dimensions(vertices, is_vertical, reference_position, ref
     if is_vertical:  # d_w / d_h < ratio:  # smaller width or larger height proportionally
         # missing width; scale on height
         scale_factor = d_h / reference_size[1]  # then divide by scale factor to find right size
-        scaled_padding = [
+        scaled_padding = (
             int(reference_position[0] - (vertices[0][0] - 50) / scale_factor),
             int(reference_position[1] - (vertices[0][1] - 50) / scale_factor)
-        ]
+        )
     else:
         # missing height; scale on width
         scale_factor = d_w / reference_size[0]
-        scaled_padding = [
+        scaled_padding = (
             int(reference_position[0] - (vertices[2][0] - 50) / scale_factor),
             int(reference_position[1] - (vertices[2][1] - 50) / scale_factor)
-        ]
+        )
     padded_and_scaled_vertices = vertices / scale_factor + scaled_padding
     padded_and_scaled_vertices = [[int(a) for a in b] for b in padded_and_scaled_vertices]
 
@@ -139,29 +151,37 @@ def get_transformation_dimensions(vertices, is_vertical, reference_position, ref
     return scaled_padding, scale_factor, padded_and_scaled_vertices
 
 
-def crop_padding_(image, padding, filename, channel_name):
+def crop_padding_(
+        image: np.ndarray,
+        padding: Tuple[int, int],
+        filename: str,
+        channel_name: str) -> Tuple[np.ndarray, Tuple[int, int]]:
     if padding[0] < 0:
         image = image[:, -padding[0]:]
-        padding[0] = 0
+        padding = (0, padding[1])
     if padding[1] < 0:
         image = image[-padding[1]:, :]
-        padding[1] = 0
+        padding = (padding[0], 0)
     if DEBUG and filename is not None and channel_name is not None:
         image_utils.save_image(image, channel_name, filename, ImageOp.PADDING)
     return image, padding
 
 
-def crop_padding(image, padding):
+def crop_padding(image: np.ndarray, padding: Tuple[int, int]) -> Tuple[np.ndarray, Tuple[int, int]]:
     if padding[0] < 0:
         image = image[-padding[0]:, :]
-        padding[0] = 0
+        padding = (0, padding[1])
     if padding[1] < 0:
         image = image[:, -padding[1]:]
-        padding[1] = 0
+        padding = (padding[0], 0)
     return image, padding
 
 
-def scale_image(image, channel_name, scale_factor, filename=None):
+def scale_image(
+        image: np.ndarray,
+        channel_name: str,
+        scale_factor: float,
+        filename: str = None) -> np.ndarray:
     new_dim = (int(image.shape[1] / scale_factor), int(image.shape[0] / scale_factor))
     scaled_image = cv2.resize(image, new_dim, interpolation=cv2.INTER_AREA)
 
@@ -170,10 +190,12 @@ def scale_image(image, channel_name, scale_factor, filename=None):
     return scaled_image
 
 
-def get_references(vertices):
-    vertices = [v for v in vertices if v is not None]
-    reference_position = [0, 0]
-    reference_size = [0, 0]
+def get_references(
+        optional_vertices: List[Optional[np.ndarray]]) -> Tuple[Tuple[np.int64, np.int64], Tuple[np.int64, np.int64]]:
+    vertices = [v for v in optional_vertices if v is not None]
+
+    reference_position: Tuple[np.int64, np.int64] = (np.int64(0), np.int64(0))
+    reference_size: Tuple[np.int64, np.int64] = (np.int64(0), np.int64(0))
 
     # 1.6 approximate ratio
     top_bottom_ref = ((vertices[0][1] - vertices[0][0])[1] / (vertices[0][3] - vertices[0][2])[0]) < 1.6
@@ -184,9 +206,9 @@ def get_references(vertices):
         dx = vertex_i[0][0] - vertex_i[2][0]
         dy = vertex_i[2][1] - vertex_i[0][1]
         if dx > reference_position[0]:
-            reference_position[0] = dx
+            reference_position = (dx, reference_position[1])
         if dy > reference_position[1]:
-            reference_position[1] = dy
+            reference_position = (reference_position[0], dy)
 
     # find reference size
     for vertex_i in vertices:
@@ -194,12 +216,12 @@ def get_references(vertices):
             d_h = vertex_i[1][1] - vertex_i[0][1]
             d_w = max(vertex_i[3][0] - vertex_i[0][0], vertex_i[0][0] - vertex_i[2][0]) * 2
             if d_h > reference_size[1]:
-                reference_size = [d_w, d_h]
+                reference_size = (d_w, d_h)
         else:
             d_h = max(vertex_i[2][1] - vertex_i[0][1], vertex_i[1][1] - vertex_i[2][1]) * 2
             d_w = vertex_i[3][0] - vertex_i[2][0]
             if d_w > reference_size[0]:
-                reference_size = [d_w, d_h]
+                reference_size = (d_w, d_h)
 
     if DEBUG:
         print("top-bottom ref: ", top_bottom_ref,
@@ -209,15 +231,23 @@ def get_references(vertices):
     return reference_position, reference_size
 
 
-def get_lines(vertices_i):
+def get_lines(vertices_i: List[np.ndarray]) -> pd.DataFrame:
 
-    delta = [(j, vertices_i[j],
-              vertices_i[(j + 1) % len(vertices_i)],
-              vertices_i[(j + 1) % len(vertices_i)] - vertices_i[j]) for j in range(len(vertices_i))]
+    delta_list: List[Tuple[int, np.ndarray, np.ndarray, np.ndarray]] = [
+        (
+            j,
+            vertices_i[j],
+            vertices_i[(j + 1) % len(vertices_i)],
+            vertices_i[(j + 1) % len(vertices_i)] - vertices_i[j]
+        ) for j in range(len(vertices_i))]
 
-    lines = [(j, (delta * delta).sum(),
-             (delta[1] / delta[0]) if delta[0] != 0 else np.sign(delta[0]) * np.sign(delta[1]) * 100000,
-             np.sign(delta[0]), np.sign(delta[1]), p0.tolist(), p1.tolist()) for j, p0, p1, delta in delta]
+    lines = [
+        (
+            j,
+            np.multiply(delta, delta).sum(),
+            (delta[1] / delta[0]) if delta[0] != 0 else np.sign(delta[0]) * np.sign(delta[1]) * 100000,
+            np.sign(delta[0]), np.sign(delta[1]), p0.tolist(), p1.tolist()
+        ) for j, p0, p1, delta in delta_list]
 
     if DEBUG:
         print("all lines\n", pd.DataFrame(lines))
@@ -236,7 +266,7 @@ def get_lines(vertices_i):
     return filtered_lines
 
 
-def get_intersection(lines):
+def get_intersection(lines: pd.DataFrame) -> Optional[List[Tuple[int, int]]]:
     intersections = []
     if len(lines) == 4:
 
@@ -259,7 +289,7 @@ def get_intersection(lines):
 
             x = int((h2 - h1) / (p1 - p2))
             y = int(p1 * x + h1)
-            intersections.append([x, y])
+            intersections.append((x, y))
 
         x0 = np.stack(lines[5].to_numpy())[:, 0]
         x1 = np.stack(lines[6].to_numpy())[:, 0]
@@ -280,24 +310,32 @@ def get_intersection(lines):
 
             x = int((h2 - h1) / (p1 - p2))
             y = int(p1 * x + h1)
-            intersections.append([x, y])
+            intersections.append((x, y))
 
     elif len(lines) == 2:
-        return
+        return None
     if DEBUG:
         print(intersections)
     return intersections
 
 
-def get_orientation(vertices):
+def get_orientation(vertices: np.ndarray) -> bool:
     d_h = vertices[1][1] - vertices[0][1]
     d_w = vertices[3][0] - vertices[2][0]
     print("orientation", d_w / d_h < 2, d_w / d_h)
-    return True
+    return True  # TODO: what the heck
 
 
 def process_raw_map(
-        image, filename_i, i, channel_name, map_size, database_client, message=None, kernel_size=5, sigma=5):
+        image: np.ndarray,
+        filename_i: str,
+        i: int,
+        channel_name: str,
+        map_size: str,
+        database_client: DatabaseClient,
+        message: discord.Message = None,
+        kernel_size: int = 5,
+        sigma: int = 5) -> Tuple[MapPatchingErrors, Union[str, Tuple[np.ndarray, bool]]]:
     print("map_patching_utils", filename_i)
     if image is None:
         if DEBUG:
@@ -307,9 +345,15 @@ def process_raw_map(
     edges = image_processing_utils.get_three_color_edges(image, channel_name, filename_i, border=50)
     blur = cv2.GaussianBlur(edges, (kernel_size, kernel_size), sigmaX=sigma)
     contour = select_contours(blur)
+
+    if contour is None:
+        return MapPatchingErrors.MAP_NOT_RECOGNIZED, filename_i
+
     polygon = draw_contour(edges, contour, channel_name, filename=filename_i)
+
     if polygon is None:
         return MapPatchingErrors.MAP_NOT_RECOGNIZED, filename_i
+
     vertices_i = compute_vertices(polygon)
     is_vertical_i = get_orientation(vertices_i)
     lines = get_lines([p[0] for p in polygon])
@@ -322,27 +366,44 @@ def process_raw_map(
     if DEBUG:
         print()
         print("intersections:\n", intersections)
-        print(len(intersections), len(intersections[0]), type(intersections))
+        if intersections is not None:
+            print(len(intersections), len(intersections[0]), type(intersections))
         print(vertices_i.shape, type(vertices_i))
 
-    if len(intersections) < 2:
+    if intersections is None or len(intersections) < 2:
         return MapPatchingErrors.MAP_NOT_RECOGNIZED, filename_i
 
     vertices_i = np.array(intersections)
 
     if DEBUG:
-        print("vertices after:\n", vertices_i)
-        print_vertices = [vertices_i[0], vertices_i[3], vertices_i[1], vertices_i[2], vertices_i[0]]
-        for i in range(len(print_vertices) - 1):
-            cv2.line(edges, print_vertices[i], print_vertices[i + 1], (255, 255, 255), 2)
-            cv2.putText(edges, "%s" % (i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
-                        (255, 255, 255), 3, cv2.LINE_AA)
-        image_utils.save_image(edges, channel_name, filename_i, ImageOp.DEBUG_VERTICES)
+        debug_process_raw_map(vertices_i, edges, channel_name, filename_i)
+
     return MapPatchingErrors.SUCCESS, (vertices_i, is_vertical_i)
 
 
+def debug_process_raw_map(
+        vertices_i: np.ndarray,
+        edges: np.ndarray,
+        channel_name: str,
+        filename_i: str) -> None:
+    print("vertices after:\n", vertices_i)
+    print_vertices = [vertices_i[0], vertices_i[3], vertices_i[1], vertices_i[2], vertices_i[0]]
+    for i in range(len(print_vertices) - 1):
+        cv2.line(edges, print_vertices[i], print_vertices[i + 1], (255, 255, 255), 2)
+        cv2.putText(edges, "%s" % (i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
+                    (255, 255, 255), 3, cv2.LINE_AA)
+    image_utils.save_image(edges, channel_name, filename_i, ImageOp.DEBUG_VERTICES)
+
+
 def transform_image(
-        image_i, vertices_i, is_vertical, reference_position, reference_size, channel_name, filename_i, map_size):
+        image_i: np.ndarray,
+        vertices_i: np.ndarray,
+        is_vertical: bool,
+        reference_position: Tuple[np.int64, np.int64],
+        reference_size: Tuple[np.int64, np.int64],
+        channel_name: str,
+        filename_i: str,
+        map_size: str) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int], float, np.ndarray]:
     transformation_dimensions = get_transformation_dimensions(
         vertices_i, is_vertical, reference_position, reference_size)
     padding, scale_factor, padded_and_scaled = transformation_dimensions
@@ -350,17 +411,21 @@ def transform_image(
     scaled_image = scale_image(image_i, channel_name, scale_factor, filename_i)
     cropped_image, padding = crop_padding_(scaled_image, padding, filename_i, channel_name)
 
-    # scale = reference_size[1] / math.sqrt(int(map_size))
-    scale = (reference_size[1] + 100) / math.sqrt(int(map_size))
+    scale = int((reference_size[1] + 100) / math.sqrt(int(map_size)))
     oppacity = remove_clouds(cropped_image, ksize=7, sigma=15, template_height=scale)
 
-    # oppacity = loop.run_until_complete(coroutine)
     padding = np.flip(padding)
 
     return cropped_image, oppacity, padding, scale_factor, padded_and_scaled
 
 
-def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
+def patch_output(
+        patch_work: np.ndarray,
+        scaled_padding: Tuple[int, int],
+        oppacity: np.ndarray,
+        size: Tuple[int, int],
+        bit: np.ndarray,
+        i: int) -> np.ndarray:
     background = patch_work[
         scaled_padding[0]:scaled_padding[0] + size[0],
         scaled_padding[1]:scaled_padding[1] + size[1], :]
@@ -379,7 +444,11 @@ def patch_output(patch_work, scaled_padding, oppacity, size, bit, i):
     return patch_work
 
 
-def crop_output(image, position, size):
+def crop_output(
+        image: np.ndarray,
+        position: Tuple[np.int64, np.int64],
+        size: Tuple[np.int64, np.int64]) -> np.ndarray:
+
     return image[
         (position[1] - 20).clip(0): (position[1] + size[1] + 20).clip(0, image.shape[1]),
         (position[0] - size[0] - 20).clip(0): (position[0] + size[0] + 20).clip(0, image.shape[0])]
@@ -395,12 +464,12 @@ def patch_partial_maps(
         message: discord.Message = None) -> Tuple[str, str, list]:
 
     patching_errors = []
-    vertices = []
-    vertical = []
+    vertices: List[Optional[np.ndarray]] = []
+    vertical: List[Optional[bool]] = []
     bits = []
     transparency_masks = []
     scaled_paddings = []
-    sizes = []
+    sizes: List[Tuple[int, int]] = []
     scaled_vertices = []
 
     for i, image_i in enumerate(images):
@@ -408,7 +477,7 @@ def patch_partial_maps(
         status, processed_raw_map = process_raw_map(
             image_i, filename_i, i, channel_name, map_size, database_client, message)
 
-        if status == MapPatchingErrors.SUCCESS:
+        if status == MapPatchingErrors.SUCCESS and not isinstance(processed_raw_map, str):
             vertices_i, is_vertical_i = processed_raw_map
             vertices.append(vertices_i)
             vertical.append(is_vertical_i)
@@ -424,11 +493,11 @@ def patch_partial_maps(
     for i in range(len(images)):
         filename_i = files[i]
         image_i = images[i]
-        vertices_i = vertices[i]
-        is_vertical_i = vertical[i]
-        if vertices_i is not None:
+        loaded_vertices_i = vertices[i]
+        loaded_is_vertical_i = vertical[i]
+        if loaded_vertices_i is not None and loaded_is_vertical_i is not None:
             transformation = transform_image(
-                image_i, vertices_i, is_vertical_i, reference_position, reference_size, channel_name,
+                image_i, loaded_vertices_i, loaded_is_vertical_i, reference_position, reference_size, channel_name,
                 filename_i, map_size)
             scaled_image, oppacity, padding, scale_factor, padded_and_scaled = transformation
 
@@ -436,7 +505,7 @@ def patch_partial_maps(
             bits.append(scaled_image)
             scaled_paddings.append(padding)
             scaled_vertices.append(padded_and_scaled)
-            sizes.append(scaled_image.shape[0:2])
+            sizes.append(scaled_image.shape[0:2])  # type: ignore
 
     output_size = np.max(np.array(scaled_paddings) + np.array(sizes), axis=0)
 
@@ -464,7 +533,10 @@ def patch_partial_maps(
     return file_path, filename, patching_errors
 
 
-def debug_patch_partial_maps(scaled_vertices, patch_work, channel_name):
+def debug_patch_partial_maps(
+        scaled_vertices: List[np.ndarray],
+        patch_work: np.ndarray,
+        channel_name: str) -> str:
     print(scaled_vertices)
     vertex_lines = np.zeros_like(patch_work)
     for j, vertices in enumerate(scaled_vertices):
@@ -474,20 +546,27 @@ def debug_patch_partial_maps(scaled_vertices, patch_work, channel_name):
             cv2.putText(vertex_lines, "%s, %s" % (j, i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
                         (255, 255, 255), 3, cv2.LINE_AA)
 
-    image_utils.save_image(vertex_lines, channel_name, 'map_patching_debut', ImageOp.DEBUG_VERTICES)
+    return image_utils.save_image(vertex_lines, channel_name, 'map_patching_debut', ImageOp.DEBUG_VERTICES)
 
 
-def is_map_patching_request(message, attachment, filename):
+def is_map_patching_request(
+        message: discord.Message,
+        attachment: discord.Attachment,
+        filename: str) -> bool:
     return "🖼️" in [r.emoji for r in message.reactions]
 
 
-def remove_clouds(img, ksize=31, sigma=25, template_height=1):
+def remove_clouds(
+        img: np.ndarray,
+        ksize: int = 31,
+        sigma: int = 25,
+        template_height: int = 1) -> np.ndarray:
     print("img shape", img.shape)
     original_template = image_utils.get_cloud_template()
 
     template_shape = original_template.shape
 
-    scale = template_height / template_shape[1] * math.sqrt(2)
+    scale = template_height * math.sqrt(2) / template_shape[1]
     template_width = int(template_shape[0] * scale)
     template_height = int(template_shape[1] * scale)
 
@@ -513,7 +592,14 @@ def remove_clouds(img, ksize=31, sigma=25, template_height=1):
     return cropped_mask
 
 
-def match_cloud(result, template, img_alpha, ksize, sigma, border_width, i):
+def match_cloud(
+        result: np.ndarray,
+        template: np.ndarray,
+        img_alpha: np.ndarray,
+        ksize: int,
+        sigma: int,
+        border_width: int,
+        i: int) -> np.ndarray:
     hh, ww = template.shape[:2]
 
     # extract pawn base image and alpha channel and make alpha 3 channels
@@ -583,14 +669,11 @@ def match_cloud(result, template, img_alpha, ksize, sigma, border_width, i):
     return img_alpha
 
 
-def on_border(loc, shape, width):
-    if shape[0] > shape[1]:
-        return ((loc[0] < width) or ((shape[1] - loc[0]) < width))
-    else:
-        return ((loc[1] < width) or ((shape[0] - loc[1]) < width))
-
-
-def remove_clouds_scaled(img, ksize=7, sigma=15, template_height=None):
+def remove_clouds_scaled(
+        img: np.ndarray,
+        ksize: int = 7,
+        sigma: int = 15,
+        template_height: int = None) -> np.ndarray:
     template = image_utils.get_cloud_template()
     hh, ww = template.shape[:2]
 
@@ -606,8 +689,8 @@ def remove_clouds_scaled(img, ksize=7, sigma=15, template_height=None):
     # - stop when it goes down again
     # - change spacing
     # - move range based on estiamted scaling
-    for scale in range(90, 110, 2):
-        scale = scale / 100.0
+    for int_scale in range(90, 110, 2):
+        scale = int_scale / 100.0
         new_dim = (int(img.shape[1] * scale), int(img.shape[0] * scale))
         resized = cv2.resize(img, new_dim, interpolation=cv2.INTER_AREA)
         if resized.shape[0] < template.shape[0] or resized.shape[1] < template.shape[1]:
