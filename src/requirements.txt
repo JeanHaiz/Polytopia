@@ -11,3 +11,5 @@ discord.py
 psycopg2-binary
 matplotlib
 nest_asyncio
+scikit-learn
+types-dataclasses

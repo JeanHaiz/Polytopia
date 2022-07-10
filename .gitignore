@@ -1,16 +1,29 @@
-/.vscode/
-/__pycache__/
-/output/
-/resources/
-/db-data/
-/attachments/
+# External sources
 /external_repos/
-/image_recognition/
-*.log
 *.zip
+
+# Bot runtime data and test data
+/db-data/
+/src/resources/
+*.log
+/attachments/
+/resources/
+/image_recognition/
+
+# Work-in-progress files
+jupyter_notebooks/
+/output/
 *.png
 *.jpg
-**/__pycache__/
-/src/resources/
+
+# environments
+env
 .env
-jupyter_notebooks/
+
+# IDEA
+.idea
+/.vscode/
+
+# Compilation
+**/__pycache__/
+/__pycache__/

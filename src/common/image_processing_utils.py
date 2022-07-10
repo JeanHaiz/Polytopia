@@ -2,7 +2,7 @@ import os
 import cv2
 
 from common import image_utils
-from common.image_utils import ImageOp
+from common.image_operation import ImageOp
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 

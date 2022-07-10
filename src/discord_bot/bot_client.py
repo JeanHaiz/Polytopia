@@ -10,7 +10,7 @@ from discord_bot import bot_utils
 from database_interaction.database_client import DatabaseClient
 from common import image_utils
 from common.logger_utils import logger
-from common.image_utils import ImageOp
+from common.image_operation import ImageOp
 
 nest_asyncio.apply()
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
@@ -29,7 +29,7 @@ async def on_ready() -> None:
 
 @bot_client.event
 async def on_message(message: discord.Message) -> None:
-    async def inner():
+    async def inner() -> None:
         print('Message from {0.author}: {0.content}'.format(message))
         logger.debug("received message: %s" % str(message))
 
@@ -56,9 +56,6 @@ async def on_message(message: discord.Message) -> None:
 
 @bot_client.event
 async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
-    channel = bot_client.get_channel(payload.channel_id)
-    message = await channel.fetch_message(payload.message_id)
-
     async def inner():
         if payload.user_id == bot_client.user.id:
             return
@@ -66,7 +63,10 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent):
         is_active = database_client.is_channel_active(payload.channel_id)
         if is_active:
             await bot_utils.reaction_added_routine(payload, bot_client, database_client)
-    await bot_utils.wrap_errors(bot_client, message, channel.guild.id, inner, True)
+
+    message = await bot_utils.get_message(bot_client, payload.channel_id, payload.message_id)
+    if message is not None:
+        await bot_utils.wrap_errors(bot_client, message, message.channel.guild.id, inner, True)
 
 
 @bot_client.event
@@ -75,9 +75,10 @@ async def on_raw_reaction_remove(payload: discord.RawReactionActionEvent):
         is_active = database_client.is_channel_active(payload.channel_id)
         if is_active:
             await bot_utils.reaction_removed_routine(payload, bot_client, database_client)
-    channel = bot_client.get_channel(payload.channel_id)
-    message = await channel.fetch_message(payload.message_id)
-    await bot_utils.wrap_errors(bot_client, message, channel.guild.id, inner, True)
+
+    message = await bot_utils.get_message(bot_client, payload.channel_id, payload.message_id)
+    if message is not None:
+        await bot_utils.wrap_errors(bot_client, message, message.channel.guild.id, inner, True)
 
 
 @bot_client.command()
@@ -206,7 +207,7 @@ async def drop_score(ctx: Context, turn: str):
 async def patch_map(ctx: Context):
     async def inner():
         turn = database_client.get_last_turn(ctx.channel.id)
-        turn, patch, patching_errors = await bot_utils.generate_patched_map(
+        turn, patch, patching_errors = await bot_utils.generate_patched_map_bis(
             database_client, ctx.channel.id, ctx.channel.name, ctx.message, turn, bot_client.loop)
         await bot_utils.manage_patching_errors(ctx.channel, ctx.message, database_client, patching_errors)
         if patch is not None:

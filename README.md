@@ -69,4 +69,4 @@ To vote on the most desired functionality, checkout the functionality improvemen
 To post your ideas for new functionalities, join #polytopia-helper-feedback
 
 
-https://discord.com/oauth2/authorize?scope=bot&permissions=2147609664&client_id=918189457893621760
+https://discord.com/oauth2/authorize?scope=bot&permissions=532576463952&client_id=918189457893621760

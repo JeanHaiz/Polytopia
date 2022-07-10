@@ -4,10 +4,12 @@ import uuid
 import sqlalchemy
 import pandas as pd
 
-from typing import Optional
+from typing import List
 from typing import Tuple
+from typing import Optional
 from sqlalchemy.engine.result import ResultProxy
-from common.image_utils import ImageOp
+from common.image_operation import ImageOp
+from map_patching.image_param import ImageParam
 
 
 class DatabaseClient:
@@ -346,3 +348,63 @@ class DatabaseClient:
                 AND input_filename = '{filename}'
                 RETURNING patch_input_uuid::text;""").fetchone()
         return patch_input_uuid is not None and len(patch_input_uuid) > 0
+
+    def set_image_params(self, image_params: ImageParam) -> bool:
+        filename_output = self.execute(
+            f"""INSERT INTO map_patching_input_param
+                (filename, cloud_scale, corners)
+                VALUES ('{image_params.filename}',
+                {image_params.cloud_scale},
+                ARRAY{self.__format_tuple_list(image_params.corners)})
+                ON CONFLICT (filename) DO UPDATE
+                SET
+                    cloud_scale = {image_params.cloud_scale},
+                    corners = ARRAY{self.__format_tuple_list(image_params.corners)}
+                RETURNING filename::text;""").fetchone()
+        return filename_output is not None and len(filename_output) > 0
+
+    def set_background_image_params(self, map_size: str, image_params: ImageParam) -> bool:
+        filename_output = self.execute(
+            f"""INSERT INTO map_patching_background_param
+                (map_size, cloud_scale, corners)
+                VALUES ('{map_size}', {image_params.cloud_scale}, ARRAY{self.__format_tuple_list(image_params.corners)})
+                ON CONFLICT (map_size) DO UPDATE
+                SET
+                    cloud_scale = {image_params.cloud_scale},
+                    corners = ARRAY{self.__format_tuple_list(image_params.corners)}
+                RETURNING map_size;""").fetchone()
+        return filename_output is not None and len(filename_output) > 0
+
+    def get_image_params(self, filename: str) -> Optional[ImageParam]:
+        result_proxy = self.execute(
+            f"""SELECT *
+                FROM map_patching_input_param
+                WHERE filename::text = {filename};""").fetchall()
+        rows = [dict(row) for row in result_proxy]
+        if len(rows) == 1:
+            return ImageParam(filename, rows[0]["cloud_scale"], rows[0]["corners"])
+        else:
+            return None
+
+    def get_bulk_image_params(self, filenames: List[str]) -> List[ImageParam]:
+        filename_list = str(tuple(filenames))
+        result_proxy = self.execute(
+            f"""SELECT *
+                FROM map_patching_input_param
+                WHERE filename::text IN {filename_list};""").fetchall()
+        return [
+            ImageParam(dict(row)["filename"], dict(row)["cloud_scale"], dict(row)["corners"]) for row in result_proxy]
+
+    def get_background_image_params(self, map_size: int) -> Optional[ImageParam]:
+        result_proxy = self.execute(
+            f"""SELECT *
+                FROM map_patching_background_param
+                WHERE map_size = {map_size};""").fetchall()
+        rows = [dict(row) for row in result_proxy]
+        if len(rows) == 1:
+            return ImageParam("processed_background_template_%s" % map_size, rows[0]["cloud_scale"], rows[0]["corners"])
+        else:
+            return None
+
+    def __format_tuple_list(self, s: List) -> str:
+        return str(list([list(s_i) for s_i in s]))

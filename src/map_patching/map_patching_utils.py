@@ -11,7 +11,7 @@ from typing import Tuple
 from typing import Optional
 
 from common import image_utils
-from common.image_utils import ImageOp
+from common.image_operation import ImageOp
 from common import image_processing_utils
 from database_interaction.database_client import DatabaseClient
 
@@ -667,72 +667,3 @@ def match_cloud(
                 break
 
     return img_alpha
-
-
-def remove_clouds_scaled(
-        img: np.ndarray,
-        ksize: int = 7,
-        sigma: int = 15,
-        template_height: int = None) -> np.ndarray:
-    template = image_utils.get_cloud_template()
-    hh, ww = template.shape[:2]
-
-    pawn = template[:, :, 0:3]
-    alpha_template = template[:, :, 3]
-    alpha = cv2.merge([alpha_template, alpha_template, alpha_template])
-
-    result_set = []
-
-    # TODO Optimisation possibilities:
-    # - not go linear, look for the point
-    # - start in the middle and go out, based on gradient
-    # - stop when it goes down again
-    # - change spacing
-    # - move range based on estiamted scaling
-    for int_scale in range(90, 110, 2):
-        scale = int_scale / 100.0
-        new_dim = (int(img.shape[1] * scale), int(img.shape[0] * scale))
-        resized = cv2.resize(img, new_dim, interpolation=cv2.INTER_AREA)
-        if resized.shape[0] < template.shape[0] or resized.shape[1] < template.shape[1]:
-            break
-
-        img_alpha = np.ones((resized.shape[0:2]))
-
-        corr_img = cv2.matchTemplate(resized, pawn, cv2.TM_CCOEFF_NORMED, mask=alpha)
-        correlation_raw = (255 * corr_img).clip(0, 255).astype(np.uint8)
-
-        blur = cv2.GaussianBlur(correlation_raw, (ksize, ksize), sigmaX=sigma)
-        threshold = 100
-
-        maximum = np.max(blur)
-
-        max_val = np.max(blur)
-        rad = int(math.sqrt(hh * hh + ww * ww) / 4)
-
-        count = 0
-
-        while max_val > threshold:
-
-            # find max value of correlation image
-            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(blur)
-
-            if max_val > threshold:
-                # draw match on copy of input
-                img_alpha[max_loc[1]: max_loc[1] + hh, max_loc[0]: max_loc[0] + ww] = \
-                    img_alpha[max_loc[1]: max_loc[1] + hh, max_loc[0]: max_loc[0] + ww] - alpha_template / 255.0
-
-                # write black circle at max_loc in corr_img
-                cv2.circle(blur, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
-                count += 1
-
-            else:
-                break
-        img_alpha_c = img_alpha.clip(0, 1).astype(np.uint8)
-        mask = cv2.merge([img_alpha_c, img_alpha_c, img_alpha_c]).astype(np.uint8)
-        alpha_area = np.sum(img_alpha_c == 0) / (img_alpha_c.shape[0] * img_alpha_c.shape[1])
-        result_set.append([scale, maximum, maximum / scale, count, alpha_area, mask])
-
-    selected_scaling = sorted(result_set, key=lambda x: -x[2])[0]
-    print("selected_scaling", selected_scaling[:5])
-    resized_original = cv2.resize(selected_scaling[5], (img.shape[1], img.shape[0]), interpolation=cv2.INTER_AREA)
-    return resized_original

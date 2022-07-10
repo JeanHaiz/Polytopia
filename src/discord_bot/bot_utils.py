@@ -12,9 +12,11 @@ from discord.ext.commands import Bot
 
 from common import image_utils
 from common.logger_utils import logger
-from common.image_utils import ImageOp
+from common.image_operation import ImageOp
 from map_patching import map_patching_utils
 from map_patching import header_recognition
+from map_patching.map_patching_analysis import analyse_map
+from map_patching.map_patching_patching import patch_processed_images
 from database_interaction.database_client import DatabaseClient
 from map_patching.map_patching_errors import MapPatchingErrors
 from map_patching.map_patching_errors import MAP_PATCHING_ERROR_MESSAGES
@@ -71,7 +73,7 @@ async def score_recognition_routine(database_client: DatabaseClient, message, fi
     channel_name = message.channel.name
     channel_id = message.channel.id
 
-    image = await image_utils.load_image(database_client, channel_name, message, filename, ImageOp.SCORE_INPUT)
+    image = await image_utils.load_or_fetch_image(database_client, channel_name, message, filename, ImageOp.SCORE_INPUT)
     if image is None:
         return
 
@@ -116,7 +118,8 @@ async def map_patching_routine(database_client: DatabaseClient, attachment, mess
         turn = last_turn
     elif last_turn is None or int(last_turn) < int(turn):
         database_client.set_new_last_turn(channel_id, turn)
-    return await generate_patched_map(database_client, channel_id, channel_name, message, turn, loop)
+    return await generate_patched_map_bis(database_client, channel_id, channel_name, message, turn, loop)
+    # return await generate_patched_map(database_client, channel_id, channel_name, message, turn, loop)
 
 
 async def manage_patching_errors(
@@ -151,7 +154,7 @@ async def generate_patched_map(database_client: DatabaseClient, channel_id, chan
     for i, filename_i in enumerate(files):
         database_client.add_patching_process_input(patch_uuid, filename_i, i)
     images = [
-        await image_utils.load_image(database_client, channel_name, message, filename_i, ImageOp.INPUT)
+        await image_utils.load_or_fetch_image(database_client, channel_name, message, filename_i, ImageOp.INPUT)
         for filename_i in files]
     images.insert(0, image_utils.get_background_template(map_size))
     files.insert(0, "background")
@@ -185,7 +188,54 @@ async def generate_patched_map(database_client: DatabaseClient, channel_id, chan
     return turn, attachment, patching_errors
 
 
-async def reaction_message_routine(bot_client, database_client, message, filename):
+async def generate_patched_map_bis(database_client: DatabaseClient, channel_id, channel_name, message, turn, loop):
+    patch_uuid = database_client.add_patching_process(channel_id, message.author.id)
+    map_size = database_client.get_game_map_size(channel_id)
+
+    if map_size is None:
+        return turn, None, [(MapPatchingErrors.MISSING_MAP_SIZE, None)]
+
+    files = database_client.get_map_patching_files(channel_id)
+    if len(files) == 0:
+        return turn, None, [(MapPatchingErrors.NO_FILE_FOUND, None)]
+    elif len(files) == 1:
+        return turn, None, [(MapPatchingErrors.ONLY_ONE_FILE, None)]
+
+    print("files_log %s" % str(files))
+    logger.debug("files_log %s" % str(files))
+
+    for i, filename_i in enumerate(files):
+        database_client.add_patching_process_input(patch_uuid, filename_i, i)
+
+    func = functools.partial(
+        patch_processed_images, database_client, files, map_size, message.guild.id, channel_id, channel_name,
+        message.id, message.author.id, message.author.name)
+
+    output_file_path, filename, patching_errors = await loop.run_in_executor(None, func)
+    print("output path", output_file_path)
+    if output_file_path is not None:
+        database_client.update_patching_process_output_filename(patch_uuid, filename)
+        attachment = image_utils.load_attachment(output_file_path, filename)
+        if attachment is None:
+            patching_errors.append((MapPatchingErrors.ATTACHMEMENT_NOT_LOADED, None))
+    else:
+        patching_errors.append((MapPatchingErrors.ATTACHMEMENT_NOT_SAVED, None))
+        attachment = None
+    if len(patching_errors) == 0:
+        status = "Done"
+    else:
+        status = "With Errors - " + "; ".join(
+            [str(str(error.name) + "(" + str(filename) + ")") for error, filename in patching_errors])
+    print("status", status)
+    database_client.update_patching_process_status(patch_uuid, status)
+    return turn, attachment, patching_errors
+
+
+async def reaction_message_routine(
+        bot_client: discord.ext.commands.Bot,
+        database_client: DatabaseClient,
+        message: discord.Message,
+        filename: str):
     for attachment in message.attachments:
         if attachment.content_type.startswith("image/"):
 
@@ -199,8 +249,10 @@ async def reaction_message_routine(bot_client, database_client, message, filenam
 
             if map_patching_utils.is_map_patching_request(message, attachment, filename):
                 image_utils.move_input_image(message.channel.name, filename, ImageOp.MAP_INPUT)
-                image = await image_utils.load_image(
+                image = await image_utils.load_or_fetch_image(
                     database_client, message.channel.name, message, filename, ImageOp.INPUT)
+                analyse_map(image, database_client, message.channel.name, filename)
+
                 turn, patch, patching_errors = await map_patching_routine(
                     database_client, attachment, message, image, bot_client.loop)
                 # func = functools.partial(await map_patching_routine, database_client, attachment, message, image)
@@ -227,7 +279,7 @@ async def reaction_removed_routine(payload, bot_client, database_client: Databas
 def reset_resource(database_client: DatabaseClient, channel, message_id, source_operation):
     filename = database_client.set_resource_operation(message_id, ImageOp.INPUT, 0)
     if filename is not None:
-        image_utils.move_back_input_image(channel, filename, source_operation)
+        image_utils.move_back_input_image(channel.name, filename, source_operation)
 
 
 async def reaction_added_routine(payload, bot_client, database_client: DatabaseClient):
@@ -290,7 +342,7 @@ async def process_map_patching(bot_client, message, channel, database_client):
         for i, attachment in enumerate(message.attachments):
             if map_patching_utils.is_map_patching_request(message, attachment, "filename"):
                 filename = await prepare_attachment(database_client, channel, message, attachment, i, ImageOp.MAP_INPUT)
-                image = await image_utils.load_image(
+                image = await image_utils.load_or_fetch_image(
                     database_client, channel.name, message, filename, ImageOp.INPUT)
                 turn, patch, patching_errors = await map_patching_routine(
                     database_client, attachment, message, image, bot_client.loop)
@@ -321,9 +373,12 @@ def now():
     return datetime.datetime.now().strftime('%Y%m%d_%H%M%S_')
 
 
-async def get_message(bot_client, channel_id, message_id):
-    channel = bot_client.get_channel(channel_id)
-    return await channel.fetch_message(message_id)
+async def get_message(bot_client: discord.ext.commands.Bot, channel_id: str, message_id: str) -> discord.Message:
+    try:
+        channel = bot_client.get_channel(channel_id)
+        return await channel.fetch_message(message_id)
+    except discord.errors.NotFound:
+        return None
 
 
 async def get_attachments(bot_client, channel_id, message_id):
