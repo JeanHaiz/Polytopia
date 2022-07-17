@@ -30,16 +30,17 @@ def analyse_map(
         channel_name: str,
         filename: str) -> Tuple[str, ImageParam]:
 
+    map_image_no_alpha = map_image[:, :, 0:3]
     print("DEBUG IMAGE")
-    print(type(map_image))
-    print(map_image.dtype)
-    print(map_image.shape)
+    print(type(map_image_no_alpha))
+    print(map_image_no_alpha.dtype)
+    print(map_image_no_alpha.shape)
 
-    alpha, scale = get_cloud_alpha_ter(map_image)
+    alpha, scale = get_cloud_alpha_ter(map_image_no_alpha)
     image_utils.save_image(alpha, channel_name, filename + "_mask", ImageOp.MAP_PROCESSED_IMAGE)
     print("image scale", scale)
 
-    map_with_alpha = attach_alpha(map_image, alpha)
+    map_with_alpha = attach_alpha(map_image_no_alpha, alpha)
     scaled_image = scale_image(map_with_alpha, scale)
     corners = get_corners(scaled_image, channel_name, filename)
     image_params = ImageParam(filename, scale, corners)
