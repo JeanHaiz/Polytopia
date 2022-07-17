@@ -29,6 +29,12 @@ def analyse_map(
         database_client: Optional[DatabaseClient],
         channel_name: str,
         filename: str) -> Tuple[str, ImageParam]:
+
+    print("DEBUG IMAGE")
+    print(type(map_image))
+    print(map_image.dtype)
+    print(map_image.shape)
+
     alpha, scale = get_cloud_alpha_ter(map_image)
     image_utils.save_image(alpha, channel_name, filename + "_mask", ImageOp.MAP_PROCESSED_IMAGE)
     print("image scale", scale)
