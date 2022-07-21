@@ -16,4 +16,4 @@ database:
 	docker-compose up --build --detach database
 
 tests:
-	pytest -v
+	python3.9 -m pytest -v

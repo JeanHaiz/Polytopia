@@ -48,12 +48,15 @@ def patch_processed_images(
         if image_entry is None or len(current_params) == 0:
             print("ANALYSING IMAGE:", filename, image_entry is None, current_params)
             raw_image = image_utils.load_image(channel_name, filename, ImageOp.MAP_INPUT)
+            if raw_image is None:
+                print("Image not found %s" % filename)
+                continue
             _, image_entry_params = map_patching_analysis.analyse_map(
                 raw_image, database_client, channel_name, filename)
             analysed_map_image = image_utils.load_image(
                 channel_name, filename, ImageOp.MAP_PROCESSED_IMAGE)
             if analysed_map_image is None or image_entry_params is None:
-                print("Could not analyse image %s:" % filename, analysed_map_image, image_entry_params)
+                print("Could not analyse image %s:" % filename, analysed_map_image is None, image_entry_params is None)
                 continue
             processed_images.append(analysed_map_image)
             processed_params.append(image_entry_params)

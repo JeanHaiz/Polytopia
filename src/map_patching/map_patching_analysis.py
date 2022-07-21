@@ -30,7 +30,7 @@ def analyse_map(
         channel_name: str,
         filename: str) -> Tuple[str, ImageParam]:
 
-    map_image_no_alpha = map_image[:, :, 0:3]
+    map_image_no_alpha = map_image[:, :, 0:3].astype(np.uint8)
     print("DEBUG IMAGE")
     print(type(map_image_no_alpha))
     print(map_image_no_alpha.dtype)
