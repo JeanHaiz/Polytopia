@@ -359,7 +359,7 @@ class DatabaseClient:
                 ON CONFLICT (filename) DO UPDATE
                 SET
                     cloud_scale = {image_params.cloud_scale},
-                    corners = ARRAY{self.__format_tuple_list(image_params.corners)}
+                    corners = ARRAY{self.__format_tuple_list(image_params.corners)}::integer[][]
                 RETURNING filename::text;""").fetchone()
         return filename_output is not None and len(filename_output) > 0
 
@@ -371,7 +371,7 @@ class DatabaseClient:
                 ON CONFLICT (map_size) DO UPDATE
                 SET
                     cloud_scale = {image_params.cloud_scale},
-                    corners = ARRAY{self.__format_tuple_list(image_params.corners)}
+                    corners = ARRAY{self.__format_tuple_list(image_params.corners)}::integer[][]
                 RETURNING map_size;""").fetchone()
         return filename_output is not None and len(filename_output) > 0
 
@@ -382,7 +382,7 @@ class DatabaseClient:
                 WHERE filename::text = {filename};""").fetchall()
         rows = [dict(row) for row in result_proxy]
         if len(rows) == 1:
-            return ImageParam(filename, rows[0]["cloud_scale"], rows[0]["corners"])
+            return ImageParam(str(filename), rows[0]["cloud_scale"], rows[0]["corners"])
         else:
             return None
 
@@ -393,7 +393,10 @@ class DatabaseClient:
                 FROM map_patching_input_param
                 WHERE filename::text IN {filename_list};""").fetchall()
         return [
-            ImageParam(dict(row)["filename"], dict(row)["cloud_scale"], dict(row)["corners"]) for row in result_proxy]
+            ImageParam(
+                str(dict(row)["filename"]),
+                dict(row)["cloud_scale"],
+                dict(row)["corners"]) for row in result_proxy]
 
     def get_background_image_params(self, map_size: int) -> Optional[ImageParam]:
         result_proxy = self.execute(

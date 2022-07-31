@@ -13,6 +13,7 @@ from map_patching.corner_orientation import CornerOrientation
 from database_interaction.database_client import DatabaseClient
 
 from map_patching import map_patching_analysis
+from map_patching.map_patching_errors import MapPatchingErrors
 
 
 def patch_processed_images(
@@ -24,25 +25,30 @@ def patch_processed_images(
         channel_name: str,
         message_id: str,
         author_id: str,
-        author_name: str) -> Tuple[str, str, list]:
+        author_name: str,
+        action_debug: bool) -> Tuple[str, str, list]:
+
+    patching_errors = []
 
     background_image = load_processed_background(map_size)
     background_params = load_background_params(database_client, map_size)
 
     if background_image is None or background_params is None:
         print("ANALYSING BACKGROUND")
-        _, background_params = map_patching_analysis.analyse_background(database_client, map_size)
+        _, background_params = map_patching_analysis.analyse_background(database_client, map_size, action_debug)
         background_image = load_processed_background(map_size)
 
     images_n_filenames = load_processed_images(image_filenames, channel_name)
     image_params = load_image_params(database_client, image_filenames)
-    # missing_filenames = []
+
+    print("images_n_filenames:", [x[0] for x in images_n_filenames])
+    print("image params:", image_params)
 
     processed_images = []
     processed_params = []
 
     for filename, image_entry in images_n_filenames:
-
+        print("iterator", filename, image_entry.shape)
         current_params = [ip for ip in image_params if ip.filename == filename]
 
         if image_entry is None or len(current_params) == 0:
@@ -50,12 +56,14 @@ def patch_processed_images(
             raw_image = image_utils.load_image(channel_name, filename, ImageOp.MAP_INPUT)
             if raw_image is None:
                 print("Image not found %s" % filename)
+                patching_errors.append((MapPatchingErrors.NO_FILE_FOUND, filename))
                 continue
             _, image_entry_params = map_patching_analysis.analyse_map(
-                raw_image, database_client, channel_name, filename)
+                raw_image, database_client, channel_name, filename, action_debug)
             analysed_map_image = image_utils.load_image(
                 channel_name, filename, ImageOp.MAP_PROCESSED_IMAGE)
-            if analysed_map_image is None or image_entry_params is None:
+            if analysed_map_image is None or image_entry_params is None or len(image_entry_params.corners) == 0:
+                patching_errors.append((MapPatchingErrors.MAP_NOT_RECOGNIZED, filename))
                 print("Could not analyse image %s:" % filename, analysed_map_image is None, image_entry_params is None)
                 continue
             processed_images.append(analysed_map_image)
@@ -73,7 +81,8 @@ def patch_processed_images(
     print("after crop", output.shape)
     filename = database_client.add_resource(
         guild_id, channel_id, message_id, author_id, author_name, ImageOp.MAP_PATCHING_OUTPUT)
-    return image_utils.save_image(output, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT), filename, []
+    ouptut_path = image_utils.save_image(output, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)
+    return ouptut_path, filename, patching_errors
 
 
 def crop_output(
