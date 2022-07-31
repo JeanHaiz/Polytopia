@@ -48,7 +48,7 @@ def patch_processed_images(
     processed_params = []
 
     for filename, image_entry in images_n_filenames:
-        print("iterator", filename, image_entry.shape)
+        
         current_params = [ip for ip in image_params if ip.filename == filename]
 
         if image_entry is None or len(current_params) == 0:
