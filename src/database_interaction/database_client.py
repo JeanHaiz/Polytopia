@@ -7,7 +7,8 @@ import pandas as pd
 from typing import List
 from typing import Tuple
 from typing import Optional
-from sqlalchemy.engine.result import ResultProxy
+from sqlalchemy.pool import NullPool
+from sqlalchemy.engine import Result
 from common.image_operation import ImageOp
 from map_patching.image_param import ImageParam
 
@@ -17,9 +18,12 @@ class DatabaseClient:
     def __init__(self, user: str, password: str, port: str, database: str, host: str) -> None:
         self.database = database
         self.database_url = f"""postgresql://{user}:{password}@{host}:{port}/{database}"""
-        self.engine = sqlalchemy.create_engine(self.database_url, echo=True)
+        self.engine = sqlalchemy.create_engine(self.database_url, echo=True, poolclass=NullPool)
 
-    def execute(self, query: str) -> ResultProxy:
+    def dispose(self) -> None:
+        self.engine.dispose(False)
+
+    def execute(self, query: str) -> Result:
         return self.engine.execute(query)
 
     def is_channel_active(self, channel_id: int) -> bool:
@@ -64,7 +68,7 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""").fetchall()
         return [dict(row) for row in result_proxy]
 
-    def add_score(self, channel_id: int, player_id: int, score: int, turn: int) -> ResultProxy:
+    def add_score(self, channel_id: int, player_id: int, score: int, turn: int) -> Result:
         player_str_id = ("'" + str(player_id) + "'") if player_id is not None else 'NULL'
         return self.execute(
             f"""INSERT INTO game_player_scores
@@ -165,7 +169,7 @@ class DatabaseClient:
 
     def set_player_discord_name(
         self, discord_player_id: int, discord_player_name: str, polytopia_player_name: str
-    ) -> ResultProxy:
+    ) -> Result:
         return self.execute(
             f"""INSERT INTO polytopia_player
                 (discord_player_id, discord_player_name, polytopia_player_name)
@@ -174,7 +178,7 @@ class DatabaseClient:
                 SET discord_player_name = '{str(discord_player_name)}',
                 polytopia_player_name = '{str(polytopia_player_name)}';""")
 
-    def set_player_game_name(self, game_player_uuid: str, polytopia_player_name: str) -> ResultProxy:
+    def set_player_game_name(self, game_player_uuid: str, polytopia_player_name: str) -> Result:
         return self.execute(
             f"""UPDATE polytopia_player
                 SET polytopia_player_name = '{polytopia_player_name}'
@@ -186,7 +190,7 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""").fetchone()
         return latest_turn[0] if latest_turn is not None and len(latest_turn) > 0 else None
 
-    def set_new_last_turn(self, channel_id: int, turn: int) -> ResultProxy:
+    def set_new_last_turn(self, channel_id: int, turn: int) -> Result:
         return self.execute(
             f"""UPDATE polytopia_game
                 SET latest_turn = {turn}
@@ -198,7 +202,7 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""").fetchone()
         return map_size[0] if map_size is not None and len(map_size) > 0 else None
 
-    def set_game_map_size(self, channel_id: int, size: int) -> ResultProxy:
+    def set_game_map_size(self, channel_id: int, size: int) -> Result:
         return self.execute(
             f"""UPDATE polytopia_game
                 SET map_size = {size}
@@ -243,7 +247,7 @@ class DatabaseClient:
         else:
             return None
 
-    def drop_score(self, channel_id: int, turn: str) -> ResultProxy:
+    def drop_score(self, channel_id: int, turn: str) -> Result:
         return self.execute(
             f"""DELETE FROM game_player_scores
                 WHERE channel_discord_id = {channel_id}
@@ -257,14 +261,14 @@ class DatabaseClient:
                 AND operation = {operation.value};""").fetchall()
         return [dict(row) for row in resources]
 
-    def add_player_to_game(self, game_player_uuid: str, channel_id: int) -> ResultProxy:
+    def add_player_to_game(self, game_player_uuid: str, channel_id: int) -> Result:
         return self.execute(
             f"""INSERT INTO game_players
                 (game_player_uuid, channel_discord_id, is_alive)
                 VALUES ('{game_player_uuid}', {channel_id}, true)
                 ON CONFLICT (game_player_uuid, channel_discord_id) DO NOTHING""")
 
-    def set_player_score(self, game_player_uuid: str, turn: int, score: int) -> ResultProxy:
+    def set_player_score(self, game_player_uuid: str, turn: int, score: int) -> Result:
         return self.execute(
             f"""UPDATE game_player_scores
                 SET game_player_uuid = '{game_player_uuid}'
@@ -285,7 +289,7 @@ class DatabaseClient:
         else:
             return None, None
 
-    def add_patching_process(self, channel_id: str, author_id: str) -> ResultProxy:
+    def add_patching_process(self, channel_id: str, author_id: str) -> Result:
         patch_uuid = self.execute(
             f"""INSERT INTO map_patching_process
                 (channel_discord_id, process_author_discord_id, status)
@@ -296,7 +300,7 @@ class DatabaseClient:
         else:
             return None
 
-    def add_patching_process_input(self, patch_uuid: str, input_filename: str, order: int) -> ResultProxy:
+    def add_patching_process_input(self, patch_uuid: str, input_filename: str, order: int) -> Result:
         return self.execute(
             f"""INSERT INTO map_patching_process_input
                 (patch_uuid, input_filename, input_order)

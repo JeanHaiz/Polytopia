@@ -17,7 +17,7 @@ from map_patching.map_patching_errors import MapPatchingErrors
 
 
 def patch_processed_images(
-        database_client: DatabaseClient,
+        database_client: Optional[DatabaseClient],
         image_filenames: List[str],
         map_size: str,
         guild_id: str,
@@ -27,6 +27,12 @@ def patch_processed_images(
         author_id: str,
         author_name: str,
         action_debug: bool) -> Tuple[str, str, list]:
+
+    if database_client is None:
+        database_client = DatabaseClient(
+            user="discordBot", password="password123", port=5432, database="polytopiaHelper_dev",
+            host="database")
+        database_client.dispose()
 
     patching_errors = []
 
@@ -48,7 +54,7 @@ def patch_processed_images(
     processed_params = []
 
     for filename, image_entry in images_n_filenames:
-        
+
         current_params = [ip for ip in image_params if ip.filename == filename]
 
         if image_entry is None or len(current_params) == 0:
@@ -79,6 +85,7 @@ def patch_processed_images(
     print("output before crop", patch_image.shape, background_params.getPosition(), background_params.getSize())
     output = crop_output(patch_image, background_params.getPosition(), background_params.getSize())
     print("after crop", output.shape)
+
     filename = database_client.add_resource(
         guild_id, channel_id, message_id, author_id, author_name, ImageOp.MAP_PATCHING_OUTPUT)
     ouptut_path = image_utils.save_image(output, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)

@@ -7,6 +7,7 @@ import functools
 import traceback
 import numpy as np
 import pandas as pd
+import concurrent.futures
 
 from typing import Dict, List
 from typing import Callable
@@ -250,10 +251,15 @@ async def generate_patched_map_bis(
         database_client.add_patching_process_input(patch_uuid, filename_i, i)
 
     func = functools.partial(
-        patch_processed_images, database_client, files, map_size, message.guild.id, channel_id, channel_name,
+        patch_processed_images, None, files, map_size, message.guild.id, channel_id, channel_name,
         message.id, message.author.id, message.author.name, action_debug)
 
-    output_file_path, filename, patching_errors = await loop.run_in_executor(None, func)
+    with concurrent.futures.ProcessPoolExecutor() as pool:
+        output_file_path, filename, patching_errors = await loop.run_in_executor(pool, func)
+        print('custom process pool done', output_file_path, filename, patching_errors)
+
+    # output_file_path, filename, patching_errors = await loop.run_in_executor(None, func)
+
     print("output path", output_file_path)
     if output_file_path is not None:
         database_client.update_patching_process_output_filename(patch_uuid, filename)
