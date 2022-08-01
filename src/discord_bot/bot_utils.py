@@ -296,7 +296,7 @@ async def reaction_message_routine(
                 analyse_map(image, database_client, message.channel.name, filename, action_debug=False)
 
                 turn, patch, patching_errors = await map_patching_routine(
-                    database_client, message, image, bot_client.loo, False)
+                    database_client, message, image, bot_client.loop, False)
                 # func = functools.partial(await map_patching_routine, database_client, attachment, message, image)
                 # turn, patch, patching_errors = await bot_client.loop.run_in_executor(None, func)
                 await manage_patching_errors(message.channel, message, database_client, patching_errors)
