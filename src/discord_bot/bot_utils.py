@@ -299,7 +299,8 @@ async def reaction_message_routine(
                 image_utils.move_input_image(message.channel.name, filename, ImageOp.MAP_INPUT)
                 image = await image_utils.load_or_fetch_image(
                     database_client, message.channel.name, message, filename, ImageOp.INPUT)
-                analyse_map(image, database_client, message.channel.name, filename, action_debug=False)
+                analyse_map(
+                    image, database_client, message.channel.name, message.channel.id, filename, action_debug=False)
 
                 turn, patch, patching_errors = await map_patching_routine(
                     database_client, message, image, bot_client.loop, False)
@@ -403,7 +404,7 @@ async def refresh_image_analysis(
 
     image = await image_utils.load_or_fetch_image(
         database_client, message.channel.name, message, filename, ImageOp.INPUT)
-    analyse_map(image, database_client, message.channel.name, filename, action_debug=False)
+    analyse_map(image, database_client, message.channel.name, message.channel.id, filename, action_debug=False)
     await process_map_patching(bot_client, message, channel, database_client, True)
 
 

@@ -65,7 +65,7 @@ def patch_processed_images(
                 patching_errors.append((MapPatchingErrors.NO_FILE_FOUND, filename))
                 continue
             _, image_entry_params = map_patching_analysis.analyse_map(
-                raw_image, database_client, channel_name, filename, action_debug)
+                raw_image, database_client, channel_name, channel_id, filename, action_debug)
             analysed_map_image = image_utils.load_image(
                 channel_name, filename, ImageOp.MAP_PROCESSED_IMAGE)
             if analysed_map_image is None or image_entry_params is None or len(image_entry_params.corners) == 0:
