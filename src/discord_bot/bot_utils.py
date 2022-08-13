@@ -350,16 +350,19 @@ async def reaction_added_routine(
     if payload.emoji == discord.PartialEmoji(name="📈"):
         channel: discord.TextChannel = bot_client.get_channel(payload.channel_id)
         message: discord.Message = await channel.fetch_message(payload.message_id)
+        await add_success_reaction(message)
         await process_score_recognition(database_client, channel, message)
 
     elif payload.emoji == discord.PartialEmoji(name="🖼️"):
         channel = bot_client.get_channel(payload.channel_id)
         message = await channel.fetch_message(payload.message_id)
+        await add_success_reaction(message)
         await process_map_patching(bot_client, message, channel, database_client, False)
 
     elif payload.emoji == discord.PartialEmoji(name="⁉️"):
         channel = bot_client.get_channel(payload.channel_id)
         message = await channel.fetch_message(payload.message_id)
+        await add_success_reaction(message)
         print("users", message.author, bot_client.user)
         if message.author == bot_client.user:
             await message.reply(
@@ -382,9 +385,9 @@ async def reaction_added_routine(
             await message.delete()
 
     elif payload.emoji == discord.PartialEmoji(name="🔄"):
-        print("right emoji")
         channel = bot_client.get_channel(payload.channel_id)
         message = await channel.fetch_message(payload.message_id)
+        await add_success_reaction(message)
         await refresh_image_analysis(channel, message, database_client, bot_client)
         await message.remove_reaction(payload.emoji, payload.member)
 
@@ -560,6 +563,7 @@ async def get_player_scores(database_client: DatabaseClient, ctx: Context, playe
 
 
 async def add_success_reaction(message: discord.Message) -> None:
+    print("added success")
     await message.add_reaction("✅")
 
 

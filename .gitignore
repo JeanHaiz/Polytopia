@@ -15,6 +15,7 @@ jupyter_notebooks/
 /output/
 *.png
 *.jpg
+*.jpeg
 
 # environments
 env
