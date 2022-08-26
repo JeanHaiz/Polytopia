@@ -36,7 +36,6 @@ DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
 def select_contours(image: np.ndarray) -> Optional[np.ndarray]:
     contours, hierarchy = cv2.findContours(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    hierarchy = hierarchy[0]
 
     max_half_perimeter = 0
     output = None
@@ -58,18 +57,18 @@ def draw_contour(
         contour_: np.ndarray,
         channel_name: str = None,
         epsilon: float = None,
-        epsilonFactor: float = 0.005,
+        epsilon_factor: float = 0.005,
         filename: str = None) -> Optional[np.ndarray]:
     mask = np.zeros(image.shape[:2], np.uint8)
 
     convex_hull = cv2.convexHull(contour_, returnPoints=True)
 
     if epsilon is None:
-        epsilon = epsilonFactor * cv2.arcLength(convex_hull, True)
+        epsilon = epsilon_factor * cv2.arcLength(convex_hull, True)
 
     approx = cv2.approxPolyDP(convex_hull, epsilon, True)
 
-    while(len(approx) > 12):
+    while len(approx) > 12:
         if DEBUG:
             print("approx too long: ", len(approx))
         epsilon /= 0.9
@@ -141,8 +140,8 @@ def get_transformation_dimensions(
             int(reference_position[0] - (vertices[2][0] - 50) / scale_factor),
             int(reference_position[1] - (vertices[2][1] - 50) / scale_factor)
         )
-    padded_and_scaled_vertices = vertices / scale_factor + scaled_padding
-    padded_and_scaled_vertices = [[int(a) for a in b] for b in padded_and_scaled_vertices]
+    
+    padded_and_scaled_vertices = [[int(a) for a in b] for b in vertices / scale_factor + scaled_padding]
 
     if DEBUG:
         print("scale factor:", scale_factor)
@@ -253,8 +252,8 @@ def get_lines(vertices_i: List[np.ndarray]) -> pd.DataFrame:
         print("all lines\n", pd.DataFrame(lines))
     # very permissive: slopes of selected lines are within 0.55 < abs(slope) < 0.65
     selected_lines = sorted([(j, length, slope, sign_x, sign_y, p0, p1)
-                            for (j, length, slope, sign_x, sign_y, p0, p1)
-                            in lines if abs(slope) < 10 and abs(slope) > 0.2], key=lambda x: -x[1])
+                             for (j, length, slope, sign_x, sign_y, p0, p1)
+                             in lines if 10 > abs(slope) > 0.2], key=lambda x: -x[1])
 
     lines_df = pd.DataFrame(selected_lines)
 
@@ -390,7 +389,7 @@ def debug_process_raw_map(
     print_vertices = [vertices_i[0], vertices_i[3], vertices_i[1], vertices_i[2], vertices_i[0]]
     for i in range(len(print_vertices) - 1):
         cv2.line(edges, print_vertices[i], print_vertices[i + 1], (255, 255, 255), 2)
-        cv2.putText(edges, "%s" % (i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
+        cv2.putText(edges, "%s" % i, print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
                     (255, 255, 255), 3, cv2.LINE_AA)
     image_utils.save_image(edges, channel_name, filename_i, ImageOp.DEBUG_VERTICES)
 
@@ -414,9 +413,9 @@ def transform_image(
     scale = int((reference_size[1] + 100) / math.sqrt(int(map_size)))
     oppacity = remove_clouds(cropped_image, ksize=7, sigma=15, template_height=scale)
 
-    padding = np.flip(padding)
+    flipped_padding = padding[1], padding[0]
 
-    return cropped_image, oppacity, padding, scale_factor, padded_and_scaled
+    return cropped_image, oppacity, flipped_padding, scale_factor, padded_and_scaled
 
 
 def patch_output(
@@ -483,7 +482,7 @@ def patch_partial_maps(
             vertical.append(is_vertical_i)
         else:
             if database_client is not None:
-                database_client.update_patching_process_input_status(patch_uuid, filename_i, status)
+                database_client.update_patching_process_input_status(patch_uuid, filename_i, status.name)
             patching_errors.append((status, processed_raw_map))
             vertices.append(None)
             vertical.append(None)

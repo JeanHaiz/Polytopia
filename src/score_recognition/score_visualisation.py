@@ -9,7 +9,7 @@ from mpl_toolkits.axisartist.axislines import SubplotZero
 from common import image_utils
 
 
-def plotScores(scores, channel_name, filename):
+def plot_scores(scores, channel_name, filename):
 
     x = list(scores[scores['polytopia_player_name'].isna()]['turn'])
     y = list(scores[scores['polytopia_player_name'].isna()]['score'])
@@ -87,8 +87,7 @@ def __print_scores(scores):
     scores.sort_values(by="turn")
 
     header = ['Player', 'Turn', 'Score', 'Delta']
-    s = []
-    s.append('   '.join([str(item).ljust(width(i), ' ') for i, item in enumerate(header)]))
+    s = ['   '.join([str(item).ljust(width(i), ' ') for i, item in enumerate(header)])]
 
     for data in score_list:
         s.append('   '.join([align(i, item) for i, item in enumerate(data)]))

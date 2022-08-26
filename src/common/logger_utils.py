@@ -2,14 +2,14 @@ import logging
 
 
 def init_logging():
-    logger = logging.getLogger('discord')
-    logger.setLevel(logging.DEBUG)
+    new_logger = logging.getLogger('discord')
+    new_logger.setLevel(logging.DEBUG)
 
     handler = logging.FileHandler(filename='./discord.log', encoding='utf-8', mode='w')
     handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 
-    logger.addHandler(handler)
-    return logger
+    new_logger.addHandler(handler)
+    return new_logger
 
 
 logger = init_logging()

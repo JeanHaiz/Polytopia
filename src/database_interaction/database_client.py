@@ -32,10 +32,10 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""").fetchone()
         return is_active is not None and len(is_active) > 0 and is_active[0]
 
-    def activate_channel(self, channel_id: int, channel_name: str, server_id: int, server_name: str) -> bool:
+    def activate_channel(self, channel_id: int, channel_name: str, server_id: int, server_name: str) -> None:
         channel_name = re.sub(r"[^a-zA-Z0-9]", "", channel_name)[:40]
         server_name = re.sub(r"[^a-zA-Z0-9]", "", server_name)[:40]
-        result = self.execute(
+        self.execute(
             f"""INSERT INTO discord_server
                 (server_discord_id, server_name)
                 VALUES ({server_id}, '{server_name}')
@@ -47,14 +47,12 @@ class DatabaseClient:
                 VALUES ({server_id}, {channel_id}, '{channel_name}', true)
                 ON CONFLICT (channel_discord_id) DO UPDATE
                 SET is_active = true;""")
-        return result.rowcount > 0
 
-    def deactivate_channel(self, channel_id: int) -> bool:
-        result = self.execute(
+    def deactivate_channel(self, channel_id: int) -> None:
+        self.execute(
             f"""UPDATE discord_channel
                 SET is_active = false
                 WHERE channel_discord_id = {channel_id};""")
-        return result.rowcount > 0
 
     # TODO: add create_if_missing=True param
     def get_game_players(self, channel_id: int) -> list:
@@ -68,7 +66,7 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""").fetchall()
         return [dict(row) for row in result_proxy]
 
-    def add_score(self, channel_id: int, player_id: int, score: int, turn: int) -> Result:
+    def add_score(self, channel_id: int, player_id: Optional[int], score: int, turn: int) -> Result:
         player_str_id = ("'" + str(player_id) + "'") if player_id is not None else 'NULL'
         return self.execute(
             f"""INSERT INTO game_player_scores
@@ -289,7 +287,7 @@ class DatabaseClient:
         else:
             return None, None
 
-    def add_patching_process(self, channel_id: str, author_id: str) -> Result:
+    def add_patching_process(self, channel_id: int, author_id: str) -> Optional[str]:
         patch_uuid = self.execute(
             f"""INSERT INTO map_patching_process
                 (channel_discord_id, process_author_discord_id, status)
@@ -413,5 +411,6 @@ class DatabaseClient:
         else:
             return None
 
-    def __format_tuple_list(self, s: List) -> str:
+    @staticmethod
+    def __format_tuple_list(s: List) -> str:
         return str(list([list(s_i) for s_i in s]))

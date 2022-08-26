@@ -12,6 +12,7 @@ import concurrent.futures
 from typing import Dict, List
 from typing import Callable
 from typing import NamedTuple
+from typing import Union
 from typing import Tuple
 from typing import Optional
 from difflib import SequenceMatcher
@@ -34,7 +35,7 @@ from score_recognition import score_visualisation
 
 
 def find_matching(
-        game_players: list,
+        game_players: List[dict],
         scores: List[Tuple[str, int]],
         author_name: str) -> Tuple[list, list]:
 
@@ -95,7 +96,7 @@ async def score_recognition_routine(
         return None
 
     scores = score_recognition_utils.read_scores(image)
-    turn = database_client.get_last_turn(channel_id)
+    turn = database_client.get_last_turn(channel_id) or 0
 
     if scores is None:
         return None
@@ -166,71 +167,14 @@ async def manage_patching_errors(
                 await message.reply(MAP_PATCHING_ERROR_MESSAGES[cause], mention_author=False)
 
 
-async def generate_patched_map(
-        database_client: DatabaseClient,
-        channel_id: str,
-        channel_name: str,
-        message: discord.Message,
-        turn: str,
-        loop: asyncio.AbstractEventLoop) -> Tuple[str, discord.File, list]:
-
-    patch_uuid = database_client.add_patching_process(channel_id, message.author.id)
-    map_size = database_client.get_game_map_size(channel_id)
-    print("map size", map_size)
-    if map_size is None:
-        return turn, None, [(MapPatchingErrors.MISSING_MAP_SIZE, None)]
-
-    files = database_client.get_map_patching_files(channel_id)
-    if len(files) == 0:
-        return turn, None, [(MapPatchingErrors.NO_FILE_FOUND, None)]
-    elif len(files) == 1:
-        return turn, None, [(MapPatchingErrors.ONLY_ONE_FILE, None)]
-
-    for i, filename_i in enumerate(files):
-        database_client.add_patching_process_input(patch_uuid, filename_i, i)
-    images = [
-        await image_utils.load_or_fetch_image(database_client, channel_name, message, filename_i, ImageOp.INPUT)
-        for filename_i in files]
-    images.insert(0, image_utils.get_background_template(map_size))
-    files.insert(0, "background")
-
-    print("files_log %s" % str(files))
-    logger.debug("files_log %s" % str(files))
-
-    # output_file_path, filename, patching_errors = map_patching_utils.patch_partial_maps(
-    #     channel_name, images, files, map_size, database_client, message)
-
-    func = functools.partial(
-        map_patching_utils.patch_partial_maps, channel_name, images, files, map_size, patch_uuid, database_client,
-        message)
-    output_file_path, filename, patching_errors = await loop.run_in_executor(None, func)
-    print("output path", output_file_path)
-    if output_file_path is not None:
-        database_client.update_patching_process_output_filename(patch_uuid, filename)
-        attachment = image_utils.load_attachment(output_file_path, filename)
-        if attachment is None:
-            patching_errors.append((MapPatchingErrors.ATTACHMEMENT_NOT_LOADED, None))
-    else:
-        patching_errors.append((MapPatchingErrors.ATTACHMEMENT_NOT_SAVED, None))
-        attachment = None
-    if len(patching_errors) == 0:
-        status = "Done"
-    else:
-        status = "With Errors - " + "; ".join(
-            [str(str(error.name) + "(" + str(filename) + ")") for error, filename in patching_errors])
-    print("status", status)
-    database_client.update_patching_process_status(patch_uuid, status)
-    return turn, attachment, patching_errors
-
-
 async def generate_patched_map_bis(
         database_client: DatabaseClient,
-        channel_id: str,
+        channel_id: int,
         channel_name: str,
         message: discord.Message,
         turn: Optional[str],
         loop: asyncio.AbstractEventLoop,
-        action_debug: bool) -> Tuple[Optional[str], discord.File, list]:
+        action_debug: bool) -> Tuple[Optional[str], Optional[discord.File], list]:
     patch_uuid = database_client.add_patching_process(channel_id, message.author.id)
     map_size = database_client.get_game_map_size(channel_id)
 
@@ -265,9 +209,9 @@ async def generate_patched_map_bis(
         database_client.update_patching_process_output_filename(patch_uuid, filename)
         attachment = image_utils.load_attachment(output_file_path, filename)
         if attachment is None:
-            patching_errors.append((MapPatchingErrors.ATTACHMEMENT_NOT_LOADED, None))
+            patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_LOADED, None))
     else:
-        patching_errors.append((MapPatchingErrors.ATTACHMEMENT_NOT_SAVED, None))
+        patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_SAVED, None))
         attachment = None
     if len(patching_errors) == 0:
         status = "Done"
@@ -287,7 +231,7 @@ async def reaction_message_routine(
     for attachment in message.attachments:
         if attachment.content_type.startswith("image/"):
 
-            if score_recognition_utils.is_score_reconition_request(message.reactions, attachment, filename):
+            if score_recognition_utils.is_score_recognition_request(message.reactions, attachment, filename):
                 image_utils.move_input_image(message.channel.name, filename, ImageOp.SCORE_INPUT)
                 score_text = await score_recognition_routine(database_client, message, filename)
                 if score_text is not None:
@@ -310,8 +254,8 @@ async def reaction_message_routine(
                 if patch is not None:
                     await message.channel.send(file=patch, content="Map patched for turn %s" % turn)
                 elif len(patching_errors) == 0 and patch is None:
-                    myid = '<@338067113639936003>'  # Jean's id
-                    await message.reply('There was an error. %s has been notified.' % myid, mention_author=False)
+                    my_id = '<@338067113639936003>'  # Jean's id
+                    await message.reply('There was an error. %s has been notified.' % my_id, mention_author=False)
 
 
 async def reaction_removed_routine(
@@ -332,7 +276,7 @@ async def reaction_removed_routine(
 def reset_resource(
         database_client: DatabaseClient,
         channel: discord.TextChannel,
-        message_id: str,
+        message_id: int,
         source_operation: ImageOp) -> None:
 
     filename = database_client.set_resource_operation(message_id, ImageOp.INPUT, 0)
@@ -419,7 +363,7 @@ async def process_score_recognition(
     if len(message.attachments) == 1:
         output = ""
         for i, attachment in enumerate(message.attachments):
-            if score_recognition_utils.is_score_reconition_request(message.reactions, attachment, "filename"):
+            if score_recognition_utils.is_score_recognition_request(message.reactions, attachment, "filename"):
                 filename = await prepare_attachment(
                     database_client, channel, message, attachment, i, ImageOp.SCORE_INPUT)
                 score_text = await score_recognition_routine(database_client, message, filename)
@@ -468,15 +412,15 @@ async def prepare_attachment(
         message: discord.Message,
         attachment: discord.Attachment,
         i: int,
-        imageOp: ImageOp) -> str:
+        image_op: ImageOp) -> str:
 
-    filename = database_client.set_resource_operation(message.id, imageOp, i)
+    filename = database_client.set_resource_operation(message.id, image_op, i)
     if filename is None:
         filename = database_client.add_resource(
-            message.guild.id, channel.id, message.id, message.author.id, message.author.name, imageOp, i)
-        await image_utils.save_attachment(attachment, channel.name, imageOp, filename)
+            message.guild.id, channel.id, message.id, message.author.id, message.author.name, image_op, i)
+        await image_utils.save_attachment(attachment, channel.name, image_op, filename)
     else:
-        image_utils.move_input_image(channel.name, filename, imageOp)
+        image_utils.move_input_image(channel.name, filename, image_op)
     return filename
 
 
@@ -484,7 +428,7 @@ def now() -> str:
     return datetime.datetime.now().strftime('%Y%m%d_%H%M%S_')
 
 
-async def get_message(bot_client: Bot, channel_id: str, message_id: str) -> discord.Message:
+async def get_message(bot_client: Bot, channel_id: int, message_id: int) -> Optional[discord.Message]:
     try:
         channel = bot_client.get_channel(channel_id)
         return await channel.fetch_message(message_id)
@@ -492,19 +436,9 @@ async def get_message(bot_client: Bot, channel_id: str, message_id: str) -> disc
         return None
 
 
-async def get_attachments(
-        bot_client: Bot,
-        channel_id: str,
-        message_id: str) -> List[discord.Attachment]:
-
-    message = await get_message(bot_client, channel_id, message_id)
-    return message.attachments
-
-
 async def wrap_errors(
-        bot_client: Bot,
-        ctx: Context,
-        guild_id: str,
+        ctx: Union[Context, discord.Message],
+        guild_id: int,
         fct: Callable,
         is_async: bool,
         *params: Tuple,
@@ -515,7 +449,7 @@ async def wrap_errors(
         is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
         # print("environment", is_test_server, is_dev_env, os.getenv("POLYTOPIA_TEST_SERVER", "0"),
         #       os.getenv("POLYTOPIA_ENVIRONMENT", ""))
-        if (is_dev_env and is_test_server) or ((not is_test_server) and (not is_dev_env)):
+        if (is_dev_env and is_test_server) or (not is_test_server and not is_dev_env):
             if is_async:
                 await fct(*params, **kwparams)
             else:
@@ -537,7 +471,7 @@ async def get_scores(database_client: DatabaseClient, ctx: Context) -> None:
     scores: pd.DataFrame = database_client.get_channel_scores(ctx.channel.id)
     if scores is not None and len(scores[scores['turn'] != -1]) > 0:
         scores = scores[scores['turn'] != -1]
-        score_plt = score_visualisation.plotScores(scores, ctx.channel.name, str(ctx.message.id))
+        score_plt = score_visualisation.plot_scores(scores, ctx.channel.name, str(ctx.message.id))
         await ctx.message.channel.send(file=score_plt, content="score recognition")
         score_text = score_visualisation.print_scores(scores)
         # await ctx.send(score_text)
@@ -579,7 +513,6 @@ async def add_delete_reaction(message: discord.Message) -> None:
 
 
 async def clear_channel_map_reactions(
-        bot_client: Bot,
         database_client: DatabaseClient,
         channel: discord.TextChannel) -> None:
     messages_ids = database_client.get_channel_resource_messages(channel.id, ImageOp.MAP_INPUT)

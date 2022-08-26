@@ -11,8 +11,8 @@ DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
 def prepare_turn_image(image, low_thresh):
     crop = image[:int(image.shape[0] / 4), :]
-    grayImage = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    (_, thresh) = cv2.threshold(grayImage, low_thresh, 255, cv2.THRESH_BINARY)
+    gray_image = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    (_, thresh) = cv2.threshold(gray_image, low_thresh, 255, cv2.THRESH_BINARY)
     cnts = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)[-2]
     for cnt in cnts:
         if cv2.contourArea(cnt) < 15:
@@ -75,11 +75,11 @@ def split_in_rows(contours):
                     if x >= row_min_i and x + w <= row_max_i:
                         found_row = True
                         rows[i] = rows[i] + [c]
-                    elif x >= row_min_i and x <= row_max_i and x + w >= row_max_i:
+                    elif row_min_i <= x <= row_max_i <= x + w:
                         row_max_i = x + w
                         found_row = True
                         rows[i] = rows[i] + [c]
-                    elif x <= row_min_i and x + w >= row_min_i and x + w <= row_max_i:
+                    elif x + w >= row_min_i >= x <= row_max_i:
                         row_min_i = x
                         found_row = True
                         rows[i] = rows[i] + [c]

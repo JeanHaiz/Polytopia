@@ -6,7 +6,7 @@ import numpy as np
 from common.logger_utils import logger
 
 
-def is_score_reconition_request(reactions, attachment, filename):
+def is_score_recognition_request(reactions, attachment, filename):
     # TODO: complete with image analysis heuristics
     return "📈" in [r.emoji for r in reactions]
 
@@ -17,9 +17,9 @@ def read(image, config=''):
 
 def crop(image):
     edges = cv2.Canny(image, 50, 150, apertureSize=3)
-    minLineLength = 500
+    min_line_length = 500
     lines = cv2.HoughLinesP(image=edges, rho=1, theta=np.pi / 2, threshold=200, lines=np.array([]),
-                            minLineLength=minLineLength, maxLineGap=10)
+                            minLineLength=min_line_length, maxLineGap=10)
     heights = sorted([lines[i][0][1] for i in range(len(lines))])
     return image[heights[0]:heights[-1], :]
 
@@ -66,7 +66,7 @@ def read_line(line):
     else:
         print("s1 error", line)
         return
-    return (player, score)
+    return player, score
 
 
 def clear_noise_optimised(image):

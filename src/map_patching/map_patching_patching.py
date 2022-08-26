@@ -20,17 +20,17 @@ def patch_processed_images(
         database_client: Optional[DatabaseClient],
         image_filenames: List[str],
         map_size: str,
-        guild_id: str,
-        channel_id: str,
+        guild_id: int,
+        channel_id: int,
         channel_name: str,
-        message_id: str,
-        author_id: str,
+        message_id: int,
+        author_id: int,
         author_name: str,
         action_debug: bool) -> Tuple[str, str, list]:
 
     if database_client is None:
         database_client = DatabaseClient(
-            user="discordBot", password="password123", port=5432, database="polytopiaHelper_dev",
+            user="discordBot", password="password123", port="5432", database="polytopiaHelper_dev",
             host="database")
         database_client.dispose()
 
@@ -80,16 +80,16 @@ def patch_processed_images(
 
     # if len(images) != len(image_filenames) or image_params != len(image_filenames) or len(missing_filenames) != 0:
 
-    patch_image = patch_processed_image_files(background_image, processed_images, background_params, processed_params)
+    patched_image = patch_processed_image_files(background_image, processed_images, background_params, processed_params)
 
-    print("output before crop", patch_image.shape, background_params.getPosition(), background_params.getSize())
-    output = crop_output(patch_image, background_params.getPosition(), background_params.getSize())
+    print("output before crop", patched_image.shape, background_params.get_position(), background_params.get_size())
+    output = crop_output(patched_image, background_params.get_position(), background_params.get_size())
     print("after crop", output.shape)
 
     filename = database_client.add_resource(
         guild_id, channel_id, message_id, author_id, author_name, ImageOp.MAP_PATCHING_OUTPUT)
-    ouptut_path = image_utils.save_image(output, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)
-    return ouptut_path, filename, patching_errors
+    output_path = image_utils.save_image(output, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)
+    return output_path, filename, patching_errors
 
 
 def crop_output(
@@ -100,9 +100,6 @@ def crop_output(
     return image[
         (position[1] - 20).clip(0): (position[1] + size[1] + 20).clip(0, image.shape[0]),
         (position[0] - 20).clip(0): (position[0] + size[0] + 20).clip(0, image.shape[1])]
-    return image[
-        (position[1] - 20).clip(0): (position[1] + size[1] + 20).clip(0, image.shape[0]),
-        (position[0] - size[0] - 20).clip(0): (position[0] + size[0] + 20).clip(0, image.shape[1])]
 
 
 def load_processed_background(map_size: str) -> np.ndarray:
@@ -144,60 +141,18 @@ def patch_processed_image_files(
 
             corner_orientations = [CornerOrientation(c[2]) for c in image_param_i.corners]
 
-            if False:  # CornerOrientation.TOP in corner_orientations and CornerOrientation.BOTTOM in corner_orientations:
-                image_i_height = get_height(image_param_i.corners) or 0
-                scale_ratio = image_i_height / background_height
+            scaled_image_i = image_i
+            corner_orientations.sort(key=lambda x: x.value)
+            selected_corner_orientation_i = corner_orientations[0]
+            print("Selected Corner", CornerOrientation(selected_corner_orientation_i))
 
-                # new_dim = image_i.shape * scale_ratio
-                # new_dim = (int(image_i.shape[0] * scale_ratio), int(image_i.shape[1] * scale_ratio))
-                new_dim = (int(image_i.shape[1] * scale_ratio), int(image_i.shape[0] * scale_ratio))
-                scaled_image_i = cv2.resize(image_i, new_dim, interpolation=cv2.INTER_AREA)
+            selected_corner_i = get_corner(image_param_i.corners, selected_corner_orientation_i) or (0, 0)
+            background_selected_corner = get_corner(background_params.corners, selected_corner_orientation_i) \
+                or (0, 0)
 
-                image_i_top = get_corner(image_param_i.corners, CornerOrientation.TOP) or [0, 0]
-                background_top = get_corner(background_params.corners, CornerOrientation.TOP) or [0, 0]
-
-                scaled_top_i = [int(i * scale_ratio) for i in image_i_top]
-
-                padding_i = (background_top[1] - scaled_top_i[1], background_top[0] - scaled_top_i[0])
-
-            elif False:  # CornerOrientation.RIGHT in corner_orientations and CornerOrientation.LEFT in corner_orientations:
-                image_i_width = get_width(image_param_i.corners) or 0
-                if image_i_width == 0:
-                    print("image width is null", image_param_i.corners)
-                    continue
-
-                print("widths", image_i_width, background_width)
-
-                scale_ratio = image_i_width / background_width
-
-                print("scale ratio", scale_ratio, image_i_width)
-                # new_dim = image_i.shape * scale_ratio
-                # new_dim = (int(image_i.shape[0] * scale_ratio), int(image_i.shape[1] * scale_ratio))
-                new_dim = (int(image_i.shape[1] * scale_ratio), int(image_i.shape[0] * scale_ratio))
-                print(new_dim, image_i.shape, scale_ratio)
-                scaled_image_i = cv2.resize(image_i, new_dim, interpolation=cv2.INTER_AREA)
-
-                image_i_left = get_corner(image_param_i.corners, CornerOrientation.LEFT) or [0, 0]
-                background_left = get_corner(background_params.corners, CornerOrientation.LEFT) or [0, 0]
-
-                scaled_left_i = [int(i * scale_ratio) for i in image_i_left]
-
-                padding_i = (background_left[1] - scaled_left_i[1], background_left[0] - scaled_left_i[0])
-
-            else:
-                print("third way")
-                scaled_image_i = image_i
-                corner_orientations.sort(key=lambda x: x.value)
-                selected_corner_orientation_i = corner_orientations[0]
-                print("Selected Corner", CornerOrientation(selected_corner_orientation_i))
-
-                selected_corner_i = get_corner(image_param_i.corners, selected_corner_orientation_i) or (0, 0)
-                background_selected_corner = get_corner(background_params.corners, selected_corner_orientation_i) \
-                    or (0, 0)
-
-                padding_i = (
-                    background_selected_corner[0] - selected_corner_i[0],
-                    background_selected_corner[1] - selected_corner_i[1])
+            padding_i = (
+                background_selected_corner[0] - selected_corner_i[0],
+                background_selected_corner[1] - selected_corner_i[1])
 
             cropped_image_i, padding_i = crop_padding(scaled_image_i, padding_i)
 
@@ -222,7 +177,7 @@ def load_image_params(
 def get_corner(corners: List[Tuple[int, int, int]], orientation: CornerOrientation) -> Optional[Tuple[int, int]]:
     for c in corners:
         if c[2] == orientation.value:
-            return (c[0], c[1])
+            return c[0], c[1]
     return None
 
 
@@ -306,7 +261,7 @@ def patch_image(
         :]
 
     cv2.imwrite("./patch-work-piece.png", background)
-    print("backgound shape", background.shape)
+    print("background shape", background.shape)
 
     print("shape for cropped bit", bit.shape)
     print(
