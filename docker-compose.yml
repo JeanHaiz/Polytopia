@@ -8,6 +8,7 @@ services:
         container_name: database
         command: postgres -c stats_temp_directory=/tmp
         restart: "always"
+        mem_limit: 1g
         ports:
             - 5432:5432
         environment:

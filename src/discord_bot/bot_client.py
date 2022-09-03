@@ -12,7 +12,7 @@ from common import image_utils
 from common.logger_utils import logger
 from common.image_operation import ImageOp
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 nest_asyncio.apply()
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
