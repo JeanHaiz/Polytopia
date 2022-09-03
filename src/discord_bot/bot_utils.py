@@ -174,6 +174,7 @@ async def generate_patched_map_bis(
         message: discord.Message,
         turn: Optional[str],
         loop: asyncio.AbstractEventLoop,
+        n_images: int,
         action_debug: bool) -> Tuple[Optional[str], Optional[discord.File], list]:
     patch_uuid = database_client.add_patching_process(channel_id, message.author.id)
     map_size = database_client.get_game_map_size(channel_id)
@@ -187,6 +188,10 @@ async def generate_patched_map_bis(
     elif len(files) == 1:
         return turn, None, [(MapPatchingErrors.ONLY_ONE_FILE, None)]
 
+    if n_images is not None:
+        n_images = max(n_images, 2)
+        files = files[-n_images:]
+    
     if DEBUG or action_debug:
         print("files_log %s" % str(files))
     logger.debug("files_log %s" % str(files))

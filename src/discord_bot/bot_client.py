@@ -204,12 +204,12 @@ async def drop_score(ctx: Context, turn: str) -> None:
 
 
 @bot_client.command(name="patch")
-async def patch_map(ctx: Context, action_debug: bool = False) -> None:
+async def patch_map(ctx: Context, n_images: int = None, action_debug: bool = False) -> None:
     async def inner() -> None:
         await bot_utils.add_received_reaction(ctx.message)
         turn = database_client.get_last_turn(ctx.channel.id)
         turn, patch, patching_errors = await bot_utils.generate_patched_map_bis(
-            database_client, ctx.channel.id, ctx.channel.name, ctx.message, turn, bot_client.loop, action_debug)
+            database_client, ctx.channel.id, ctx.channel.name, ctx.message, turn, bot_client.loop, n_images, action_debug)
         await bot_utils.manage_patching_errors(ctx.channel, ctx.message, database_client, patching_errors)
         if patch is not None:
             return await ctx.channel.send(file=patch, content="map patched for turn %s" % turn)
