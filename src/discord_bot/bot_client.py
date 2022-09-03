@@ -25,6 +25,12 @@ database_client = DatabaseClient(
 @bot_client.event
 async def on_ready() -> None:
     print('We have logged in as {0}'.format(bot_client.user))
+    logger.error('We have logged in as {0}'.format(bot_client.user))
+
+
+@bot_client.event
+async def on_error(event, *args, **kwargs) -> None:
+    print("Error: %s\n%s\n%s" % (event, args, kwargs))
 
 
 @bot_client.event
