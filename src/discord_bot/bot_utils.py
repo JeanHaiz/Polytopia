@@ -9,12 +9,13 @@ import numpy as np
 import pandas as pd
 import concurrent.futures
 
-from typing import Dict, List
-from typing import Callable
-from typing import NamedTuple
+from typing import List
+from typing import Dict
 from typing import Union
 from typing import Tuple
+from typing import Callable
 from typing import Optional
+from typing import Coroutine
 from difflib import SequenceMatcher
 from discord.ext.commands import Bot
 from discord.ext.commands import Context
@@ -174,8 +175,8 @@ async def generate_patched_map_bis(
         message: discord.Message,
         turn: Optional[str],
         loop: asyncio.AbstractEventLoop,
-        n_images: Optional[int],
-        action_debug: bool) -> Tuple[Optional[str], Optional[discord.File], list]:
+        n_images: Optional[int] = 4,
+        action_debug: bool = False) -> Tuple[Optional[str], Optional[discord.File], list]:
     patch_uuid = database_client.add_patching_process(channel_id, message.author.id)
     map_size = database_client.get_game_map_size(channel_id)
 
@@ -441,24 +442,14 @@ async def get_message(bot_client: Bot, channel_id: int, message_id: int) -> Opti
         return None
 
 
-async def wrap_errors(
-        ctx: Union[Context, discord.Message],
-        guild_id: int,
-        fct: Callable,
-        is_async: bool,
-        *params: Tuple,
-        **kwparams: NamedTuple) -> None:
-
+async def wrap_errors(ctx: Union[Context, discord.Message], guild_id: int, fct: Callable[[], Coroutine]) -> None:
     try:
         is_test_server = str(guild_id) == "918195469245628446"
         is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
         # print("environment", is_test_server, is_dev_env, os.getenv("POLYTOPIA_TEST_SERVER", "0"),
         #       os.getenv("POLYTOPIA_ENVIRONMENT", ""))
         if (is_dev_env and is_test_server) or (not is_test_server and not is_dev_env):
-            if is_async:
-                await fct(*params, **kwparams)
-            else:
-                fct(*params, **kwparams)
+            await asyncio.create_task(fct())
     except discord.errors.Forbidden:
         await ctx.reply("Missing permission. <@338067113639936003> has been notified.", mention_author=False)
     except BaseException:
