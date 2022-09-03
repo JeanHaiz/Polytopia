@@ -144,7 +144,7 @@ async def map_patching_routine(
         turn = last_turn
     elif last_turn is None or int(last_turn) < int(turn):
         database_client.set_new_last_turn(channel_id, turn)
-    return await generate_patched_map_bis(database_client, channel_id, channel_name, message, turn, loop, action_debug)
+    return await generate_patched_map_bis(database_client, channel_id, channel_name, message, turn, loop, None, action_debug)
     # return await generate_patched_map(database_client, channel_id, channel_name, message, turn, loop)
 
 
@@ -174,7 +174,7 @@ async def generate_patched_map_bis(
         message: discord.Message,
         turn: Optional[str],
         loop: asyncio.AbstractEventLoop,
-        n_images: int,
+        n_images: Optional[int],
         action_debug: bool) -> Tuple[Optional[str], Optional[discord.File], list]:
     patch_uuid = database_client.add_patching_process(channel_id, message.author.id)
     map_size = database_client.get_game_map_size(channel_id)
