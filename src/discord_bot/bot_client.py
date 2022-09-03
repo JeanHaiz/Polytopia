@@ -17,7 +17,9 @@ VERSION = "0.1.0"
 nest_asyncio.apply()
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
 
-bot_client = commands.Bot(":")
+intents = discord.Intents.default()
+intents.message_content = True
+bot_client = commands.Bot(":", intents=intents)
 
 database_client = DatabaseClient(
     user="discordBot", password="password123", port="5432", database="polytopiaHelper_dev",
@@ -225,9 +227,9 @@ async def patch_map(ctx: Context, n_images: int = None, action_debug: bool = Fal
             database_client, ctx.channel.id, ctx.channel.name, ctx.message, turn, bot_client.loop, n_images, action_debug)
         await bot_utils.manage_patching_errors(ctx.channel, ctx.message, database_client, patching_errors)
         if patch is not None:
-            return await ctx.channel.send(file=patch, content="map patched for turn %s" % turn)
+            await ctx.channel.send(file=patch, content="map patched for turn %s" % turn)
         else:
-            return await ctx.channel.send("patch failed")
+            await ctx.channel.send("patch failed")
     await bot_utils.wrap_errors(ctx, ctx.guild.id, inner, True)
 
 

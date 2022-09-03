@@ -287,7 +287,7 @@ class DatabaseClient:
         else:
             return None, None
 
-    def add_patching_process(self, channel_id: int, author_id: str) -> Optional[str]:
+    def add_patching_process(self, channel_id: int, author_id: int) -> Optional[str]:
         patch_uuid = self.execute(
             f"""INSERT INTO map_patching_process
                 (channel_discord_id, process_author_discord_id, status)
