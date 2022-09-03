@@ -12,6 +12,8 @@ from common import image_utils
 from common.logger_utils import logger
 from common.image_operation import ImageOp
 
+VERSION = "0.1.0"
+
 nest_asyncio.apply()
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
 
@@ -85,6 +87,11 @@ async def on_raw_reaction_remove(payload: discord.RawReactionActionEvent) -> Non
     message = await bot_utils.get_message(bot_client, payload.channel_id, payload.message_id)
     if message is not None:
         await bot_utils.wrap_errors(message, message.channel.guild.id, inner, True)
+
+
+@bot_client.command()
+async def version(ctx: Context) -> None:
+    await ctx.send("version %s" % VERSION)
 
 
 @bot_client.command()
