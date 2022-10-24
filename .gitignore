@@ -4,8 +4,10 @@
 
 # Bot runtime data and test data
 /db-data/
+/es-data/
 /src/resources/
 *.log
+*.log.*
 /attachments/
 /resources/
 /image_recognition/

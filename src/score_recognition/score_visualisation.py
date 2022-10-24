@@ -7,9 +7,18 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axisartist.axislines import SubplotZero
 
 from common import image_utils
+from database_interaction.database_client import DatabaseClient
 
 
-def plot_scores(scores, channel_name, filename):
+def plot_scores(
+        database_client: DatabaseClient,
+        scores: pd.DataFrame,
+        channel_id: str,
+        channel_name: str,
+        author_id: str):
+
+    filename = database_client.add_visualisation(channel_id, author_id)
+    database_client.add_visualisation_scores(filename, scores)
 
     x = list(scores[scores['polytopia_player_name'].isna()]['turn'])
     y = list(scores[scores['polytopia_player_name'].isna()]['score'])
@@ -38,13 +47,14 @@ def plot_scores(scores, channel_name, filename):
     plt.legend()
     plt.tight_layout()
 
-    parent_path, file_path = image_utils.get_plt_path(channel_name, filename)
+    parent_path, filepath = image_utils.get_plt_path(channel_name, filename)
     if not os.path.exists(parent_path):
         os.makedirs(parent_path, exist_ok=True)
 
-    plt.savefig(file_path)
-    plt.show()
-    return image_utils.load_attachment(file_path, "Score visualisation")
+    plt.savefig(filepath)
+    # plt.show()
+    return filepath, filename
+    # return image_utils.load_attachment(file_path, "Score visualisation")
 
 
 def augment_scores(scores: pd.DataFrame):
@@ -69,6 +79,8 @@ def print_player_scores(scores: pd.DataFrame, player):
 
 
 def __print_scores(scores):
+    print(scores)
+    scores = scores.drop(columns="score_uuid")
     score_list = scores.to_numpy().tolist()
     player_width = np.max([len(d) if type(d) == str else 0 for data in score_list for d in data])
     print("player_width", player_width)

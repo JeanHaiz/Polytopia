@@ -39,7 +39,7 @@ services:
         build:
             context: "/Users/jean/Documents/Coding/Polytopia/src/"
             dockerfile: Dockerfile
-        # restart: "unless-stopped"
+        restart: "unless-stopped"
         container_name: helper
         mem_limit: 1g
         volumes:

@@ -63,7 +63,7 @@ def analyse_background(
         action_debug: bool) -> Tuple[str, ImageParam]:
     background_template = image_utils.get_background_template(map_size)
     _, scale = get_cloud_alpha_quater(
-        background_template, "templates", "processed_background_template_%s", map_size, is_background=True,
+        background_template, "templates", "processed_background_template_%s", map_size,
         action_debug=action_debug)
     scaled_image = scale_image(background_template, scale)
 
@@ -102,88 +102,6 @@ def store_background_image_params(database_client: DatabaseClient, map_size: str
 
 def store_transformed_image(image: np.ndarray, channel_name: str, filename: str) -> str:
     return image_utils.save_image(image, channel_name, filename, ImageOp.MAP_PROCESSED_IMAGE)
-
-
-def get_cloud_alpha(
-        map_image: np.ndarray,
-        kernel_size: int = 7,
-        sigma: int = 15,
-        is_background: bool = False) -> Tuple[np.ndarray, float]:
-
-    template = image_utils.get_cloud_template()
-    hh, ww = template.shape[:2]
-
-    pawn = template[:, :, 0:3]
-    alpha_template = template[:, :, 3]
-    alpha = cv2.merge([alpha_template, alpha_template, alpha_template])
-    if DEBUG:
-        print("alpha hist", np.histogram(alpha_template, bins=[-4, -3, -2, -1, 0, 1]))
-
-    result_set = []
-
-    # TODO Optimisation possibilities:
-    # - not go linear, look for the point
-    # - start in the middle and go out, based on gradient
-    # - stop when it goes down again
-    # - change spacing
-    # - move range based on estimated scaling
-    # - add half-templates
-    for int_scale in range(40, 400, 20):
-        scale = int_scale / 100.0
-        new_dim = (int(map_image.shape[1] * scale), int(map_image.shape[0] * scale))
-        resized = cv2.resize(map_image, new_dim, interpolation=cv2.INTER_AREA)
-        if resized.shape[0] < template.shape[0] or resized.shape[1] < template.shape[1]:
-            break
-
-        img_alpha = np.ones((resized.shape[0:2]))
-
-        corr_img = cv2.matchTemplate(resized, pawn, cv2.TM_CCOEFF_NORMED, mask=alpha)
-        correlation_raw = (255 * corr_img).clip(0, 255).astype(np.uint8)
-
-        blur = cv2.GaussianBlur(correlation_raw, (kernel_size, kernel_size), sigmaX=sigma)
-        threshold = 100
-
-        maximum = np.max(blur)
-
-        max_val = np.max(blur)
-        rad = int(math.sqrt(hh * hh + ww * ww) / 4)
-
-        count = 0
-
-        while max_val > threshold:
-
-            # find max value of correlation image
-            min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(blur)
-
-            if max_val > threshold:
-                # draw match on copy of input
-                img_alpha[max_loc[1]: max_loc[1] + hh, max_loc[0]: max_loc[0] + ww] = \
-                    img_alpha[max_loc[1]: max_loc[1] + hh, max_loc[0]: max_loc[0] + ww] - alpha_template / 255.0
-
-                # write black circle at max_loc in corr_img
-                cv2.circle(blur, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
-                count += 1
-
-            else:
-                break
-        hist = np.histogram(img_alpha, bins=[-4, -3, -2, -1, 0, 1])
-
-        if DEBUG:
-            print("hist", scale, int(sum(hist[0][:-1])), int(np.dot(hist[0][:-1], hist[1][1:-1] - 1) / scale), hist)
-        img_alpha_c = img_alpha.clip(0, 1).astype(np.uint8) * 255
-        alpha_area = np.sum(img_alpha_c == 0) / (img_alpha_c.shape[0] * img_alpha_c.shape[1])
-        result_set.append([scale, maximum, maximum / scale, count, alpha_area, img_alpha_c])
-
-    if False:  # not is_background:
-        selected_scaling = sorted(result_set, key=lambda x: abs(1.21 - x[0]))[0]
-    else:
-        selected_scaling = sorted(result_set, key=lambda x: -x[2])[0]
-
-    if DEBUG:
-        print("selected_scaling", selected_scaling[:5])
-    resized_original = cv2.resize(
-        selected_scaling[5], (map_image.shape[1], map_image.shape[0]), interpolation=cv2.INTER_AREA)
-    return resized_original, selected_scaling[0]
 
 
 def get_corners(
@@ -367,7 +285,6 @@ def get_corner_orientation(
 def match_full_clouds(
         blur: np.ndarray,
         img_alpha: np.ndarray,
-        template: np.ndarray,
         template_alpha: np.ndarray) -> np.ndarray:
 
     threshold = 60
@@ -615,9 +532,6 @@ def get_cloud_alpha_quater(
         channel_name: str,
         filename: str,
         map_size: str,
-        ksize: int = 15,  # 15
-        sigma: int = 2,  # 1
-        is_background: bool = False,
         action_debug: bool = False) -> Tuple[np.ndarray, float]:
 
     template = image_utils.get_cloud_template()
@@ -646,7 +560,7 @@ def get_cloud_alpha_quater(
 
     img_alpha = np.ones((map_image.shape[0:2]))
 
-    img_alpha = match_full_clouds(grid_blur, img_alpha, resized_template, resized_template_alpha_layer)
+    img_alpha = match_full_clouds(grid_blur, img_alpha, resized_template_alpha_layer)
 
     cloud_less_map_image = cv2.bitwise_and(map_image, map_image, mask=img_alpha.astype(np.uint8))
 
@@ -728,5 +642,5 @@ def find_cloud_grid(map_image, channel_name, filename, map_size, ksize: int = 7,
 
 
 def get_grid(channel_name, filename, grid_size):
-    map = image_utils.load_image(channel_name, filename, ImageOp.MAP_INPUT)
-    return find_cloud_grid(map[:, :, 0:3].astype(np.uint8), channel_name, filename, grid_size)
+    image = image_utils.load_image(channel_name, filename, ImageOp.MAP_INPUT)
+    return find_cloud_grid(image[:, :, 0:3].astype(np.uint8), channel_name, filename, grid_size)

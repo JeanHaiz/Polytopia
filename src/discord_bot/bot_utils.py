@@ -5,6 +5,8 @@ import discord
 import datetime
 import functools
 import traceback
+
+import interactions
 import numpy as np
 import pandas as pd
 import concurrent.futures
@@ -17,6 +19,10 @@ from typing import Callable
 from typing import Optional
 from typing import Coroutine
 from difflib import SequenceMatcher
+from interactions import CommandContext
+from interactions import File
+from interactions import Embed
+from interactions import Channel
 from discord.ext.commands import Bot
 from discord.ext.commands import Context
 
@@ -135,7 +141,7 @@ async def map_patching_routine(
         message: discord.Message,
         image: np.ndarray,
         loop: asyncio.AbstractEventLoop,
-        action_debug: bool) -> Tuple[Optional[str], discord.File, list]:
+        action_debug: bool) -> Tuple[Optional[str], Optional[Tuple[str, str, str]], list]:
 
     channel_name = message.channel.name
     channel_id = message.channel.id
@@ -145,8 +151,18 @@ async def map_patching_routine(
         turn = last_turn
     elif last_turn is None or int(last_turn) < int(turn):
         database_client.set_new_last_turn(channel_id, turn)
-    return await generate_patched_map_bis(database_client, channel_id, channel_name, message, turn, loop, None, action_debug)
-    # return await generate_patched_map(database_client, channel_id, channel_name, message, turn, loop)
+    return await generate_patched_map_bis(
+        database_client,
+        channel_id,
+        channel_name,
+        message.author.id,
+        message.author.name,
+        message.guild.id,
+        message.id,
+        turn,
+        loop,
+        None,
+        action_debug)
 
 
 async def manage_patching_errors(
@@ -168,16 +184,37 @@ async def manage_patching_errors(
                 await message.reply(MAP_PATCHING_ERROR_MESSAGES[cause], mention_author=False)
 
 
+async def manage_slash_patching_errors(
+        channel: Channel,
+        database_client: DatabaseClient,
+        patching_errors: list) -> None:
+
+    for cause, error_filename in patching_errors:
+        if error_filename is None:
+            await channel.send(MAP_PATCHING_ERROR_MESSAGES[cause])
+        else:
+            channel_id, message_id = database_client.get_resource_message(error_filename)
+            if channel_id is not None and message_id is not None:
+                message = await channel.get_message(message_id)
+                if message is None:
+                    await channel.send(MAP_PATCHING_ERROR_MESSAGES[cause])
+                else:
+                    await message.reply(MAP_PATCHING_ERROR_MESSAGES[cause])
+
+
 async def generate_patched_map_bis(
         database_client: DatabaseClient,
         channel_id: int,
         channel_name: str,
-        message: discord.Message,
+        author_id: int,
+        author_name: str,
+        guild_id: int,
+        interaction_id: int,
         turn: Optional[str],
         loop: asyncio.AbstractEventLoop,
         n_images: Optional[int] = 4,
-        action_debug: bool = False) -> Tuple[Optional[str], Optional[discord.File], list]:
-    patch_uuid = database_client.add_patching_process(channel_id, message.author.id)
+        action_debug: bool = False) -> Tuple[Optional[str], Optional[Tuple[str, str, str]], list]:
+    patch_uuid = database_client.add_patching_process(channel_id, author_id)
     map_size = database_client.get_game_map_size(channel_id)
 
     if map_size is None:
@@ -192,7 +229,7 @@ async def generate_patched_map_bis(
     if n_images is not None:
         n_images = max(n_images, 2)
         files = files[-n_images:]
-    
+
     if DEBUG or action_debug:
         print("files_log %s" % str(files))
     logger.debug("files_log %s" % str(files))
@@ -201,32 +238,20 @@ async def generate_patched_map_bis(
         database_client.add_patching_process_input(patch_uuid, filename_i, i)
 
     func = functools.partial(
-        patch_processed_images, None, files, map_size, message.guild.id, channel_id, channel_name,
-        message.id, message.author.id, message.author.name, action_debug)
+        patch_processed_images, files, map_size, guild_id, channel_id, channel_name,
+        interaction_id, author_id, author_name, action_debug)
 
     with concurrent.futures.ProcessPoolExecutor() as pool:
         output_file_path, filename, patching_errors = await loop.run_in_executor(pool, func)
-        print('custom process pool done', output_file_path, filename, patching_errors)
 
-    # output_file_path, filename, patching_errors = await loop.run_in_executor(None, func)
-
-    print("output path", output_file_path)
-    if output_file_path is not None:
-        database_client.update_patching_process_output_filename(patch_uuid, filename)
-        attachment = image_utils.load_attachment(output_file_path, filename)
-        if attachment is None:
-            patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_LOADED, None))
-    else:
-        patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_SAVED, None))
-        attachment = None
     if len(patching_errors) == 0:
-        status = "Done"
+        status = "DONE"
     else:
-        status = "With Errors - " + "; ".join(
+        status = "ERRORS - " + "; ".join(
             [str(str(error.name) + "(" + str(filename) + ")") for error, filename in patching_errors])
     print("status", status)
     database_client.update_patching_process_status(patch_uuid, status)
-    return turn, attachment, patching_errors
+    return turn, (output_file_path, patch_uuid, filename), patching_errors
 
 
 async def reaction_message_routine(
@@ -252,16 +277,23 @@ async def reaction_message_routine(
                 analyse_map(
                     image, database_client, message.channel.name, message.channel.id, filename, action_debug=False)
 
-                turn, patch, patching_errors = await map_patching_routine(
+                turn, output_tuple, patching_errors = await map_patching_routine(
                     database_client, message, image, bot_client.loop, False)
-                # func = functools.partial(await map_patching_routine, database_client, attachment, message, image)
-                # turn, patch, patching_errors = await bot_client.loop.run_in_executor(None, func)
+                
+                if output_tuple is not None:
+                    patch_path, patch_uuid, patch_filename = output_tuple
+                    database_client.update_patching_process_output_filename(patch_uuid, patch_filename)
+                    with open(patch_path, "rb") as fh:
+                        attachment = File(fp=fh, filename=patch_filename + ".png")
+                        if attachment is not None:
+                            await message.channel.send(file=attachment, content="Map patched for turn %s" % turn)
+                        elif len(patching_errors) == 0 and attachment is None:
+                            patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_LOADED, None))
+                            my_id = '<@338067113639936003>'  # Jean's id
+                            await message.reply(
+                                'There was an error. %s has been notified.' % my_id, mention_author=False)
+                        fh.close()
                 await manage_patching_errors(message.channel, message, database_client, patching_errors)
-                if patch is not None:
-                    await message.channel.send(file=patch, content="Map patched for turn %s" % turn)
-                elif len(patching_errors) == 0 and patch is None:
-                    my_id = '<@338067113639936003>'  # Jean's id
-                    await message.reply('There was an error. %s has been notified.' % my_id, mention_author=False)
 
 
 async def reaction_removed_routine(
@@ -294,8 +326,6 @@ async def reaction_added_routine(
         payload: discord.RawReactionActionEvent,
         bot_client: Bot,
         database_client: DatabaseClient) -> None:
-
-    print("emojy", payload.emoji)
 
     if payload.emoji == discord.PartialEmoji(name="📈"):
         channel: discord.TextChannel = bot_client.get_channel(payload.channel_id)
@@ -330,7 +360,7 @@ async def reaction_added_routine(
                 await clear_map_reaction(reset_message)
 
             elif message.content.startswith("Message not found: "):
-                reset_message_id = message.content[len("Message not found: "):]
+                reset_message_id = int(message.content[len("Message not found: "):])
                 reset_resource(database_client, message.channel, reset_message_id, ImageOp.MAP_INPUT)
             await message.delete()
 
@@ -398,16 +428,24 @@ async def process_map_patching(
                 filename = await prepare_attachment(database_client, channel, message, attachment, i, ImageOp.MAP_INPUT)
                 image = await image_utils.load_or_fetch_image(
                     database_client, channel.name, message, filename, ImageOp.INPUT)
-                turn, patch, patching_errors = await map_patching_routine(
-                    database_client, message, image, bot_client.loop, action_debug)
-                # func = functools.partial(map_patching_routine, database_client, attachment, message, image)
-                # turn, patch, patching_errors = await bot_client.loop.run_in_executor(None, func)
-                await manage_patching_errors(channel, message, database_client, patching_errors)
-                if patch is not None:
-                    await channel.send(file=patch, content="Map patched for turn %s" % turn)
-                elif len(patching_errors) == 0 and patch is None:
-                    myid = '<@338067113639936003>'  # Jean's id
-                    await message.reply('There was an error. %s has been notified.' % myid, mention_author=False)
+
+                turn, output_tuple, patching_errors = await map_patching_routine(
+                    database_client, message, image, bot_client.loop, False)
+
+                if output_tuple is not None:
+                    patch_path, patch_uuid, patch_filename = output_tuple
+                    database_client.update_patching_process_output_filename(patch_uuid, patch_filename)
+                    with open(patch_path, "rb") as fh:
+                        attachment = discord.File(fp=fh, filename=patch_filename + ".png")
+                        if attachment is not None:
+                            await message.channel.send(file=attachment, content="Map patched for turn %s" % turn)
+                        elif len(patching_errors) == 0 and attachment is None:
+                            patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_LOADED, None))
+                            my_id = '<@338067113639936003>'  # Jean's id
+                            await message.reply(
+                                'There was an error. %s has been notified.' % my_id, mention_author=False)
+                        fh.close()
+                await manage_patching_errors(message.channel, message, database_client, patching_errors)
     elif len(message.attachments) > 1:
         await message.reply("Only one image per message is currently supported.", mention_author=False)
 
@@ -442,6 +480,25 @@ async def get_message(bot_client: Bot, channel_id: int, message_id: int) -> Opti
         return None
 
 
+async def wrap_slash_errors(ctx: CommandContext, guild_id: int, fct: Callable[[], Coroutine]) -> None:
+    try:
+        is_test_server = str(guild_id) == "918195469245628446"
+        is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
+        if (is_dev_env and is_test_server) or (not is_test_server and not is_dev_env):
+            await asyncio.create_task(fct())
+    except discord.errors.Forbidden:
+        await ctx.send("Missing permission. <@338067113639936003> has been notified.")
+    except BaseException:
+        error = sys.exc_info()[0]
+        logger.error("##### ERROR #####")
+        logger.error(error)
+        logger.error(traceback.format_exc())
+        print("##### ERROR #####")
+        print(error)
+        traceback.print_exc()
+        await ctx.send('There was an error. <@338067113639936003> has been notified.')
+
+
 async def wrap_errors(ctx: Union[Context, discord.Message], guild_id: int, fct: Callable[[], Coroutine]) -> None:
     try:
         is_test_server = str(guild_id) == "918195469245628446"
@@ -463,31 +520,37 @@ async def wrap_errors(ctx: Union[Context, discord.Message], guild_id: int, fct: 
         await ctx.reply('There was an error. <@338067113639936003> has been notified.', mention_author=False)
 
 
-async def get_scores(database_client: DatabaseClient, ctx: Context) -> None:
-    scores: pd.DataFrame = database_client.get_channel_scores(ctx.channel.id)
+async def get_scores(database_client: DatabaseClient, ctx: CommandContext) -> None:
+    scores: pd.DataFrame = database_client.get_channel_scores(ctx.channel_id)
     if scores is not None and len(scores[scores['turn'] != -1]) > 0:
         scores = scores[scores['turn'] != -1]
-        score_plt = score_visualisation.plot_scores(scores, ctx.channel.name, str(ctx.message.id))
-        await ctx.message.channel.send(file=score_plt, content="score recognition")
+        channel = await ctx.get_channel()
+        filepath, filename = score_visualisation.plot_scores(
+            database_client, scores, channel.id, channel.name, ctx.author.id)
+        with open(filepath, "rb") as fh:
+            attachment = File(fp=fh, filename=filename + ".png")
+            image_utils.load_attachment(filepath, "Score visualisation")
+            await channel.send(files=attachment, content="score recognition")
+
         score_text = score_visualisation.print_scores(scores)
         # await ctx.send(score_text)
         embed = discord.Embed(title='Game scores', description=score_text)
-        await ctx.send(embed=embed)
+        await ctx.send(embeds=embed)
     else:
         await ctx.send("No score found")
 
 
-async def get_player_scores(database_client: DatabaseClient, ctx: Context, player: str) -> None:
+async def get_player_scores(database_client: DatabaseClient, ctx: CommandContext, player: str) -> None:
     scores = database_client.get_channel_scores(ctx.channel.id)
     if scores is not None and len(scores[scores['turn'] != -1]) > 0:
         if player is not None and player not in scores["polytopia_player_name"].unique():
             players = scores["polytopia_player_name"].unique()
-            players.pop(None)
+            # players.pop(None)
             await ctx.send("Player %s not recognised. Available players: %s" % (str(player), str(players)))
         else:
             score_text = score_visualisation.print_player_scores(scores, player)
-            embed = discord.Embed(title='%s scores' % str(player), description=score_text)
-            await ctx.send(embed=embed)
+            embed = Embed(title='%s scores' % str(player), description=score_text)
+            await ctx.send(embeds=embed)
     else:
         await ctx.send("No score found for player %s" % str(player))
 
@@ -510,7 +573,7 @@ async def add_delete_reaction(message: discord.Message) -> None:
 
 async def clear_channel_map_reactions(
         database_client: DatabaseClient,
-        channel: discord.TextChannel) -> None:
+        channel: Union[discord.TextChannel, interactions.Channel]) -> None:
     messages_ids = database_client.get_channel_resource_messages(channel.id, ImageOp.MAP_INPUT)
 
     for m_id in messages_ids:
@@ -521,6 +584,14 @@ async def clear_channel_map_reactions(
 
 async def clear_map_reaction(message: discord.Message) -> None:
     await message.clear_reaction("🖼️")
-    # for reaction in message.reactions:
-    #     if reaction.emoji == "🖼️":
-    #         await reaction.clear()
+
+
+async def renew_patching(dry_run=False):
+    database_client = DatabaseClient(
+        user="discordBot", password="password123", port="5432", database="polytopiaHelper_dev",
+        host="database")
+    incomplete_channel_list = database_client.get_incomplete_patching_run()
+
+    for incomplete_run in incomplete_channel_list:
+        print(incomplete_run)
+        # channel_details = database_client.get_channel_info(channel_id)

@@ -328,11 +328,7 @@ def get_orientation(vertices: np.ndarray) -> bool:
 def process_raw_map(
         image: np.ndarray,
         filename_i: str,
-        i: int,
         channel_name: str,
-        map_size: str,
-        database_client: DatabaseClient,
-        message: discord.Message = None,
         kernel_size: int = 5,
         sigma: int = 5) -> Tuple[MapPatchingErrors, Union[str, Tuple[np.ndarray, bool]]]:
     print("map_patching_utils", filename_i)
@@ -473,8 +469,7 @@ def patch_partial_maps(
 
     for i, image_i in enumerate(images):
         filename_i = files[i]
-        status, processed_raw_map = process_raw_map(
-            image_i, filename_i, i, channel_name, map_size, database_client, message)
+        status, processed_raw_map = process_raw_map(image_i, filename_i, channel_name)
 
         if status == MapPatchingErrors.SUCCESS and not isinstance(processed_raw_map, str):
             vertices_i, is_vertical_i = processed_raw_map

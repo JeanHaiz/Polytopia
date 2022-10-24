@@ -8,7 +8,7 @@ from typing import List
 from typing import Tuple
 from typing import Optional
 from sqlalchemy.pool import NullPool
-from sqlalchemy.engine import Result
+from sqlalchemy.engine import CursorResult
 from common.image_operation import ImageOp
 from map_patching.image_param import ImageParam
 
@@ -21,9 +21,9 @@ class DatabaseClient:
         self.engine = sqlalchemy.create_engine(self.database_url, echo=True, poolclass=NullPool)
 
     def dispose(self) -> None:
-        self.engine.dispose(False)
+        self.engine.dispose()
 
-    def execute(self, query: str) -> Result:
+    def execute(self, query: str) -> CursorResult:
         return self.engine.execute(query)
 
     def is_channel_active(self, channel_id: int) -> bool:
@@ -32,10 +32,10 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""").fetchone()
         return is_active is not None and len(is_active) > 0 and is_active[0]
 
-    def activate_channel(self, channel_id: int, channel_name: str, server_id: int, server_name: str) -> None:
+    def activate_channel(self, channel_id: int, channel_name: str, server_id: int, server_name: str) -> CursorResult:
         channel_name = re.sub(r"[^a-zA-Z0-9]", "", channel_name)[:40]
         server_name = re.sub(r"[^a-zA-Z0-9]", "", server_name)[:40]
-        self.execute(
+        return self.execute(
             f"""INSERT INTO discord_server
                 (server_discord_id, server_name)
                 VALUES ({server_id}, '{server_name}')
@@ -46,13 +46,15 @@ class DatabaseClient:
                 (server_discord_id, channel_discord_id, channel_name, is_active)
                 VALUES ({server_id}, {channel_id}, '{channel_name}', true)
                 ON CONFLICT (channel_discord_id) DO UPDATE
-                SET is_active = true;""")
+                SET is_active = true
+                RETURNING is_active;""")
 
-    def deactivate_channel(self, channel_id: int) -> None:
-        self.execute(
+    def deactivate_channel(self, channel_id: int) -> CursorResult:
+        return self.execute(
             f"""UPDATE discord_channel
                 SET is_active = false
-                WHERE channel_discord_id = {channel_id};""")
+                WHERE channel_discord_id = {channel_id}
+                RETURNING is_active;""")
 
     # TODO: add create_if_missing=True param
     def get_game_players(self, channel_id: int) -> list:
@@ -66,7 +68,7 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""").fetchall()
         return [dict(row) for row in result_proxy]
 
-    def add_score(self, channel_id: int, player_id: Optional[int], score: int, turn: int) -> Result:
+    def add_score(self, channel_id: int, player_id: Optional[int], score: int, turn: int) -> CursorResult:
         player_str_id = ("'" + str(player_id) + "'") if player_id is not None else 'NULL'
         return self.execute(
             f"""INSERT INTO game_player_scores
@@ -75,7 +77,7 @@ class DatabaseClient:
 
     def get_channel_scores(self, channel_id: int) -> pd.DataFrame:
         scores = self.execute(
-            f"""SELECT polytopia_player_name, turn, score
+            f"""SELECT score_uuid, polytopia_player_name, turn, score
                 FROM game_player_scores
                 LEFT JOIN polytopia_player
                 ON game_player_scores.game_player_uuid = polytopia_player.game_player_uuid
@@ -96,7 +98,8 @@ class DatabaseClient:
 
     def list_active_channels(self, server_id: int) -> list:
         return self.execute(
-            f"""SELECT channel_name FROM discord_channel
+            f"""SELECT channel_discord_id, channel_name
+                FROM discord_channel
                 WHERE server_discord_id = {server_id}
                 AND is_active = true;""").fetchall()
 
@@ -167,7 +170,7 @@ class DatabaseClient:
 
     def set_player_discord_name(
         self, discord_player_id: int, discord_player_name: str, polytopia_player_name: str
-    ) -> Result:
+    ) -> CursorResult:
         return self.execute(
             f"""INSERT INTO polytopia_player
                 (discord_player_id, discord_player_name, polytopia_player_name)
@@ -176,7 +179,7 @@ class DatabaseClient:
                 SET discord_player_name = '{str(discord_player_name)}',
                 polytopia_player_name = '{str(polytopia_player_name)}';""")
 
-    def set_player_game_name(self, game_player_uuid: str, polytopia_player_name: str) -> Result:
+    def set_player_game_name(self, game_player_uuid: str, polytopia_player_name: str) -> CursorResult:
         return self.execute(
             f"""UPDATE polytopia_player
                 SET polytopia_player_name = '{polytopia_player_name}'
@@ -188,7 +191,7 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""").fetchone()
         return latest_turn[0] if latest_turn is not None and len(latest_turn) > 0 else None
 
-    def set_new_last_turn(self, channel_id: int, turn: int) -> Result:
+    def set_new_last_turn(self, channel_id: int, turn: int) -> CursorResult:
         return self.execute(
             f"""UPDATE polytopia_game
                 SET latest_turn = {turn}
@@ -200,11 +203,12 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""").fetchone()
         return map_size[0] if map_size is not None and len(map_size) > 0 else None
 
-    def set_game_map_size(self, channel_id: int, size: int) -> Result:
+    def set_game_map_size(self, channel_id: int, size: int) -> CursorResult:
         return self.execute(
             f"""UPDATE polytopia_game
                 SET map_size = {size}
-                WHERE channel_discord_id = {channel_id};""")
+                WHERE channel_discord_id = {channel_id}
+                RETURNING channel_discord_id;""")
 
     def add_player_n_game(self, channel_id: int, guild_id: int, author_id: int, author_name: str) -> Optional[str]:
         game_player_uuid = self.execute(
@@ -245,7 +249,7 @@ class DatabaseClient:
         else:
             return None
 
-    def drop_score(self, channel_id: int, turn: str) -> Result:
+    def drop_score(self, channel_id: int, turn: str) -> CursorResult:
         return self.execute(
             f"""DELETE FROM game_player_scores
                 WHERE channel_discord_id = {channel_id}
@@ -259,23 +263,26 @@ class DatabaseClient:
                 AND operation = {operation.value};""").fetchall()
         return [dict(row) for row in resources]
 
-    def add_player_to_game(self, game_player_uuid: str, channel_id: int) -> Result:
+    def add_player_to_game(self, game_player_uuid: str, channel_id: int) -> CursorResult:
         return self.execute(
             f"""INSERT INTO game_players
                 (game_player_uuid, channel_discord_id, is_alive)
                 VALUES ('{game_player_uuid}', {channel_id}, true)
                 ON CONFLICT (game_player_uuid, channel_discord_id) DO NOTHING""")
 
-    def set_player_score(self, game_player_uuid: str, turn: int, score: int) -> Result:
+    def set_player_score(self, game_player_uuid: str, turn: int, score: int) -> CursorResult:
         return self.execute(
             f"""UPDATE game_player_scores
-                SET game_player_uuid = '{game_player_uuid}'
+                SET score = {score}, game_player_uuid = '{game_player_uuid}'
                 WHERE score_uuid = (
                     SELECT score_uuid
                     FROM game_player_scores
                     WHERE turn = {turn}
-                    AND score = {score}
-                    LIMIT 1);""")
+                    AND (
+                        game_player_uuid = '{game_player_uuid}'
+                        OR score = {score})
+                    LIMIT 1)
+                RETURNING score;""")
 
     def get_resource_message(self, filename: str) -> Optional[Tuple]:
         resources = self.execute(
@@ -298,7 +305,7 @@ class DatabaseClient:
         else:
             return None
 
-    def add_patching_process_input(self, patch_uuid: str, input_filename: str, order: int) -> Result:
+    def add_patching_process_input(self, patch_uuid: str, input_filename: str, order: int) -> CursorResult:
         return self.execute(
             f"""INSERT INTO map_patching_process_input
                 (patch_uuid, input_filename, input_order)
@@ -410,6 +417,57 @@ class DatabaseClient:
             return ImageParam("processed_background_template_%s" % map_size, rows[0]["cloud_scale"], rows[0]["corners"])
         else:
             return None
+
+    def get_patching_runs_for_status(self, status: str):
+        result = self.execute(
+            f"""SELECT DISTINCT channel_discord_id
+                FROM map_patching_process
+                WHERE status='{status}';""")
+        return [row[0] for row in result]
+
+    def get_incomplete_patching_run(self):
+        result = self.execute(
+            """select *
+                from (
+                    select channel_discord_id, max(started_on) max_started_on_started
+                    from map_patching_process
+                    where status='STARTED'
+                    group by channel_discord_id) a
+                inner join (
+                    select channel_discord_id, max(started_on) max_started_on_done
+                    from map_patching_process
+                    where status='Done'
+                    group by channel_discord_id) b
+                on a.channel_discord_id = b.channel_discord_id
+                where a.max_started_on_started > b.max_started_on_done;"""
+        )
+        return [dict(row) for row in result]
+
+    def get_channel_info(self, channel_id):
+        return dict(self.execute(
+            f"""select * from discord_channel
+                where channel_discord_id = '{channel_id}';""").fetchone())
+
+    def add_visualisation(self, channel_id, author_id):
+        visualisation_uuid = self.execute(
+            f"""INSERT INTO score_visualisation
+                (channel_discord_id, visualisation_author_discord_id, status)
+                VALUES ('{channel_id}', {author_id}, 'STARTED')
+                RETURNING visualisation_uuid::text;""").fetchone()
+        if visualisation_uuid is not None and len(visualisation_uuid) > 0:
+            return visualisation_uuid[0]
+        else:
+            return None
+
+    def add_visualisation_scores(self, visualisation_id, scores):
+        values = ", ".join(
+            f"""('{str(visualisation_id)}', '{str(score_i["score_uuid"])}')"""
+            for index, score_i in scores.iterrows())
+        return self.execute(
+            f"""INSERT INTO score_visualisation_input
+                (visualisation_uuid, score_uuid)
+                VALUES {values}
+                RETURNING visualisation_uuid;""").fetchone()
 
     @staticmethod
     def __format_tuple_list(s: List) -> str:

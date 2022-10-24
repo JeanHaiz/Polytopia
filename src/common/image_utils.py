@@ -3,7 +3,7 @@ import re
 import cv2
 import sys
 import time
-import discord
+import interactions
 import pathlib
 
 import numpy as np
@@ -78,22 +78,23 @@ def load_attachment(file_path: str, filename: str) -> File:
     print("loading attachment: %s" % file_path)
 
     with open(file_path, "rb") as fh:
-        attachment = discord.File(fh, filename=filename + ".png")
+        attachment = interactions.File(fp=fh, filename=filename + ".png")
         fh.close()
 
     return attachment
 
 
-def save_image(image: np.ndarray, channel_name: str, filename: str, operation: ImageOp) -> str:
+def save_image(image: np.ndarray, channel_name: str, filename: str, operation: ImageOp) -> Optional[str]:
     parent_path = __get_parent_path(channel_name, operation)
     os.makedirs(parent_path, exist_ok=True)
     file_path = __get_file_path(channel_name, operation, filename)
     logger.debug("writing image: %s" % file_path)
     if operation == ImageOp.MAP_PATCHING_OUTPUT:
-        cv2.imwrite(file_path, image, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+        is_written = cv2.imwrite(file_path, image, [cv2.IMWRITE_PNG_COMPRESSION, 9])
     else:
-        cv2.imwrite(file_path, image)
-    return file_path
+        is_written = cv2.imwrite(file_path, image)
+    
+    return file_path if is_written else None
 
 
 def move_input_image(channel_name: str, filename: str, target_operation: ImageOp) -> Optional[str]:

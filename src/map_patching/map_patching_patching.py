@@ -17,7 +17,6 @@ from map_patching.map_patching_errors import MapPatchingErrors
 
 
 def patch_processed_images(
-        database_client: Optional[DatabaseClient],
         image_filenames: List[str],
         map_size: str,
         guild_id: int,
@@ -28,11 +27,10 @@ def patch_processed_images(
         author_name: str,
         action_debug: bool) -> Tuple[str, str, list]:
 
-    if database_client is None:
-        database_client = DatabaseClient(
-            user="discordBot", password="password123", port="5432", database="polytopiaHelper_dev",
-            host="database")
-        database_client.dispose()
+    database_client = DatabaseClient(
+        user="discordBot", password="password123", port="5432", database="polytopiaHelper_dev",
+        host="database")
+    database_client.dispose()
 
     patching_errors = []
 
@@ -86,10 +84,17 @@ def patch_processed_images(
     output = crop_output(patched_image, background_params.get_position(), background_params.get_size())
     print("after crop", output.shape)
 
-    filename = database_client.add_resource(
+    output_filename = database_client.add_resource(
         guild_id, channel_id, message_id, author_id, author_name, ImageOp.MAP_PATCHING_OUTPUT)
-    output_path = image_utils.save_image(output, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)
-    return output_path, filename, patching_errors
+    if output_filename is None:
+        output_path = None
+        patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_SAVED, ""))
+    else:
+        output_path = image_utils.save_image(output, channel_name, output_filename, ImageOp.MAP_PATCHING_OUTPUT)
+        if output_path is None:
+            patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_SAVED, ""))
+            
+    return output_path, output_filename, patching_errors
 
 
 def crop_output(
