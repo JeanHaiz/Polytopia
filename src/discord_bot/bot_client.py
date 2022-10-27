@@ -137,7 +137,7 @@ async def slash_activate(ctx: CommandContext, size: int) -> None:
         else:
             myid = '<@338067113639936003>'  # Jean's id
             await ctx.send('There was an error. %s has been notified.' % myid)
-    await bot_utils.wrap_slash_errors(ctx, ctx.guild_id, inner)
+    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
 
 
 @slash_bot_client.command(
@@ -153,7 +153,7 @@ async def slash_deactivate(ctx: CommandContext) -> None:
         else:
             myid = '<@338067113639936003>'  # Jean's id
             await ctx.send('There was an error. %s has been notified.' % myid)
-    await bot_utils.wrap_slash_errors(ctx, ctx.guild_id, inner)
+    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
 
 
 @slash_bot_client.command(
@@ -182,7 +182,7 @@ async def slash_get_channel_player_scores(ctx: CommandContext, player: str = Non
             await bot_utils.get_scores(database_client, ctx)
         else:
             await bot_utils.get_player_scores(database_client, ctx, player)
-    await bot_utils.wrap_slash_errors(ctx, ctx.guild_id, inner)
+    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
 
 
 @slash_bot_client.command(
@@ -228,7 +228,7 @@ async def slash_patch_map(ctx: CommandContext, number_of_images: int = None) -> 
                     await channel.send('There was an error. %s has been notified.' % my_id)
                 fh.close()
         await bot_utils.manage_slash_patching_errors(channel, database_client, patching_errors)
-    await bot_utils.wrap_slash_errors(ctx, ctx.guild_id, inner)
+    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
 
 
 @slash_bot_client.command(
@@ -277,7 +277,7 @@ async def slash_set_player_score(ctx: CommandContext, player_name: str, turn: in
         else:
             myid = '<@338067113639936003>'  # Jean's id
             await ctx.send('There was an error. %s has been notified.' % myid)
-    await bot_utils.wrap_slash_errors(ctx, ctx.guild_id, inner)
+    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
 
 
 @slash_bot_client.command(
@@ -289,7 +289,7 @@ async def slash_clear_map_reactions(ctx: CommandContext) -> None:
         channel = await ctx.get_channel()
         await bot_utils.clear_channel_map_reactions(database_client, channel)
         await ctx.send("Done.")
-    await bot_utils.wrap_slash_errors(ctx, ctx.guild_id, inner)
+    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
 
 
 @slash_bot_client.command(
@@ -309,7 +309,7 @@ async def slash_list_active_channels(ctx: CommandContext) -> None:
             await ctx.send(message)
         else:
             await ctx.send("The command is reserved for admins.")
-    await bot_utils.wrap_slash_errors(ctx, ctx.guild_id, inner)
+    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
 
 
 @bot_client.command(

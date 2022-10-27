@@ -480,7 +480,11 @@ async def get_message(bot_client: Bot, channel_id: int, message_id: int) -> Opti
         return None
 
 
-async def wrap_slash_errors(ctx: CommandContext, guild_id: int, fct: Callable[[], Coroutine]) -> None:
+async def wrap_slash_errors(
+        ctx: CommandContext,
+        bot_client: Bot,
+        guild_id: int,
+        fct: Callable[[], Coroutine]) -> None:
     try:
         is_test_server = str(guild_id) == "918195469245628446"
         is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
@@ -488,7 +492,7 @@ async def wrap_slash_errors(ctx: CommandContext, guild_id: int, fct: Callable[[]
             await asyncio.create_task(fct())
     except discord.errors.Forbidden:
         await ctx.send("Missing permission. <@338067113639936003> has been notified.")
-    except BaseException:
+    except BaseException as baseException:
         error = sys.exc_info()[0]
         logger.error("##### ERROR #####")
         logger.error(error)
@@ -496,6 +500,14 @@ async def wrap_slash_errors(ctx: CommandContext, guild_id: int, fct: Callable[[]
         print("##### ERROR #####")
         print(error)
         traceback.print_exc()
+        error_channel = bot_client.get_channel(1035274340125659230)
+        channel = await ctx.get_channel()
+        guild = await ctx.get_guild()
+        await error_channel.send(
+            f"""Error in channel {channel.name}, {guild.name}:\n
+                {traceback.format_exc()}\n\n
+                {error}\n\n
+                {baseException}""")
         await ctx.send('There was an error. <@338067113639936003> has been notified.')
 
 
