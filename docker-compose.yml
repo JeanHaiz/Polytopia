@@ -8,7 +8,10 @@ services:
         container_name: database
         command: postgres -c stats_temp_directory=/tmp
         restart: "always"
-        mem_limit: 500M
+        deploy:
+            resources:
+                limits:
+                    memory: 200m
         ports:
             - 5432:5432
         environment:
@@ -27,13 +30,11 @@ services:
             test: [ "CMD-SHELL", "pg_isready", "-d", "polytopiaHelper_dev"]
             interval: 30s
             timeout: 60s
-            retries: 5
-            start_period: 80s
+            retries: 10
 
     helper:
         depends_on:
-            database:
-                condition: service_healthy
+            - database
             # kibana:
             #     condition: service_healthy
         build:
@@ -41,7 +42,6 @@ services:
             dockerfile: Dockerfile
         restart: "unless-stopped"
         container_name: helper
-        mem_limit: 2g
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/src:/app
             - certs:/usr/share/elasticsearch/config/certs
@@ -51,7 +51,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 4000M
+                    memory: 2g
         networks:
             - polytopia
 
@@ -122,8 +122,7 @@ services:
 
     elasticsearch:
         depends_on:
-            es_setup:
-                condition: service_healthy
+            - es_setup
         image: docker.elastic.co/elasticsearch/elasticsearch:${ELK_VERSION:-8.4.0}
         container_name: elasticsearch
         platform: ${PLATFORM:-linux/amd64}
@@ -147,7 +146,10 @@ services:
             - xpack.security.transport.ssl.certificate_authorities=certs/ca/ca.crt
             - xpack.security.transport.ssl.verification_mode=certificate
             - xpack.license.self_generated.type=${ELK_LICENSE}
-        mem_limit: ${ELK_MEM_LIMIT}
+        deploy:
+            resources:
+                limits:
+                    memory: 1g
         ulimits:
             memlock:
                 soft: -1
@@ -174,8 +176,7 @@ services:
 
     kibana:
         depends_on:
-            elasticsearch:
-                condition: service_healthy
+            - elasticsearch
         container_name: kibana
         image: docker.elastic.co/kibana/kibana:${ELK_VERSION:-8.4.0}
         platform: ${PLATFORM:-linux/amd64}
@@ -199,7 +200,10 @@ services:
         volumes:
             - certs:/usr/share/kibana/config/certs
             - kibanadata:/usr/share/kibana/data
-        mem_limit: ${ELK_MEM_LIMIT}
+        deploy:
+            resources:
+                limits:
+                    memory: 1g
         networks:
             - polytopia
         healthcheck:
@@ -214,8 +218,7 @@ services:
 
     filebeat:
         depends_on:
-            kibana:
-                condition: service_healthy
+            - kibana
         container_name: filebeat
         user: "root"
         image: docker.elastic.co/beats/filebeat:${ELK_VERSION:-8.4.0}
