@@ -30,6 +30,8 @@ def patch_processed_images(
         author_id: int,
         author_name: str,
         action_debug: bool) -> Tuple[str, str, list]:
+    
+    gc.set_threshold(30, 10, 10)
 
     database_client = DatabaseClient(
         user="discordBot", password="password123", port="5432", database="polytopiaHelper_dev",
@@ -39,8 +41,6 @@ def patch_processed_images(
     patching_errors = []
 
     images_n_check = check_processed_images(image_filenames, channel_name)
-    
-    gc.collect()
     
     image_params = load_image_params(database_client, image_filenames)
 
@@ -78,15 +78,17 @@ def patch_processed_images(
     background_image = load_processed_background(map_size)
 
     if background_image is None or background_params is None:
-        print("ANALYSING BACKGROUND")
+        if DEBUG:
+            print("ANALYSING BACKGROUND")
         _, background_params = map_patching_analysis.analyse_background(database_client, map_size, action_debug)
         background_image = load_processed_background(map_size)
     
+    print("collector 4", gc.get_count())
     patched_image = patch_processed_image_files(background_image, background_params, channel_name, processed_params)
-
-    print("output before crop", patched_image.shape, background_params.get_position(), background_params.get_size())
-    output = crop_output(patched_image, background_params.get_position(), background_params.get_size())
-    print("after crop", output.shape)
+    print("collector 6", gc.get_count())
+    
+    if DEBUG:
+        print("output before crop", patched_image.shape, background_params.get_position(), background_params.get_size())
 
     output_filename = database_client.add_resource(
         guild_id, channel_id, message_id, author_id, author_name, ImageOp.MAP_PATCHING_OUTPUT)
@@ -94,10 +96,15 @@ def patch_processed_images(
         output_path = None
         patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_SAVED, ""))
     else:
+        output = crop_output(patched_image, background_params.get_position(), background_params.get_size())
+    
+        if DEBUG:
+            print("after crop", output.shape)
+
         output_path = image_utils.save_image(output, channel_name, output_filename, ImageOp.MAP_PATCHING_OUTPUT)
         if output_path is None:
             patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_SAVED, ""))
-            
+
     return output_path, output_filename, patching_errors
 
 
@@ -113,17 +120,6 @@ def crop_output(
 
 def load_processed_background(map_size: str) -> np.ndarray:
     return image_utils.get_processed_background_template(map_size)
-
-
-def load_processed_images(
-        image_filenames: List[str],
-        channel_name: str) -> List[Tuple[str, np.ndarray]]:
-
-    return [(filename, image_utils.load_image(
-        channel_name,
-        filename,
-        image_utils.ImageOp.MAP_PROCESSED_IMAGE
-    ) is not None) for filename in image_filenames]
 
 
 def check_processed_images(
@@ -183,6 +179,8 @@ def patch_processed_image_files(
                 patch_work=background_image,
                 scaled_padding=padding_i,
                 reshaped_cropped_image_i=cropped_image_i)
+            print("collector 5", gc.get_count())
+            del image_i, cropped_image_i,
             gc.collect()
 
         return background_image

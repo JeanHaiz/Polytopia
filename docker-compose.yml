@@ -8,7 +8,7 @@ services:
         container_name: database
         command: postgres -c stats_temp_directory=/tmp
         restart: "always"
-        mem_limit: 1g
+        mem_limit: 500M
         ports:
             - 5432:5432
         environment:
@@ -41,7 +41,7 @@ services:
             dockerfile: Dockerfile
         restart: "unless-stopped"
         container_name: helper
-        mem_limit: 1g
+        mem_limit: 2g
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/src:/app
             - certs:/usr/share/elasticsearch/config/certs

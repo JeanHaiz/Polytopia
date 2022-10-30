@@ -20,20 +20,6 @@ from map_patching.map_patching_errors import MapPatchingErrors
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
 
-""" def getLines(image, minLineLength=500, channel: discord.TextChannel = None, filename: str = None):
-    processed = image.copy()
-    edges = image_processing_utils.get_one_color_edges(image, channel=channel)
-    lines = cv2.HoughLinesP(image=edges, rho=0.1, theta=np.pi / 180, threshold=150, lines=np.array([]),
-                            minLineLength=minLineLength, maxLineGap=100)
-
-    for i in range(lines.shape[0]):
-        cv2.line(processed, (lines[i][0][0], lines[i][0][1]), (lines[i][0][2], lines[i][0][3]), (0, 0, 255), 3,
-                 cv2.LINE_AA)
-        if DEBUG and filename is not None and channel is not None:
-            image_utils.save_image(image, channel.name, filename, ImageOp.HOUGH_LINES)
-    return processed """
-
-
 def select_contours(image: np.ndarray) -> Optional[np.ndarray]:
     contours, hierarchy = cv2.findContours(image, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
 
@@ -121,7 +107,7 @@ def get_transformation_dimensions(
         vertices: np.ndarray,
         is_vertical: bool,
         reference_position: Tuple[np.int64, np.int64],
-        reference_size: Tuple[np.int64, np.int64]) -> Tuple[Tuple[int, int], float, np.ndarray]:
+        reference_size: Tuple[np.int64, np.int64]) -> Tuple[Tuple[int, int], float, List[List[int]]]:
 
     d_h = vertices[1][1] - vertices[0][1]
     d_w = vertices[3][0] - vertices[2][0]
@@ -398,7 +384,7 @@ def transform_image(
         reference_size: Tuple[np.int64, np.int64],
         channel_name: str,
         filename_i: str,
-        map_size: str) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int], float, np.ndarray]:
+        map_size: str) -> Tuple[np.ndarray, np.ndarray, Tuple[int, int], float, List[List[int]]]:
     transformation_dimensions = get_transformation_dimensions(
         vertices_i, is_vertical, reference_position, reference_size)
     padding, scale_factor, padded_and_scaled = transformation_dimensions
@@ -407,7 +393,7 @@ def transform_image(
     cropped_image, padding = crop_padding_(scaled_image, padding, filename_i, channel_name)
 
     scale = int((reference_size[1] + 100) / math.sqrt(int(map_size)))
-    opacity = remove_clouds(cropped_image, ksize=7, sigma=15, template_height=scale)
+    opacity = remove_clouds(cropped_image, k_size=7, sigma=15, template_height=scale)
 
     flipped_padding = padding[1], padding[0]
 
@@ -449,100 +435,6 @@ def crop_output(
         (position[0] - size[0] - 20).clip(0): (position[0] + size[0] + 20).clip(0, image.shape[0])]
 
 
-def patch_partial_maps(
-        channel_name: str,
-        images: list,
-        files: list,
-        map_size: str,
-        patch_uuid: str,
-        database_client: DatabaseClient = None,
-        message: discord.Message = None) -> Tuple[str, str, list]:
-
-    patching_errors = []
-    vertices: List[Optional[np.ndarray]] = []
-    vertical: List[Optional[bool]] = []
-    bits = []
-    transparency_masks = []
-    scaled_paddings = []
-    sizes: List[Tuple[int, int]] = []
-    scaled_vertices = []
-
-    for i, image_i in enumerate(images):
-        filename_i = files[i]
-        status, processed_raw_map = process_raw_map(image_i, filename_i, channel_name)
-
-        if status == MapPatchingErrors.SUCCESS and not isinstance(processed_raw_map, str):
-            vertices_i, is_vertical_i = processed_raw_map
-            vertices.append(vertices_i)
-            vertical.append(is_vertical_i)
-        else:
-            if database_client is not None:
-                database_client.update_patching_process_input_status(patch_uuid, filename_i, status.name)
-            patching_errors.append((status, processed_raw_map))
-            vertices.append(None)
-            vertical.append(None)
-
-    reference_position, reference_size = get_references(vertices)
-
-    for i in range(len(images)):
-        filename_i = files[i]
-        image_i = images[i]
-        loaded_vertices_i = vertices[i]
-        loaded_is_vertical_i = vertical[i]
-        if loaded_vertices_i is not None and loaded_is_vertical_i is not None:
-            transformation = transform_image(
-                image_i, loaded_vertices_i, loaded_is_vertical_i, reference_position, reference_size, channel_name,
-                filename_i, map_size)
-            scaled_image, opacity, padding, scale_factor, padded_and_scaled = transformation
-
-            transparency_masks.append(opacity)
-            bits.append(scaled_image)
-            scaled_paddings.append(padding)
-            scaled_vertices.append(padded_and_scaled)
-            sizes.append(scaled_image.shape[0:2])  # type: ignore
-
-    output_size = np.max(np.array(scaled_paddings) + np.array(sizes), axis=0)
-
-    patch_work = np.zeros([output_size[0], output_size[1], 3], np.uint8)
-
-    for i in range(len(bits)):
-        bit = bits[i]
-        scaled_padding = scaled_paddings[i]
-        size = sizes[i]
-        opacity = transparency_masks[i]
-        patch_work = patch_output(patch_work, scaled_padding, opacity, size, bit, i)
-
-    cropped_patch_work = crop_output(patch_work, reference_position, reference_size)
-
-    if DEBUG:
-        debug_patch_partial_maps(scaled_vertices, patch_work, channel_name)
-
-    if message is not None and database_client is not None:
-        filename = database_client.add_resource(
-            message.guild.id, message.channel.id, message.id, message.author.id, message.author.name,
-            ImageOp.MAP_PATCHING_OUTPUT)
-    else:
-        filename = 'map_patching_debug'
-    file_path = image_utils.save_image(cropped_patch_work, channel_name, filename, ImageOp.MAP_PATCHING_OUTPUT)
-    return file_path, filename, patching_errors
-
-
-def debug_patch_partial_maps(
-        scaled_vertices: List[np.ndarray],
-        patch_work: np.ndarray,
-        channel_name: str) -> str:
-    print(scaled_vertices)
-    vertex_lines = np.zeros_like(patch_work)
-    for j, vertices in enumerate(scaled_vertices):
-        print_vertices = [vertices[0], vertices[3], vertices[1], vertices[2], vertices[0]]
-        for i in range(len(print_vertices) - 1):
-            cv2.line(vertex_lines, print_vertices[i], print_vertices[i + 1], (255, 255, 255), 2)
-            cv2.putText(vertex_lines, "%s, %s" % (j, i), print_vertices[i], cv2.FONT_HERSHEY_COMPLEX, 6,
-                        (255, 255, 255), 3, cv2.LINE_AA)
-
-    return image_utils.save_image(vertex_lines, channel_name, 'map_patching_debut', ImageOp.DEBUG_VERTICES)
-
-
 def is_map_patching_request(
         message: discord.Message,
         attachment: discord.Attachment,
@@ -552,7 +444,7 @@ def is_map_patching_request(
 
 def remove_clouds(
         img: np.ndarray,
-        ksize: int = 31,
+        k_size: int = 31,
         sigma: int = 25,
         template_height: int = 1) -> np.ndarray:
     print("img shape", img.shape)
@@ -578,7 +470,7 @@ def remove_clouds(
     right_template = scaled_template[:, int(template_height / 2):, :]
 
     for i, template in enumerate([scaled_template, left_template, right_template]):  # , ]:
-        img_alpha = match_cloud(result, template, img_alpha, ksize, sigma, 50 + img_border_width, i)
+        img_alpha = match_cloud(result, template, img_alpha, k_size, sigma, 50 + img_border_width, i)
 
     img_alpha_c = img_alpha.clip(0, 1).astype(np.uint8)
     mask = cv2.merge([img_alpha_c, img_alpha_c, img_alpha_c]).astype(np.uint8)
@@ -590,23 +482,21 @@ def match_cloud(
         result: np.ndarray,
         template: np.ndarray,
         img_alpha: np.ndarray,
-        ksize: int,
+        k_size: int,
         sigma: int,
         border_width: int,
         i: int) -> np.ndarray:
     hh, ww = template.shape[:2]
 
-    # extract pawn base image and alpha channel and make alpha 3 channels
     pawn = template[:, :, 0:3]
     alpha_template = template[:, :, 3]
     alpha = cv2.merge([alpha_template, alpha_template, alpha_template])
 
-    # do masked template matching and save correlation image
     corr_img = cv2.matchTemplate(result, pawn, cv2.TM_CCOEFF_NORMED, mask=alpha)
     correlation_raw = (255 * corr_img).clip(0, 255).astype(np.uint8)
     corr_shape = corr_img.shape
 
-    blur = cv2.GaussianBlur(correlation_raw, (ksize, ksize), sigmaX=sigma)
+    blur = cv2.GaussianBlur(correlation_raw, (k_size, k_size), sigmaX=sigma)
 
     threshold = {
         0: 80,
