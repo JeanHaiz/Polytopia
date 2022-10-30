@@ -153,7 +153,7 @@ class DatabaseClient:
                 AND operation = {operation.value};""").fetchone()
         return filename[0] if filename is not None and len(filename) > 0 else None
 
-    def get_map_patching_files(self, channel_id: int) -> list:
+    def get_map_patching_files(self, channel_id: int) -> List[str]:
         filenames = self.execute(
             f"""SELECT DISTINCT ON (source_message_id) source_message_id,
                 filename::text, author_id

@@ -22,7 +22,8 @@ VERSION = "0.1.3"
 nest_asyncio.apply()
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
 
-token = os.getenv("DISCORD_TOKEN")
+DEBUG = os.getenv("POLYTOPIA_DEBUG")
+token = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
 print("token", token)
 slash_bot_client = interactions.Client(
     token=token,
@@ -403,7 +404,7 @@ async def set_turn(ctx: Context, turn: int) -> None:
 @bot_client.command(
     name="size",
     description="deprecated command"
-)  # exists as slash command
+)
 async def set_map_size(ctx: Context, size: str = None) -> None:
     async def inner() -> None:
         game_player_uuid = database_client.add_player_n_game(
@@ -456,7 +457,7 @@ async def drop_score(ctx: Context, turn: str) -> None:
 @bot_client.command(
     name="patch",
     description="command deprecated — use the patch slash command"
-)  # exists as slash command
+)
 async def patch_map(ctx: Context, n_images: int = None, action_debug: bool = False) -> None:
     async def inner() -> None:
         await bot_utils.add_received_reaction(ctx.message)
@@ -494,7 +495,7 @@ async def patch_map(ctx: Context, n_images: int = None, action_debug: bool = Fal
 @bot_client.command(
     name="hello",
     description="Health check, please report to @jeanh if no response within 10 seconds"
-)  # exists as slash command
+)
 async def say_hello(ctx: Context) -> None:
     async def inner():
         await ctx.send("Welcome to my botifull world!")
@@ -536,7 +537,7 @@ async def get_map_trace(ctx: Context) -> None:
 @bot_client.command(
     name="clear_maps",
     description="Clear the stack of maps to patch"
-)  # exists as slash
+)
 async def clear_map_reactions(ctx: Context) -> None:
     async def inner() -> None:
         await bot_utils.clear_channel_map_reactions(database_client, ctx.channel)
@@ -547,7 +548,7 @@ async def clear_map_reactions(ctx: Context) -> None:
 @bot_client.command(
     name="setscore",
     description="Set score for a specific player and turn"
-)  # exists as slash
+)
 async def set_player_score(ctx: Context, player_name: str, turn: int, score: int) -> None:
     async def inner() -> None:
         players = database_client.get_game_players(ctx.channel.id)

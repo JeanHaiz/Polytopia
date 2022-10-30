@@ -1,3 +1,5 @@
+import gc
+import os
 import cv2
 
 import numpy as np
@@ -14,6 +16,8 @@ from database_interaction.database_client import DatabaseClient
 
 from map_patching import map_patching_analysis
 from map_patching.map_patching_errors import MapPatchingErrors
+
+DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
 
 def patch_processed_images(
@@ -34,29 +38,24 @@ def patch_processed_images(
 
     patching_errors = []
 
-    background_image = load_processed_background(map_size)
-    background_params = load_background_params(database_client, map_size)
-
-    if background_image is None or background_params is None:
-        print("ANALYSING BACKGROUND")
-        _, background_params = map_patching_analysis.analyse_background(database_client, map_size, action_debug)
-        background_image = load_processed_background(map_size)
-
-    images_n_filenames = load_processed_images(image_filenames, channel_name)
+    images_n_check = check_processed_images(image_filenames, channel_name)
+    
+    gc.collect()
+    
     image_params = load_image_params(database_client, image_filenames)
 
-    print("images_n_filenames:", [x[0] for x in images_n_filenames])
-    print("image params:", image_params)
+    if DEBUG:
+        print("images_n_filenames:", images_n_check)
+        print("image params:", image_params)
 
-    processed_images = []
     processed_params = []
 
-    for filename, image_entry in images_n_filenames:
+    for filename, image_check in images_n_check:
 
         current_params = [ip for ip in image_params if ip.filename == filename]
 
-        if image_entry is None or len(current_params) == 0:
-            print("ANALYSING IMAGE:", filename, image_entry is None, current_params)
+        if not image_check or len(current_params) == 0:
+            print("ANALYSING IMAGE:", filename, current_params)
             raw_image = image_utils.load_image(channel_name, filename, ImageOp.MAP_INPUT)
             if raw_image is None:
                 print("Image not found %s" % filename)
@@ -70,15 +69,20 @@ def patch_processed_images(
                 patching_errors.append((MapPatchingErrors.MAP_NOT_RECOGNIZED, filename))
                 print("Could not analyse image %s:" % filename, analysed_map_image is None, image_entry_params is None)
                 continue
-            processed_images.append(analysed_map_image)
             processed_params.append(image_entry_params)
         else:
-            processed_images.append(image_entry)
             processed_params.append(current_params[0])
+        gc.collect()
 
-    # if len(images) != len(image_filenames) or image_params != len(image_filenames) or len(missing_filenames) != 0:
+    background_params = load_background_params(database_client, map_size)
+    background_image = load_processed_background(map_size)
 
-    patched_image = patch_processed_image_files(background_image, processed_images, background_params, processed_params)
+    if background_image is None or background_params is None:
+        print("ANALYSING BACKGROUND")
+        _, background_params = map_patching_analysis.analyse_background(database_client, map_size, action_debug)
+        background_image = load_processed_background(map_size)
+    
+    patched_image = patch_processed_image_files(background_image, background_params, channel_name, processed_params)
 
     print("output before crop", patched_image.shape, background_params.get_position(), background_params.get_size())
     output = crop_output(patched_image, background_params.get_position(), background_params.get_size())
@@ -119,37 +123,51 @@ def load_processed_images(
         channel_name,
         filename,
         image_utils.ImageOp.MAP_PROCESSED_IMAGE
-    )) for filename in image_filenames]
+    ) is not None) for filename in image_filenames]
+
+
+def check_processed_images(
+        image_filenames: List[str],
+        channel_name: str) -> List[Tuple[str, bool]]:
+
+    return [(filename, image_utils.load_image(
+        channel_name,
+        filename,
+        image_utils.ImageOp.MAP_PROCESSED_IMAGE
+    ) is not None) for filename in image_filenames]
 
 
 def patch_processed_image_files(
         background_image: np.ndarray,
-        images: List[np.ndarray],
         background_params: ImageParam,
+        channel_name: str,
         image_params: List[ImageParam]) -> np.ndarray:
 
     background_height = get_height(background_params.corners)
     background_width = get_width(background_params.corners)
 
-    print("background shape (y, x)", background_height, background_width)
-
-    output = background_image
+    if DEBUG:
+        print("background shape (y, x)", background_height, background_width)
 
     if background_height is None or background_width is None:
-        print("background invalid: " + str(background_params.corners))
-        return output
+        if DEBUG:
+            print("background invalid: " + str(background_params.corners))
+        return background_image
     else:
-        for image_i, image_param_i in zip(images, image_params):
+        for image_param_i in image_params:
+            image_i = image_utils.load_image(
+                channel_name, image_param_i.filename, image_utils.ImageOp.MAP_PROCESSED_IMAGE)
+
             if len(image_param_i.corners) == 0:
                 print("no corner found for image", image_param_i)
                 continue
 
             corner_orientations = [CornerOrientation(c[2]) for c in image_param_i.corners]
 
-            scaled_image_i = image_i
             corner_orientations.sort(key=lambda x: x.value)
             selected_corner_orientation_i = corner_orientations[0]
-            print("Selected Corner", CornerOrientation(selected_corner_orientation_i))
+            if DEBUG:
+                print("Selected Corner", CornerOrientation(selected_corner_orientation_i))
 
             selected_corner_i = get_corner(image_param_i.corners, selected_corner_orientation_i) or (0, 0)
             background_selected_corner = get_corner(background_params.corners, selected_corner_orientation_i) \
@@ -159,14 +177,15 @@ def patch_processed_image_files(
                 background_selected_corner[0] - selected_corner_i[0],
                 background_selected_corner[1] - selected_corner_i[1])
 
-            cropped_image_i, padding_i = crop_padding(scaled_image_i, padding_i)
+            cropped_image_i, padding_i = crop_padding(image_i, padding_i)
 
-            output = patch_image(
-                patch_work=output,
+            background_image = patch_image(
+                patch_work=background_image,
                 scaled_padding=padding_i,
-                cropped_image_i=cropped_image_i)
+                reshaped_cropped_image_i=cropped_image_i)
+            gc.collect()
 
-    return output
+        return background_image
 
 
 def load_background_params(database_client: DatabaseClient, map_size: str) -> ImageParam:
@@ -235,86 +254,87 @@ def crop_padding_(
 def patch_image(
         patch_work: np.ndarray,
         scaled_padding: Tuple[int, int],
-        cropped_image_i: np.ndarray) -> np.ndarray:
+        reshaped_cropped_image_i: np.ndarray) -> np.ndarray:
 
-    print("patch work", patch_work.shape)
+    if DEBUG:
+        print("patch work", patch_work.shape)
+        print("cropped_image_i shape", reshaped_cropped_image_i.shape)
 
-    print("cropped_image_i shape", cropped_image_i.shape)
-    # reshaped_cropped_image_i = np.reshape(cropped_image_i,
-    #   (cropped_image_i.shape[1], cropped_image_i.shape[0], cropped_image_i.shape[2]))
-    # print("reshaped cropped_image_i shape", reshaped_cropped_image_i.shape)
-    reshaped_cropped_image_i = cropped_image_i
-    oppacity: np.ndarray = reshaped_cropped_image_i[:, :, 3]
+    opacity: np.ndarray = reshaped_cropped_image_i[:, :, 3]
     size: Tuple[int, int] = reshaped_cropped_image_i.shape[0:2]
     bit: np.ndarray = reshaped_cropped_image_i[:, :, 0:3]
 
-    # print(len(oppacity))
-    print("oppacity", oppacity.shape)
-    print("bit", bit.shape)
-    print("padding", scaled_padding)
-
-    print("patch types", type(patch_work), type(oppacity), type(bit))
-    print(patch_work.shape, scaled_padding, oppacity.shape, size, bit.shape)
-
-    print("shape for background", patch_work.shape)
-    print(scaled_padding[0], scaled_padding[0] + size[1], size[1])
-    print(scaled_padding[1], scaled_padding[1] + size[0], size[0])
+    if DEBUG:
+        # print(len(opacity))
+        print("opacity", opacity.shape)
+        print("bit", bit.shape)
+        print("padding", scaled_padding)
+    
+        print("patch types", type(patch_work), type(opacity), type(bit))
+        print(patch_work.shape, scaled_padding, opacity.shape, size, bit.shape)
+    
+        print("shape for background", patch_work.shape)
+        print(scaled_padding[0], scaled_padding[0] + size[1], size[1])
+        print(scaled_padding[1], scaled_padding[1] + size[0], size[0])
 
     background = patch_work[
         scaled_padding[1]:scaled_padding[1] + size[0],
         scaled_padding[0]:scaled_padding[0] + size[1],
         :]
 
-    cv2.imwrite("./patch-work-piece.png", background)
-    print("background shape", background.shape)
+    if DEBUG:
+        cv2.imwrite("./patch-work-piece.png", background)
+        print("background shape", background.shape)
+    
+        print("shape for cropped bit", bit.shape)
+        print(
+            min(
+                bit.shape[0],
+                scaled_padding[0] + size[0],
+                background.shape[1]
+            ), bit.shape[0], scaled_padding[0] + size[0], background.shape[1])
+        print(
+            min(
+                bit.shape[1],
+                scaled_padding[1] + size[1],
+                background.shape[0]
+            ), bit.shape[1], scaled_padding[1] + size[1], background.shape[0])
 
-    print("shape for cropped bit", bit.shape)
-    print(
-        min(
-            bit.shape[0],
-            scaled_padding[0] + size[0],
-            background.shape[1]
-        ), bit.shape[0], scaled_padding[0] + size[0], background.shape[1])
-    print(
-        min(
-            bit.shape[1],
-            scaled_padding[1] + size[1],
-            background.shape[0]
-        ), bit.shape[1], scaled_padding[1] + size[1], background.shape[0])
     cropped_bit = bit[
         :min(bit.shape[0], scaled_padding[0] + size[0], background.shape[0]),
         :min(bit.shape[1], scaled_padding[1] + size[1], background.shape[1]),
         :]
-    cv2.imwrite("./cropped_bit.png", cropped_bit)
-    print("cropped bit shape", cropped_bit.shape)
+    
+    if DEBUG:
+        cv2.imwrite("./cropped_bit.png", cropped_bit)
+        print("cropped bit shape", cropped_bit.shape)
+    
+        print("shape for cropped opacity", opacity.shape)
+        print(
+            min(
+                opacity.shape[0],
+                scaled_padding[0] + size[0],
+                background.shape[1]
+            ), opacity.shape[0], scaled_padding[0] + size[0], background.shape[1])
+        print(
+            min(
+                opacity.shape[1],
+                scaled_padding[1] + size[1],
+                background.shape[0]
+            ), opacity.shape[1], scaled_padding[1] + size[1], background.shape[0])
 
-    print("shape for cropped oppacity", oppacity.shape)
-    print(
-        min(
-            oppacity.shape[0],
-            scaled_padding[0] + size[0],
-            background.shape[1]
-        ), oppacity.shape[0], scaled_padding[0] + size[0], background.shape[1])
-    print(
-        min(
-            oppacity.shape[1],
-            scaled_padding[1] + size[1],
-            background.shape[0]
-        ), oppacity.shape[1], scaled_padding[1] + size[1], background.shape[0])
-    cropped_oppacity = (oppacity[
-        :min(oppacity.shape[0], scaled_padding[0] + size[0], background.shape[0]),
-        :min(oppacity.shape[1], scaled_padding[1] + size[1], background.shape[1])] / 255).astype('uint8')
+    cropped_opacity = (opacity[
+        :min(opacity.shape[0], scaled_padding[0] + size[0], background.shape[0]),
+        :min(opacity.shape[1], scaled_padding[1] + size[1], background.shape[1])] / 255).astype('uint8')
 
-    print("cropped oppacity shape", cropped_oppacity.shape)
-    cv2.imwrite("./cropped-oppacity.png", cropped_oppacity)
+    if DEBUG:
+        print("cropped opacity shape", cropped_opacity.shape)
+        cv2.imwrite("./cropped-opacity.png", cropped_opacity)
+    
+        print("should match", background.shape, cv2.merge((cropped_opacity, cropped_opacity, cropped_opacity)).shape)
 
-    print("should match", background.shape, cv2.merge((cropped_oppacity, cropped_oppacity, cropped_oppacity)).shape)
-
-    # background = np.reshape(background, (background.shape[1], background.shape[0], background.shape[2]))
-    # print("do match", background.shape, cv2.merge((cropped_oppacity, cropped_oppacity, cropped_oppacity)).shape)
-    # print("cropped max", np.max(cv2.merge((cropped_oppacity, cropped_oppacity, cropped_oppacity))))
-    opaque_bit = cv2.multiply(background, 1 - cv2.merge((cropped_oppacity, cropped_oppacity, cropped_oppacity)))
-    transparent_bit = cv2.multiply(cropped_bit, cv2.merge((cropped_oppacity, cropped_oppacity, cropped_oppacity)))
+    opaque_bit = cv2.multiply(background, 1 - cv2.merge((cropped_opacity, cropped_opacity, cropped_opacity)))
+    transparent_bit = cv2.multiply(cropped_bit, cv2.merge((cropped_opacity, cropped_opacity, cropped_opacity)))
 
     result = opaque_bit + transparent_bit
 

@@ -407,17 +407,17 @@ def transform_image(
     cropped_image, padding = crop_padding_(scaled_image, padding, filename_i, channel_name)
 
     scale = int((reference_size[1] + 100) / math.sqrt(int(map_size)))
-    oppacity = remove_clouds(cropped_image, ksize=7, sigma=15, template_height=scale)
+    opacity = remove_clouds(cropped_image, ksize=7, sigma=15, template_height=scale)
 
     flipped_padding = padding[1], padding[0]
 
-    return cropped_image, oppacity, flipped_padding, scale_factor, padded_and_scaled
+    return cropped_image, opacity, flipped_padding, scale_factor, padded_and_scaled
 
 
 def patch_output(
         patch_work: np.ndarray,
         scaled_padding: Tuple[int, int],
-        oppacity: np.ndarray,
+        opacity: np.ndarray,
         size: Tuple[int, int],
         bit: np.ndarray,
         i: int) -> np.ndarray:
@@ -425,14 +425,14 @@ def patch_output(
         scaled_padding[0]:scaled_padding[0] + size[0],
         scaled_padding[1]:scaled_padding[1] + size[1], :]
     if DEBUG:
-        print(background.shape, oppacity.shape)
+        print(background.shape, opacity.shape)
         print("scaled_padding", scaled_padding)
         print("size", size)
         print("bit size", bit.shape)
     if i == 0:  # background
         result = bit
     else:
-        result = cv2.multiply(background, 1 - oppacity) + cv2.multiply(bit, oppacity)
+        result = cv2.multiply(background, 1 - opacity) + cv2.multiply(bit, opacity)
     patch_work[
         scaled_padding[0]: scaled_padding[0] + size[0],
         scaled_padding[1]: scaled_padding[1] + size[1], :] = result
@@ -493,9 +493,9 @@ def patch_partial_maps(
             transformation = transform_image(
                 image_i, loaded_vertices_i, loaded_is_vertical_i, reference_position, reference_size, channel_name,
                 filename_i, map_size)
-            scaled_image, oppacity, padding, scale_factor, padded_and_scaled = transformation
+            scaled_image, opacity, padding, scale_factor, padded_and_scaled = transformation
 
-            transparency_masks.append(oppacity)
+            transparency_masks.append(opacity)
             bits.append(scaled_image)
             scaled_paddings.append(padding)
             scaled_vertices.append(padded_and_scaled)
@@ -509,8 +509,8 @@ def patch_partial_maps(
         bit = bits[i]
         scaled_padding = scaled_paddings[i]
         size = sizes[i]
-        oppacity = transparency_masks[i]
-        patch_work = patch_output(patch_work, scaled_padding, oppacity, size, bit, i)
+        opacity = transparency_masks[i]
+        patch_work = patch_output(patch_work, scaled_padding, opacity, size, bit, i)
 
     cropped_patch_work = crop_output(patch_work, reference_position, reference_size)
 

@@ -4,8 +4,8 @@ import asyncio
 from discord_bot.bot_client import bot_client, slash_bot_client
 from common.logger_utils import logger
 
-token = os.getenv("DISCORD_TOKEN")
-debug = os.getenv("POLYTOPIA_DEBUG")
+DEBUG = os.getenv("POLYTOPIA_DEBUG")
+token = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
 
 logger.debug("token: %s" % token)
 
