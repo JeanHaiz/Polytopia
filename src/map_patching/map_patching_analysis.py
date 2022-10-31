@@ -464,7 +464,6 @@ def get_inter_point_space(centers: List[np.ndarray]) -> int:
     max_index = np.argmax(num)
     min_bin = bins[max_index]
     max_bin = bins[max_index + 1]
-
     return int(np.median([v for v in values if min_bin <= v <= max_bin]))
 
 

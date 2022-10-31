@@ -17,7 +17,7 @@ from common import image_utils
 from common.logger_utils import logger
 from common.image_operation import ImageOp
 
-VERSION = "0.1.6"
+VERSION = "0.1.7"
 
 nest_asyncio.apply()
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
@@ -287,9 +287,10 @@ async def slash_set_player_score(ctx: CommandContext, player_name: str, turn: in
 )
 async def slash_clear_map_reactions(ctx: CommandContext) -> None:
     async def inner() -> None:
-        channel = bot_client.get_channel(ctx.channel_id)
-        await bot_utils.clear_channel_map_reactions(database_client, channel)
-        await ctx.send("Done.")
+        message = await ctx.send("Processing")
+        slash_channel = await ctx.get_channel()
+        channel = bot_client.get_channel(int(slash_channel.id))
+        await bot_utils.clear_channel_map_reactions(database_client, channel, lambda: message.edit("Done"))
     await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
 
 
@@ -540,8 +541,8 @@ async def get_map_trace(ctx: Context) -> None:
 )
 async def clear_map_reactions(ctx: Context) -> None:
     async def inner() -> None:
-        await bot_utils.clear_channel_map_reactions(database_client, ctx.channel)
-        await bot_utils.add_success_reaction(ctx.message)
+        await bot_utils.clear_channel_map_reactions(database_client, ctx.channel, lambda: bot_utils.add_success_reaction(ctx.message))
+        
     await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 

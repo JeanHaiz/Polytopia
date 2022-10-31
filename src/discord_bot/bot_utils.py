@@ -6,11 +6,11 @@ import datetime
 import functools
 import traceback
 
-import interactions
 import numpy as np
 import pandas as pd
 import concurrent.futures
 
+from typing import Any
 from typing import List
 from typing import Dict
 from typing import Union
@@ -589,13 +589,15 @@ async def add_delete_reaction(message: discord.Message) -> None:
 
 async def clear_channel_map_reactions(
         database_client: DatabaseClient,
-        channel: discord.TextChannel) -> None:
+        channel: discord.TextChannel,
+        fct: Callable[[], Coroutine[Any, Any, Any]]) -> None:
     messages_ids = database_client.get_channel_resource_messages(channel.id, ImageOp.MAP_INPUT)
 
     for m_id in messages_ids:
         message: discord.Message = await channel.fetch_message(m_id['source_message_id'])
         await clear_map_reaction(message)
         database_client.set_resource_operation(m_id['source_message_id'], ImageOp.INPUT, 0)
+    await fct()
 
 
 async def clear_map_reaction(message: discord.Message) -> None:
