@@ -17,7 +17,7 @@ from common import image_utils
 from common.logger_utils import logger
 from common.image_operation import ImageOp
 
-VERSION = "0.1.5"
+VERSION = "0.1.6"
 
 nest_asyncio.apply()
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
@@ -76,7 +76,7 @@ async def on_message(message: discord.Message) -> None:
                     if message.reactions is not None and len(message.reactions) > 0:
                         await bot_utils.reaction_message_routine(bot_client, database_client, message, filename)
         await bot_client.process_commands(message)
-    await bot_utils.wrap_errors(message, message.guild.id, inner)
+    await bot_utils.wrap_errors(message, bot_client, message.guild.id, inner)
 
 
 @bot_client.event
@@ -91,7 +91,7 @@ async def on_raw_reaction_add(payload: discord.RawReactionActionEvent) -> None:
 
     message = await bot_utils.get_message(bot_client, payload.channel_id, payload.message_id)
     if message is not None:
-        await bot_utils.wrap_errors(message, message.channel.guild.id, inner)
+        await bot_utils.wrap_errors(message, bot_client, message.channel.guild.id, inner)
 
 
 @bot_client.event
@@ -103,7 +103,7 @@ async def on_raw_reaction_remove(payload: discord.RawReactionActionEvent) -> Non
 
     message = await bot_utils.get_message(bot_client, payload.channel_id, payload.message_id)
     if message is not None:
-        await bot_utils.wrap_errors(message, message.channel.guild.id, inner)
+        await bot_utils.wrap_errors(message, bot_client, message.channel.guild.id, inner)
 
 
 @slash_bot_client.command(
@@ -287,7 +287,7 @@ async def slash_set_player_score(ctx: CommandContext, player_name: str, turn: in
 )
 async def slash_clear_map_reactions(ctx: CommandContext) -> None:
     async def inner() -> None:
-        channel = await ctx.get_channel()
+        channel = bot_client.get_channel(ctx.channel_id)
         await bot_utils.clear_channel_map_reactions(database_client, channel)
         await ctx.send("Done.")
     await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
@@ -320,7 +320,7 @@ async def slash_list_active_channels(ctx: CommandContext) -> None:
 async def activate(ctx: Context) -> None:
     async def inner() -> None:
         await ctx.send("command deprecated — use the activate slash command")
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -330,7 +330,7 @@ async def activate(ctx: Context) -> None:
 async def deactivate(ctx: Context) -> None:
     async def inner() -> None:
         await ctx.send("command deprecated — use the activate slash command")
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -350,7 +350,7 @@ async def list_active_channels(ctx: Context) -> None:
             await ctx.send(message)
         else:
             await ctx.send("The command is reserved for admins.")
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -362,7 +362,7 @@ async def set_player_discord_name(ctx: Context, discord_id: int, discord_name: s
         logger.debug("set player name")
         database_client.set_player_discord_name(discord_id, discord_name, polytopia_name)
         await ctx.send("Hi %s!" % discord_name)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -374,7 +374,7 @@ async def add_game_opponent(ctx: Context, discord_name: str, polytopia_name: str
         logger.debug("set player name")
         database_client.set_player_discord_name(None, discord_name, polytopia_name)
         await ctx.send("Hi %s!" % discord_name)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -386,7 +386,7 @@ async def set_self_discord_name(ctx: Context, polytopia_name: str) -> None:
         logger.debug("set self player name")
         database_client.set_player_discord_name(ctx.author.id, ctx.author.name, polytopia_name)
         await ctx.send("Hi %s!" % ctx.author.name)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -398,7 +398,7 @@ async def set_turn(ctx: Context, turn: int) -> None:
         database_client.add_player_n_game(ctx.channel.id, ctx.guild.id, ctx.author.id, ctx.author.name)
         database_client.set_new_last_turn(ctx.channel.id, turn)
         await ctx.send("current turn is now %s" % str(turn))
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -428,7 +428,7 @@ async def set_map_size(ctx: Context, size: str = None) -> None:
             await bot_utils.add_error_reaction(ctx.message)
             myid = '<@338067113639936003>'  # Jean's id
             await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -451,7 +451,7 @@ async def drop_score(ctx: Context, turn: str) -> None:
         elif row_count == 0:
             await bot_utils.add_error_reaction(ctx.message)
             await ctx.reply("No score entry updated. \nTo to signal an error, react with ⁉️", mention_author=False)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -489,7 +489,7 @@ async def patch_map(ctx: Context, n_images: int = None, action_debug: bool = Fal
                         'There was an error. %s has been notified.' % my_id, mention_author=False)
                 fh.close()
         await bot_utils.manage_patching_errors(ctx.channel, ctx.message, database_client, patching_errors)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -499,7 +499,7 @@ async def patch_map(ctx: Context, n_images: int = None, action_debug: bool = Fal
 async def say_hello(ctx: Context) -> None:
     async def inner():
         await ctx.send("Welcome to my botifull world!")
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -511,7 +511,7 @@ async def get_channel_players(ctx: Context) -> None:
         game_players = database_client.get_game_players(ctx.channel.id)
         player_frame = pd.DataFrame(game_players)
         await ctx.send(player_frame.to_string())
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -531,7 +531,7 @@ async def get_map_trace(ctx: Context) -> None:
             await bot_utils.add_delete_reaction(sent_message)
         if len(messages) == 0:
             await ctx.send("Trace empty")
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -542,7 +542,7 @@ async def clear_map_reactions(ctx: Context) -> None:
     async def inner() -> None:
         await bot_utils.clear_channel_map_reactions(database_client, ctx.channel)
         await bot_utils.add_success_reaction(ctx.message)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
@@ -571,4 +571,4 @@ async def set_player_score(ctx: Context, player_name: str, turn: int, score: int
         else:
             myid = '<@338067113639936003>'  # Jean's id
             await ctx.reply('There was an error. %s has been notified.' % myid, mention_author=False)
-    await bot_utils.wrap_errors(ctx, ctx.guild.id, inner)
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)

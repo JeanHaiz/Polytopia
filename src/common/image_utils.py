@@ -95,7 +95,7 @@ def save_image(image: np.ndarray, channel_name: str, filename: str, operation: I
         file_size = os.path.getsize(file_path)
         if file_size > MAX_FILE_SIZE:
             compression_factor = min(file_size / MAX_FILE_SIZE, 0.95) - 0.05  # target: 8Mb - 5%
-            compressed_image = cv2.resize(image, (image.shape[0] * compression_factor))
+            compressed_image = cv2.resize(image, (int(image.shape[0] * compression_factor), int(image.shape[1] * compression_factor)))
             save_image(compressed_image, channel_name, filename, operation)
     else:
         is_written = cv2.imwrite(file_path, image)

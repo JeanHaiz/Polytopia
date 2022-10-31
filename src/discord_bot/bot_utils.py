@@ -500,18 +500,18 @@ async def wrap_slash_errors(
         print("##### ERROR #####")
         print(error)
         traceback.print_exc()
-        error_channel = bot_client.get_channel(1035274340125659230)
+        error_channel = bot_client.get_channel(1035274340125659230)  # Polytopia Helper Testing server, Error channel
         channel = await ctx.get_channel()
         guild = await ctx.get_guild()
-        await error_channel.send(
-            f"""Error in channel {channel.name}, {guild.name}:\n
-                {traceback.format_exc()}\n\n
-                {error}\n\n
-                {baseException}""")
+        await error_channel.send(f"""Error in channel {channel.name}, {guild.name}:\n{traceback.format_exc()}\n""")
         await ctx.send('There was an error. <@338067113639936003> has been notified.')
 
 
-async def wrap_errors(ctx: Union[Context, discord.Message], guild_id: int, fct: Callable[[], Coroutine]) -> None:
+async def wrap_errors(
+        ctx: Union[Context, discord.Message],
+        bot_client: Bot,
+        guild_id: int,
+        fct: Callable[[], Coroutine]) -> None:
     try:
         is_test_server = str(guild_id) == "918195469245628446"
         is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
@@ -529,6 +529,10 @@ async def wrap_errors(ctx: Union[Context, discord.Message], guild_id: int, fct: 
         print("##### ERROR #####")
         print(error)
         traceback.print_exc()
+        error_channel = bot_client.get_channel(1035274340125659230)  # Polytopia Helper Testing server, Error channel
+        channel = bot_client.get_channel(ctx.channel.id)
+        guild = await ctx.get_guild()
+        await error_channel.send(f"""Error in channel {channel.name}, {guild.name}:\n{traceback.format_exc()}\n""")
         await ctx.reply('There was an error. <@338067113639936003> has been notified.', mention_author=False)
 
 
@@ -585,7 +589,7 @@ async def add_delete_reaction(message: discord.Message) -> None:
 
 async def clear_channel_map_reactions(
         database_client: DatabaseClient,
-        channel: Union[discord.TextChannel, interactions.Channel]) -> None:
+        channel: discord.TextChannel) -> None:
     messages_ids = database_client.get_channel_resource_messages(channel.id, ImageOp.MAP_INPUT)
 
     for m_id in messages_ids:
