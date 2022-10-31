@@ -13,7 +13,7 @@ services:
                 limits:
                     memory: 200m
         ports:
-            - 5432:5432
+            - "5432:5432"
         environment:
             POSTGRES_USER: discordBot
             POSTGRES_PASSWORD: password123
@@ -63,7 +63,7 @@ services:
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/jupyter_noteboooks:/home/jovyan/work
         ports:
-            - 8888:8888
+            - "8888:8888"
         networks:
             - polytopia
 
@@ -158,8 +158,8 @@ services:
             - elasticsearch:/usr/share/elasticsearch/data
             - certs:/usr/share/elasticsearch/config/certs
         ports:
-            - 9200:9200
-            - 9300:9300
+            - "9200:9200"
+            - "9300:9300"
         networks:
             - polytopia
         healthcheck:

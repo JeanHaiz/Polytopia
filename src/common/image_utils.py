@@ -19,7 +19,7 @@ from common.image_operation import ImageOp
 from database_interaction.database_client import DatabaseClient
 
 REPO_ROOT = pathlib.Path(__file__).parent.parent.absolute()
-
+MAX_FILE_SIZE = 8000000
 
 async def load_or_fetch_image(
         database_client: DatabaseClient,
@@ -88,9 +88,15 @@ def save_image(image: np.ndarray, channel_name: str, filename: str, operation: I
     parent_path = __get_parent_path(channel_name, operation)
     os.makedirs(parent_path, exist_ok=True)
     file_path = __get_file_path(channel_name, operation, filename)
-    logger.debug("writing image: %s" % file_path)
+    logger.debug("writing image %s: %s" % (file_path, str(image.shape)))
+    
     if operation == ImageOp.MAP_PATCHING_OUTPUT:
         is_written = cv2.imwrite(file_path, image, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+        file_size = os.path.getsize(file_path)
+        if file_size > MAX_FILE_SIZE:
+            compression_factor = min(file_size / MAX_FILE_SIZE, 0.95) - 0.05  # target: 8Mb - 5%
+            compressed_image = cv2.resize(image, (image.shape[0] * compression_factor))
+            save_image(compressed_image, channel_name, filename, operation)
     else:
         is_written = cv2.imwrite(file_path, image)
     
