@@ -17,7 +17,7 @@ from common import image_utils
 from common.logger_utils import logger
 from common.image_operation import ImageOp
 
-VERSION = "0.1.8"
+VERSION = "0.1.10"
 
 nest_asyncio.apply()
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
@@ -203,7 +203,7 @@ async def slash_patch_map(ctx: CommandContext, number_of_images: int = None) -> 
     async def inner() -> None:
         action_debug = ctx.author.id == 338067113639936003
         channel = await ctx.get_channel()
-        await ctx.send("processing")
+        answer_message = await ctx.send("processing")
         turn = database_client.get_last_turn(ctx.channel_id)
         turn, output_tuple, patching_errors = await bot_utils.generate_patched_map_bis(
             database_client,
@@ -227,9 +227,9 @@ async def slash_patch_map(ctx: CommandContext, number_of_images: int = None) -> 
                 elif len(patching_errors) == 0 and attachment is None:
                     patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_LOADED, None))
                     my_id = '<@338067113639936003>'  # Jean's id
-                    await channel.send('There was an error. %s has been notified.' % my_id)
+                    await answer_message.edit('There was an error. %s has been notified.' % my_id)
                 fh.close()
-        await bot_utils.manage_slash_patching_errors(channel, database_client, patching_errors)
+        await bot_utils.manage_slash_patching_errors(channel, answer_message, database_client, patching_errors)
     await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
 
 

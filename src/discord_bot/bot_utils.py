@@ -23,6 +23,7 @@ from interactions import CommandContext
 from interactions import File
 from interactions import Embed
 from interactions import Channel
+from interactions import Message
 from discord.ext.commands import Bot
 from discord.ext.commands import Context
 
@@ -186,20 +187,25 @@ async def manage_patching_errors(
 
 async def manage_slash_patching_errors(
         channel: Channel,
+        answer_message: Message,
         database_client: DatabaseClient,
         patching_errors: list) -> None:
 
+    error_text = []
     for cause, error_filename in patching_errors:
         if error_filename is None:
-            await channel.send(MAP_PATCHING_ERROR_MESSAGES[cause])
+            error_text.append(MAP_PATCHING_ERROR_MESSAGES[cause])
         else:
             channel_id, message_id = database_client.get_resource_message(error_filename)
             if channel_id is not None and message_id is not None:
                 message = await channel.get_message(message_id)
                 if message is None:
-                    await channel.send(MAP_PATCHING_ERROR_MESSAGES[cause])
+                    error_text.append(MAP_PATCHING_ERROR_MESSAGES[cause])
                 else:
                     await message.reply(MAP_PATCHING_ERROR_MESSAGES[cause])
+    my_id = '<@338067113639936003>'  # Jean's id
+    error_text.append('%s has been notified.' % my_id)
+    await answer_message.edit("\n".join(error_text))
 
 
 async def generate_patched_map_bis(
