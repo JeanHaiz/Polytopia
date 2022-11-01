@@ -17,7 +17,7 @@ from common import image_utils
 from common.logger_utils import logger
 from common.image_operation import ImageOp
 
-VERSION = "0.1.7"
+VERSION = "0.1.8"
 
 nest_asyncio.apply()
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
@@ -27,7 +27,8 @@ token = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
 print("token", token)
 slash_bot_client = interactions.Client(
     token=token,
-    intents=interactions.Intents.DEFAULT | interactions.Intents.GUILD_MESSAGE_CONTENT
+    intents=interactions.Intents.DEFAULT | interactions.Intents.GUILD_MESSAGE_CONTENT,
+    prefix=":"
 )
 
 intents = discord.Intents.default()
@@ -459,7 +460,7 @@ async def drop_score(ctx: Context, turn: str) -> None:
     name="patch",
     description="command deprecated — use the patch slash command"
 )
-async def patch_map(ctx: Context, n_images: int = None, action_debug: bool = False) -> None:
+async def patch(ctx: Context, n_images: int = None, action_debug: bool = False) -> None:
     async def inner() -> None:
         await bot_utils.add_received_reaction(ctx.message)
         turn = database_client.get_last_turn(ctx.channel.id)

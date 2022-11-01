@@ -114,6 +114,9 @@ class DatabaseClient:
         self, guild_id: int, channel_id: int, message_id: int, author_id: int, author_name: str,
             operation: ImageOp, resource_number: int = 0) -> Optional[str]:
         self.add_player_n_game(channel_id, guild_id, author_id, author_name)
+        existing = self.get_resource(message_id, resource_number)
+        if existing is not None:
+            return str(existing["filename"])
         filename = self.execute(
             f"""INSERT INTO message_resources
                 (source_channel_id, source_message_id, resource_number, author_id, operation)
@@ -162,7 +165,7 @@ class DatabaseClient:
                 AND operation = {ImageOp.MAP_INPUT.value};""").fetchall()
         return [dict(row)["filename"] for row in filenames]
 
-    def get_resource_number(self, filename: str) -> str:
+    def get_resource_number(self, filename: str) -> int:
         result = self.execute(
             f"""SELECT resource_number FROM message_resources
                 WHERE filename::text = '{filename}';""").fetchone()

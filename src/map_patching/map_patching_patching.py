@@ -31,7 +31,7 @@ def patch_processed_images(
         author_name: str,
         action_debug: bool) -> Tuple[str, str, list]:
     
-    gc.set_threshold(30, 10, 10)
+    gc.set_threshold(50, 10, 10)
 
     database_client = DatabaseClient(
         user="discordBot", password="password123", port="5432", database="polytopiaHelper_dev",

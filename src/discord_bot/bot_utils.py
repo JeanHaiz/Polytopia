@@ -492,7 +492,7 @@ async def wrap_slash_errors(
             await asyncio.create_task(fct())
     except discord.errors.Forbidden:
         await ctx.send("Missing permission. <@338067113639936003> has been notified.")
-    except BaseException as baseException:
+    except:
         error = sys.exc_info()[0]
         logger.error("##### ERROR #####")
         logger.error(error)
@@ -521,7 +521,7 @@ async def wrap_errors(
             await asyncio.create_task(fct())
     except discord.errors.Forbidden:
         await ctx.reply("Missing permission. <@338067113639936003> has been notified.", mention_author=False)
-    except BaseException:
+    except:
         error = sys.exc_info()[0]
         logger.error("##### ERROR #####")
         logger.error(error)

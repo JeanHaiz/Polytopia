@@ -21,6 +21,7 @@ from database_interaction.database_client import DatabaseClient
 REPO_ROOT = pathlib.Path(__file__).parent.parent.absolute()
 MAX_FILE_SIZE = 8000000
 
+
 async def load_or_fetch_image(
         database_client: DatabaseClient,
         channel_name: str,
@@ -65,12 +66,12 @@ async def save_attachment(
     file_path = __get_file_path(channel_name, operation, filename)
     try:
         await attachment.save(file_path)
-    except BaseException:
+    except BaseException as be:
         if allow_retry:
             time.sleep(3)
             await save_attachment(attachment, channel_name, operation, filename, False)
         else:
-            logger.error(sys.exc_info()[0])
+            raise be
 
 
 def load_attachment(file_path: str, filename: str) -> File:
@@ -95,7 +96,8 @@ def save_image(image: np.ndarray, channel_name: str, filename: str, operation: I
         file_size = os.path.getsize(file_path)
         if file_size > MAX_FILE_SIZE:
             compression_factor = min(file_size / MAX_FILE_SIZE, 0.95) - 0.05  # target: 8Mb - 5%
-            compressed_image = cv2.resize(image, (int(image.shape[0] * compression_factor), int(image.shape[1] * compression_factor)))
+            compressed_image = cv2.resize(
+                image, (int(image.shape[0] * compression_factor), int(image.shape[1] * compression_factor)))
             save_image(compressed_image, channel_name, filename, operation)
     else:
         is_written = cv2.imwrite(file_path, image)
