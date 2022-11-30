@@ -1,3 +1,10 @@
+/*
+ * psql --dbname=polytopiaHelper_dev -U discordBot --echo-all -f docker-entrypoint-initdb.d/DB_0.2_migration.sql
+ */
+/*
+ * psql --dbname=polytopiaHelper_dev -U discordBot --echo-all -c "drop table game_player_scores; drop table game_players;"
+ */
+
 drop table game_player_scores;
 drop table game_players;
 

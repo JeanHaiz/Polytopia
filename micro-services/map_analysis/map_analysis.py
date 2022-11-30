@@ -15,20 +15,67 @@ from common import image_processing_utils
 from common.image_operation import ImageOp
 from common.image_param import ImageParam
 from common.corner_orientation import CornerOrientation
-from database_interaction.database_client import DatabaseClient
+from database.database_client import DatabaseClient
+from map_analysis import analysis_callback_utils
+
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
-# TODO: add analyse background loop over sizes
+database_client = DatabaseClient(
+    user="discordBot",
+    password="password123",
+    port="5432",
+    database="polytopiaHelper_dev",
+    host="database"
+)
+
+
+def map_analysis_request(
+        patch_process_id: str,
+        map_requirement_id: str,
+        channel_id: int,
+        channel_name: str,
+        message_id: int,
+        resource_number: int,
+        filename: str
+):
+    image = image_utils.load_image(channel_name, filename, ImageOp.MAP_INPUT)
+
+    print("image", image is None, image.shape, flush=True)
+    
+    filename, _ = analyse_map(
+        image,
+        channel_name,
+        channel_id,
+        filename,
+        False
+    )
+    
+    if filename is not None:
+        database_client.set_resource_operation(
+            message_id,
+            ImageOp.MAP_PROCESSED_IMAGE,
+            resource_number
+        )
+    
+    print("map analysis done, callback sent", flush=True)
+    
+    analysis_callback_utils.send_analysis_completion(
+        patch_process_id,
+        map_requirement_id
+    )
+    """await bot_utils_callbacks.on_map_analysis_complete(
+        patch_process_id,
+        map_requirement_id
+    )"""  # TODO restore
 
 
 def analyse_map(
         map_image: np.ndarray,
-        database_client: Optional[DatabaseClient],
         channel_name: str,
         channel_id: int,
         filename: str,
-        action_debug: bool) -> Tuple[str, ImageParam]:
+        action_debug: bool) -> Tuple[Optional[str], ImageParam]:
 
     map_image_no_alpha = map_image[:, :, 0:3].astype(np.uint8)
     if DEBUG or action_debug:
@@ -53,17 +100,16 @@ def analyse_map(
     if DEBUG or action_debug:
         print(image_params)
     if database_client is not None and len(image_params.corners) != 0:
-        store_image_params(database_client, image_params)
+        store_image_params(image_params)
     return store_transformed_image(scaled_image, channel_name, filename), image_params
 
 
 def analyse_background(
-        database_client: Optional[DatabaseClient],
         map_size: str,
         action_debug: bool) -> Tuple[str, ImageParam]:
     background_template = image_utils.get_background_template(map_size)
     _, scale = get_cloud_alpha_quater(
-        background_template, "templates", "processed_background_template_%s", map_size,
+        background_template, "templates", "processed_background_template_%s" % map_size, map_size,
         action_debug=action_debug)
     scaled_image = scale_image(background_template, scale)
 
@@ -75,9 +121,8 @@ def analyse_background(
 
     if DEBUG or action_debug:
         print(image_params)
-    # TODO: fix this, it won't work
-    if database_client is not None:
-        store_background_image_params(database_client, map_size, image_params)
+
+    store_background_image_params(map_size, image_params)
     return path, image_params
 
 
@@ -87,199 +132,20 @@ def attach_alpha(map_image: np.ndarray, alpha: np.ndarray) -> np.ndarray:
 
 
 def scale_image(image: np.ndarray, scale: float) -> np.ndarray:
-    # new_dim = (int(image.shape[1] / scale), int(image.shape[0] / scale))
     new_dim = (int(image.shape[1] * scale), int(image.shape[0] * scale))
     return cv2.resize(image, new_dim, interpolation=cv2.INTER_AREA)
 
 
-def store_image_params(database_client: DatabaseClient, image_params: ImageParam) -> bool:
+def store_image_params(image_params: ImageParam) -> bool:
     return database_client.set_image_params(image_params)
 
 
-def store_background_image_params(database_client: DatabaseClient, map_size: str, image_params: ImageParam) -> bool:
+def store_background_image_params(map_size: str, image_params: ImageParam) -> bool:
     return database_client.set_background_image_params(map_size, image_params)
 
 
-def store_transformed_image(image: np.ndarray, channel_name: str, filename: str) -> str:
+def store_transformed_image(image: np.ndarray, channel_name: str, filename: str) -> Optional[str]:
     return image_utils.save_image(image, channel_name, filename, ImageOp.MAP_PROCESSED_IMAGE)
-
-
-def get_corners(
-        image: np.ndarray,
-        channel_name: str,
-        filename: str,
-        action_debug: bool) -> List[Tuple[int, int, int]]:
-
-    # hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-
-    light_colour = (0, 0, 0)
-    dark_colour = (10, 10, 10)
-
-    mask = cv2.inRange(image[:, :, 0:3], light_colour, dark_colour)
-
-    contours, _ = cv2.findContours(255 - mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    selected_contour = sorted([(c, cv2.contourArea(c)) for c in contours], key=lambda x: -x[1])[0]
-    contour_mask = cv2.drawContours(np.zeros_like(mask), [selected_contour[0]], 0, (255, 255, 255))
-    # edges = image_processing_utils.get_one_color_edges(mask)
-
-    if DEBUG or action_debug:
-        image_utils.save_image(mask, channel_name, filename + "_background_edges", ImageOp.MAP_PROCESSED_IMAGE)
-        image_utils.save_image(contour_mask, channel_name, filename + "_edges", ImageOp.MAP_PROCESSED_IMAGE)
-
-    blur_edges = cv2.GaussianBlur(contour_mask, (11, 11), 3)
-
-    _, threshold_edges = cv2.threshold(blur_edges, 3, np.max(blur_edges), cv2.THRESH_BINARY)
-
-    lines = cv2.HoughLinesP(
-        threshold_edges,
-        10,
-        np.pi / 180,
-        40,
-        None,
-        int(max(image.shape[0], image.shape[0]) / 10),
-        int(max(image.shape[0], image.shape[0]) / 20))
-
-    if DEBUG:
-        print("all lines %d" % len(lines))
-
-    if DEBUG or action_debug:
-        lines_image = image.copy()
-        for i in range(0, len(lines)):
-            line_i = lines[i][0]
-            cv2.line(lines_image, (line_i[0], line_i[1]), (line_i[2], line_i[3]), (0, 0, 255, 255), 3, cv2.LINE_AA)
-        image_utils.save_image(lines_image, channel_name, filename + "_all_lines", ImageOp.MAP_PROCESSED_IMAGE)
-
-    lines = [line for line in lines if slope_in_range(line[0], 0.5, 0.7)]
-    if DEBUG:
-        print("filtered lines %d" % len(lines))
-
-    if DEBUG or action_debug:
-        lines_image = image.copy()
-        for i in range(0, len(lines)):
-            line_i = lines[i][0]
-            cv2.line(lines_image, (line_i[0], line_i[1]), (line_i[2], line_i[3]), (0, 0, 255, 255), 3, cv2.LINE_AA)
-        image_utils.save_image(lines_image, channel_name, filename + "_filtered_lines", ImageOp.MAP_PROCESSED_IMAGE)
-
-    slopes = norm([get_line_slope(line[0]) for line in lines])
-    heights = norm([get_line_h0(line[0]) for line in lines])
-
-    labels = cluster_lines(slopes, heights)
-
-    selected_lines = select_lines_by_length(lines, labels)
-
-    if DEBUG or action_debug:
-        lines_image = image.copy()
-        for i in range(0, len(selected_lines)):
-            line_i = selected_lines[i][0]
-            cv2.line(lines_image, (line_i[0], line_i[1]), (line_i[2], line_i[3]), (0, 0, 255, 255), 3, cv2.LINE_AA)
-        image_utils.save_image(lines_image, channel_name, filename + "_selected_lines", ImageOp.MAP_PROCESSED_IMAGE)
-
-    return find_all_intersections(selected_lines)
-
-
-def get_squared_length(line: List[int]) -> int:
-    dx = line[2] - line[0]
-    dy = line[3] - line[1]
-    return dx * dx + dy * dy
-
-
-def select_lines_by_length(lines: List[np.ndarray], labels: np.ndarray) -> List[List[List[np.int32]]]:
-    selected_lines = []
-    for i in range(max(labels) + 1):
-        label_lines = [(line, get_squared_length(line[0])) for j, line in enumerate(lines) if labels[j] == i]
-        label_lines.sort(key=lambda x: -x[1])
-        longest_line = label_lines[0][0]
-        selected_lines.append(longest_line.tolist())
-    return selected_lines
-
-
-def get_line_h0(line: List[np.int32]) -> float:
-    slope = get_line_slope(line)
-    return float(line[1] - slope * line[0])
-
-
-def norm(array: List[float]) -> np.ndarray:
-    np_array: np.ndarray = np.array(array)
-    min_array: float = min(array)
-    max_array: float = max(array)
-    value: np.ndarray = (np_array - min_array) / (max_array - min_array)
-    return value
-
-
-def get_line_slope(line: List[np.int32]) -> float:
-    dx = float(line[2] - line[0])
-    dy = float(line[3] - line[1])
-    return dy / dx if dx != 0 else 100
-
-
-def slope_in_range(line: List[np.int32], min_slope: float = 0.5, max_slope: float = 0.7) -> bool:
-    # x_start, y_start, x_end, y_end
-    return min_slope <= abs(get_line_slope(line)) <= max_slope
-
-
-def get_intersection(first_line: List[List[np.int32]], second_line: List[List[np.int32]]) -> Optional[Tuple[int, int]]:
-    h1 = get_line_h0(first_line[0])
-    h2 = get_line_h0(second_line[0])
-    p1 = get_line_slope(first_line[0])
-    p2 = get_line_slope(second_line[0])
-    if p1 - p2 == 0:
-        return None
-    x = int((h2 - h1) / (p1 - p2))
-    y = int(p1 * x + h1)
-    if not (-2000 <= x <= 10000) or not (-2000 <= y <= 10000):
-        return None
-    return x, y
-
-
-def find_all_intersections(
-    selected_lines: List[List[List[np.int32]]]
-) -> List[Tuple[int, int, int]]:
-
-    corners = []
-    for line1 in selected_lines:
-        for line2 in selected_lines:
-            if line1 > line2:
-                if get_line_slope(line1[0]) != get_line_slope(line2[0]):
-                    intersection = get_intersection(line1, line2)
-                    if intersection is not None:
-                        corner_orientation = get_corner_orientation(line1[0], line2[0], intersection)
-                        if corner_orientation is not None:
-                            corners.append((intersection[0], intersection[1], corner_orientation.value))
-    return corners
-
-
-def cluster_lines(slopes: np.ndarray, heights: np.ndarray) -> np.ndarray:
-    line_functions = np.array(list(zip(slopes, heights)))
-    clustering = DBSCAN(eps=0.3, min_samples=1).fit(line_functions)
-    return clustering.labels_
-
-
-def get_corner_orientation(
-    line1: List[np.int32],
-    line2: List[np.int32],
-    intersection: Tuple[int, int]
-) -> Optional[CornerOrientation]:
-    # print(line1)
-    # print(line2)
-    center1 = ((line1[0] + line1[2]) / 2, (line1[1] + line1[3]) / 2)
-    center2 = ((line2[0] + line2[2]) / 2, (line2[1] + line2[3]) / 2)
-
-    if center1[0] <= intersection[0] <= center2[0] or center2[0] <= intersection[0] <= center1[0]:  # top or bottom
-        if intersection[1] >= center1[1] and intersection[1] >= center2[1]:
-            return CornerOrientation.BOTTOM
-        elif intersection[1] <= center1[1] and intersection[1] <= center2[1]:
-            return CornerOrientation.TOP
-        else:
-            return None
-    elif center1[1] <= intersection[1] <= center2[1] or center2[1] <= intersection[1] <= center1[1]:  # left or right
-        if intersection[0] >= center1[0] and intersection[0] >= center2[0]:
-            return CornerOrientation.RIGHT
-        elif intersection[0] <= center1[0] and intersection[0] <= center2[0]:
-            return CornerOrientation.LEFT
-        else:
-            return None
-    else:
-        return None
 
 
 def match_full_clouds(
@@ -506,8 +372,8 @@ def get_scale(
         action_debug: bool) -> float:
     edges = image_processing_utils.get_one_color_edges(template)
     # template_edge = get_one_color_edges(template)
-    if DEBUG or action_debug:
-        image_utils.save_image(edges, channel_name, filename + "_self_edges", ImageOp.MAP_PROCESSED_IMAGE)
+    # if DEBUG or action_debug:
+    #     image_utils.save_image(edges, channel_name, filename + "_self_edges", ImageOp.MAP_PROCESSED_IMAGE)
 
     correlation_raw, mask, thresh = match_template(template, edges)
 
@@ -540,13 +406,13 @@ def get_cloud_alpha_quater(
 
     resized_template, resized_template_alpha, resized_template_alpha_layer = resize_template(template, scale)
 
-    ksize = int(resized_template.shape[0] * 0.3)
-    if ksize % 2 == 0:
-        ksize += 1
+    k_size = int(resized_template.shape[0] * 0.3)
+    if k_size % 2 == 0:
+        k_size += 1
 
     sigma = int(resized_template.shape[0] / 25)
 
-    blur = get_template_matching(map_image, resized_template, resized_template_alpha, ksize, sigma)
+    blur = get_template_matching(map_image, resized_template, resized_template_alpha, k_size, sigma)
 
     # grid_image = get_grid(channel_name, filename, map_size)
 
@@ -592,7 +458,7 @@ def get_cloud_alpha_quater(
     return img_alpha_c, scale
 
 
-def find_cloud_grid(map_image, channel_name, filename, map_size, ksize: int = 7, sigma: float = 3, action_debug=True):
+def find_cloud_grid(map_image, channel_name, filename, map_size, k_size: int = 7, sigma: float = 3, action_debug=True):
     template = image_utils.get_cloud_template()
     raw_scale = get_scale(map_image, channel_name, filename, action_debug)
     scale = 1.0 / (raw_scale / template.shape[0])
@@ -604,12 +470,12 @@ def find_cloud_grid(map_image, channel_name, filename, map_size, ksize: int = 7,
     half_template_width = template_width / 2
     half_template_height = template_height / 2
 
-    blur = get_template_matching(map_image, resized_template, resized_template_alpha, ksize, sigma)
+    blur = get_template_matching(map_image, resized_template, resized_template_alpha, k_size, sigma)
 
     hh, ww = resized_template.shape[:2]
     rad = int(math.sqrt(hh * hh + ww * ww) / 8)
 
-    map_width = int(math.sqrt(map_size))
+    map_width = int(math.sqrt(int(map_size)))
 
     voting_map = np.zeros((blur.shape[0], blur.shape[1], 3), dtype=np.uint8)
 
@@ -643,3 +509,192 @@ def find_cloud_grid(map_image, channel_name, filename, map_size, ksize: int = 7,
 def get_grid(channel_name, filename, grid_size):
     image = image_utils.load_image(channel_name, filename, ImageOp.MAP_INPUT)
     return find_cloud_grid(image[:, :, 0:3].astype(np.uint8), channel_name, filename, grid_size)
+
+
+def cluster_lines(slopes: np.ndarray, heights: np.ndarray) -> np.ndarray:
+    line_functions = np.array(list(zip(slopes, heights)))
+    clustering = DBSCAN(eps=0.3, min_samples=1).fit(line_functions)
+    return clustering.labels_
+
+
+def get_corners(
+        image: np.ndarray,
+        channel_name: str,
+        filename: str,
+        action_debug: bool) -> List[Tuple[int, int, int]]:
+
+    # hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+
+    light_colour = (0, 0, 0)
+    dark_colour = (10, 10, 10)
+
+    mask = cv2.inRange(image[:, :, 0:3], light_colour, dark_colour)
+
+    contours, _ = cv2.findContours(255 - mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    selected_contour = sorted([(c, cv2.contourArea(c)) for c in contours], key=lambda x: -x[1])[0]
+    contour_mask = cv2.drawContours(np.zeros_like(mask), [selected_contour[0]], 0, (255, 255, 255))
+    # edges = image_processing_utils.get_one_color_edges(mask)
+
+    if DEBUG or action_debug:
+        image_utils.save_image(mask, channel_name, filename + "_background_edges", ImageOp.MAP_PROCESSED_IMAGE)
+        image_utils.save_image(contour_mask, channel_name, filename + "_edges", ImageOp.MAP_PROCESSED_IMAGE)
+
+    blur_edges = cv2.GaussianBlur(contour_mask, (11, 11), 3)
+
+    _, threshold_edges = cv2.threshold(blur_edges, 3, np.max(blur_edges), cv2.THRESH_BINARY)
+
+    lines = cv2.HoughLinesP(
+        threshold_edges,
+        10,
+        np.pi / 180,
+        40,
+        None,
+        int(max(image.shape[0], image.shape[0]) / 10),
+        int(max(image.shape[0], image.shape[0]) / 20))
+
+    if DEBUG:
+        print("all lines %d" % len(lines))
+
+    if DEBUG or action_debug:
+        lines_image = image.copy()
+        for i in range(0, len(lines)):
+            line_i = lines[i][0]
+            cv2.line(lines_image, (line_i[0], line_i[1]), (line_i[2], line_i[3]), (0, 0, 255, 255), 3, cv2.LINE_AA)
+        image_utils.save_image(lines_image, channel_name, filename + "_all_lines", ImageOp.MAP_PROCESSED_IMAGE)
+
+    lines = [line for line in lines if slope_in_range(line[0], 0.5, 0.7)]
+    if DEBUG:
+        print("filtered lines %d" % len(lines))
+
+    if DEBUG or action_debug:
+        lines_image = image.copy()
+        for i in range(0, len(lines)):
+            line_i = lines[i][0]
+            cv2.line(lines_image, (line_i[0], line_i[1]), (line_i[2], line_i[3]), (0, 0, 255, 255), 3, cv2.LINE_AA)
+        image_utils.save_image(lines_image, channel_name, filename + "_filtered_lines", ImageOp.MAP_PROCESSED_IMAGE)
+
+    slopes = norm([get_line_slope(line[0]) for line in lines])
+    heights = norm([get_line_h0(line[0]) for line in lines])
+
+    labels = cluster_lines(slopes, heights)
+
+    selected_lines = select_lines_by_length(lines, labels)
+
+    if DEBUG or action_debug:
+        lines_image = image.copy()
+        for i in range(0, len(selected_lines)):
+            line_i = selected_lines[i][0]
+            cv2.line(lines_image, (line_i[0], line_i[1]), (line_i[2], line_i[3]), (0, 0, 255, 255), 3, cv2.LINE_AA)
+        image_utils.save_image(lines_image, channel_name, filename + "_selected_lines", ImageOp.MAP_PROCESSED_IMAGE)
+
+    return find_all_intersections(selected_lines)
+
+
+def select_lines_by_length(lines: List[np.ndarray], labels: np.ndarray) -> List[List[List[np.int32]]]:
+    selected_lines = []
+    for i in range(max(labels) + 1):
+        label_lines = [(line, get_squared_length(line[0])) for j, line in enumerate(lines) if labels[j] == i]
+        label_lines.sort(key=lambda x: -x[1])
+        longest_line = label_lines[0][0]
+        selected_lines.append(longest_line.tolist())
+    return selected_lines
+
+
+def get_squared_length(line: List[int]) -> int:
+    dx = line[2] - line[0]
+    dy = line[3] - line[1]
+    return dx * dx + dy * dy
+
+
+def find_all_intersections(
+    selected_lines: List[List[List[np.int32]]]
+) -> List[Tuple[int, int, int]]:
+
+    corners = []
+    for line1 in selected_lines:
+        for line2 in selected_lines:
+            if line1 > line2:
+                if get_line_slope(line1[0]) != get_line_slope(line2[0]):
+                    intersection = get_intersection(line1, line2)
+                    if intersection is not None:
+                        corner_orientation = get_corner_orientation(line1[0], line2[0], intersection)
+                        if corner_orientation is not None:
+                            corners.append((intersection[0], intersection[1], corner_orientation.value))
+    return corners
+
+
+def get_corner_orientation(
+    line1: List[np.int32],
+    line2: List[np.int32],
+    intersection: Tuple[int, int]
+) -> Optional[CornerOrientation]:
+    # print(line1)
+    # print(line2)
+    center1 = ((line1[0] + line1[2]) / 2, (line1[1] + line1[3]) / 2)
+    center2 = ((line2[0] + line2[2]) / 2, (line2[1] + line2[3]) / 2)
+
+    if center1[0] <= intersection[0] <= center2[0] or center2[0] <= intersection[0] <= center1[0]:  # top or bottom
+        if intersection[1] >= center1[1] and intersection[1] >= center2[1]:
+            return CornerOrientation.BOTTOM
+        elif intersection[1] <= center1[1] and intersection[1] <= center2[1]:
+            return CornerOrientation.TOP
+        else:
+            return None
+    elif center1[1] <= intersection[1] <= center2[1] or center2[1] <= intersection[1] <= center1[1]:  # left or right
+        if intersection[0] >= center1[0] and intersection[0] >= center2[0]:
+            return CornerOrientation.RIGHT
+        elif intersection[0] <= center1[0] and intersection[0] <= center2[0]:
+            return CornerOrientation.LEFT
+        else:
+            return None
+    else:
+        return None
+    
+
+def get_intersection(first_line: List[List[np.int32]], second_line: List[List[np.int32]]) -> Optional[Tuple[int, int]]:
+    h1 = get_line_h0(first_line[0])
+    h2 = get_line_h0(second_line[0])
+    p1 = get_line_slope(first_line[0])
+    p2 = get_line_slope(second_line[0])
+    if p1 - p2 == 0:
+        return None
+    x = int((h2 - h1) / (p1 - p2))
+    y = int(p1 * x + h1)
+    if not (-2000 <= x <= 10000) or not (-2000 <= y <= 10000):
+        return None
+    return x, y
+
+
+def get_line_h0(line: List[np.int32]) -> float:
+    slope = get_line_slope(line)
+    return float(line[1] - slope * line[0])
+
+
+def slope_in_range(line: List[np.int32], min_slope: float = 0.5, max_slope: float = 0.7) -> bool:
+    # x_start, y_start, x_end, y_end
+    return min_slope <= abs(get_line_slope(line)) <= max_slope
+
+
+def norm(array: List[float]) -> np.ndarray:
+    np_array: np.ndarray = np.array(array)
+    min_array: float = min(array)
+    max_array: float = max(array)
+    value: np.ndarray = (np_array - min_array) / (max_array - min_array)
+    return value
+
+
+def get_line_slope(line: List[np.int32]) -> float:
+    dx = float(line[2] - line[0])
+    dy = float(line[3] - line[1])
+    return dy / dx if dx != 0 else 100
+
+
+for map_size_i in [121, 196, 256, 324, 400]: # missing 900 map
+    print("checking map size", map_size_i)
+    background_params = database_client.get_background_image_params(map_size_i)
+    background_image = image_utils.get_processed_background_template(str(map_size_i))
+    print("existing values", background_image is None, background_params, flush=True)
+    if background_image is None or background_params is None:
+        if DEBUG:
+            print("ANALYSING BACKGROUND", flush=True)
+        _, _ = analyse_background(str(map_size_i), False)

@@ -1,0 +1,13 @@
+
+
+
+
+select * from message_resources right join (select min(date_added), source_message_id, resource_number from message_resources where operation = 2048 or operation = 1 group by source_message_id, resource_number having count(*) > 1) as inner_table on inner_table.min != message_resources.date_added and inner_table.source_message_id = message_resources.source_message_id and inner_table.resource_number=message_resources.resource_number where message_resources.operation <> 8;
+
+select * from map_patching_process_input where patch_uuid in (select patch_uuid from message_resources where filename in (select filename from message_resources right join (select min(date_added), source_message_id, resource_number from message_resources where operation = 2048 or operation = 1 group by source_message_id, resource_number having count(*) > 1) as inner_table on inner_table.min != message_resources.date_added and inner_table.source_message_id = message_resources.source_message_id and inner_table.resource_number=message_resources.resource_number where message_resources.operation <> 8));
+
+select * from map_patching_process_input where patch_uuid in (select patch_uuid from message_resources where filename in (select filename from message_resources right join (select min(date_added), source_message_id, resource_number from message_resources where operation = 2048 or operation = 1 group by source_message_id, resource_number having count(*) > 1) as inner_table on inner_table.min != message_resources.date_added and inner_table.source_message_id = message_resources.source_message_id and inner_table.resource_number=message_resources.resource_number where message_resources.operation <> 8));
+
+select * from map_patching_process where output_filename in (select filename from message_resources right join (select min(date_added), source_message_id, resource_number from message_resources where operation = 2048 or operation = 1 group by source_message_id, resource_number having count(*) > 1) as inner_table on inner_table.min != message_resources.date_added and inner_table.source_message_id = message_resources.source_message_id and inner_table.resource_number=message_resources.resource_number where message_resources.operation <> 8);
+
+select * from message_resources right join map_patching_process on message_resources.filename = map_patching_process.output_filename where operation <> 8;

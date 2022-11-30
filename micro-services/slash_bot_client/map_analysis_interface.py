@@ -1,0 +1,66 @@
+import os
+
+from common.image_operation import ImageOp
+from database.database_client import DatabaseClient
+from slash_bot_client import bot_utils_callbacks
+from slash_bot_client import service_connector
+
+DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
+
+database_client = DatabaseClient(
+    user="discordBot",
+    password="password123",
+    port="5432",
+    database="polytopiaHelper_dev",
+    host="database"
+)
+
+
+async def get_or_analyse_map(
+        patch_process_id: str,
+        map_requirement_id: str,
+        message_id: int,
+        resource_number: int
+):
+    resource = database_client.get_resource(message_id, resource_number)
+
+    operation = resource["operation"]
+    channel_id = resource["source_channel_id"]
+    channel_info = database_client.get_channel_info(channel_id)
+
+    filename = str(resource["filename"])
+    
+    print("get or analyse map", patch_process_id, map_requirement_id, message_id, flush=True)
+    print("processed image", operation, ImageOp.MAP_PROCESSED_IMAGE.value, operation == ImageOp.MAP_PROCESSED_IMAGE.value, flush=True)
+    print("processed image", operation, ImageOp.MAP_INPUT.value, operation == ImageOp.MAP_INPUT.value, flush=True)
+    if operation == ImageOp.MAP_PROCESSED_IMAGE.value:
+        bot_utils_callbacks.on_map_analysis_complete(
+            patch_process_id,
+            map_requirement_id
+        )
+    elif operation == ImageOp.MAP_INPUT.value:
+        service_connector.send_analysis_request(
+            patch_process_id,
+            map_requirement_id,
+            channel_id,
+            channel_info["channel_name"],
+            message_id,
+            resource_number,
+            filename
+        )
+    else:
+        print("operation not recognised", operation, ImageOp.MAP_INPUT,
+              operation == ImageOp.MAP_PROCESSED_IMAGE.value, operation == ImageOp.MAP_INPUT.value, flush=True)
+
+
+async def force_analyse_map(
+        patch_process_id,
+        map_requirement_id,
+        message_id,
+        resource_number
+):
+    # TODO actually analyse the image
+    bot_utils_callbacks.on_map_analysis_complete(
+        patch_process_id,
+        map_requirement_id
+    )

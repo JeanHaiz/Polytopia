@@ -1,0 +1,188 @@
+version: '3.3'
+
+services:
+    database:
+        build:
+            context: ../database
+            dockerfile: Dockerfile
+        container_name: database
+        command: postgres -c stats_temp_directory=/tmp
+        restart: "always"
+        deploy:
+            resources:
+                limits:
+                    memory: 200m
+        ports:
+            - "5432:5432"
+        environment:
+            POSTGRES_USER: discordBot
+            POSTGRES_PASSWORD: password123
+            POSTGRES_DB: polytopiaHelper_dev
+            PGDATABASE: polytopiaHelper_dev
+            PGUSER: discordBot
+        volumes:
+            # - ./database/1_init_sql.sql:/docker-entrypoint-initdb.d/1_init.sql
+            - ./db-data/:/var/lib/postgresql/data/
+        networks:
+            - database
+        healthcheck:
+            test: [ "CMD-SHELL", "pg_isready", "-d", "polytopiaHelper_dev"]
+            interval: 30s
+            timeout: 60s
+            retries: 10
+
+    slash_bot:
+        depends_on:
+            - database
+            - rabbitmq
+            - map_patching
+            - map_analysis
+            # kibana:
+            #     condition: service_healthy
+        build:
+            context: "/Users/jean/Documents/Coding/Polytopia/micro-services/"
+            dockerfile: slash_bot_client/Dockerfile
+        restart: "unless-stopped"
+        container_name: slash_bot
+        volumes:
+            - /Users/jean/Documents/Coding/Polytopia/micro-services:/app
+            - certs:/usr/share/elasticsearch/config/certs
+        # /usr/share/elasticsearch/config/certs/ca/ca.crt
+        env_file:
+            - .env
+        deploy:
+            resources:
+                limits:
+                    memory: 500M
+        networks:
+            - database
+
+    map_patching:
+        depends_on:
+            - database
+            - rabbitmq
+        build:
+            context: "/Users/jean/Documents/Coding/Polytopia/micro-services/"
+            dockerfile: map_patching/Dockerfile
+        restart: "unless-stopped"
+        container_name: map_patching
+        volumes:
+            - /Users/jean/Documents/Coding/Polytopia/micro-services:/app
+        env_file:
+            - .env
+        deploy:
+            resources:
+                limits:
+                    memory: 1g
+        networks:
+            - database
+
+    map_analysis:
+        depends_on:
+            - database
+            - rabbitmq
+        build:
+            context: "/Users/jean/Documents/Coding/Polytopia/micro-services/"
+            dockerfile: map_analysis/Dockerfile
+        restart: "unless-stopped"
+        container_name: map_analysis
+        volumes:
+            - /Users/jean/Documents/Coding/Polytopia/micro-services:/app
+        env_file:
+            - .env
+        deploy:
+            resources:
+                limits:
+                    memory: 1g
+        networks:
+            - database
+
+    rabbitmq:
+        image: 'rabbitmq:3.11-management-alpine'
+        container_name: "rabbitmq"
+        ports:
+            - "5672:5672"
+            - "15672:15672"
+        networks:
+            - database
+        healthcheck:
+            test: rabbitmq-diagnostics -q ping
+            interval: 10s
+            timeout: 20s
+            retries: 6
+
+    jupyter-notebook:
+        image: jupyter/datascience-notebook
+        environment:
+            - CHOWN_HOME=yes
+            - CHOWN_HOME_OPTS='-R'
+        volumes:
+            - /Users/jean/Documents/Coding/Polytopia/jupyter_noteboooks:/home/jovyan/work
+        ports:
+            - "8888:8888"
+        networks:
+            - polytopia
+
+    es_setup:
+        image: docker.elastic.co/elasticsearch/elasticsearch:${ELK_VERSION:-"8.4.0"}
+        container_name: es_setup
+        user: "0"
+        platform: ${PLATFORM:-linux/amd64}
+        volumes:
+            - certs:/usr/share/elasticsearch/config/certs
+        command: >
+            bash -c '
+                if [ x${ELASTIC_PASSWORD} == x ]; then
+                    echo "Set the ELASTIC_PASSWORD environment variable in the .env file";
+                    exit 1;
+                elif [ x${KIBANA_PASSWORD} == x ]; then
+                    echo "Set the KIBANA_PASSWORD environment variable in the .env file";
+                    exit 1;
+                fi;
+                if [ ! -f config/certs/ca.zip ]; then
+                    echo "Creating CA";
+                    bin/elasticsearch-certutil ca --silent --pem -out config/certs/ca.zip;
+                    unzip config/certs/ca.zip -d config/certs;
+                fi;
+                if [ ! -f config/certs/certs.zip ]; then
+                    echo "Creating certs";
+                    echo -ne \
+                    "instances:\n"\
+                    "  - name: elasticsearch\n"\
+                    "    dns:\n"\
+                    "      - elasticsearch\n"\
+                    "      - localhost\n"\
+                    "    ip:\n"\
+                    "      - 127.0.0.1\n"\
+                    > config/certs/instances.yml;
+                    bin/elasticsearch-certutil cert --silent --pem -out config/certs/certs.zip --in config/certs/instances.yml --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key;
+                    unzip config/certs/certs.zip -d config/certs;
+                fi;
+                echo "Setting file permissions"
+                chown -R root:root config/certs;
+                find . -type d -exec chmod 750 \{\} \;;
+                find . -type f -exec chmod 640 \{\} \;;
+                echo "Waiting for Elasticsearch availability";
+                until curl -s --cacert config/certs/ca/ca.crt https://elasticsearch:9200 | grep -q "missing authentication credentials"; do sleep 30; done;
+                echo "Setting kibana_system password";
+                until curl -s -X POST --cacert config/certs/ca/ca.crt -u "elastic:${ELASTIC_PASSWORD}" -H "Content-Type: application/json" https://elasticsearch:9200/_security/user/kibana_system/_password -d "{\"password\":\"${KIBANA_PASSWORD}\"}" | grep -q "^{}"; do sleep 10; done;
+                echo "All done!";
+            '
+        networks:
+            - polytopia
+        healthcheck:
+            test: [ "CMD-SHELL", "[ -f config/certs/elasticsearch/elasticsearch.crt ]" ]
+            interval: 1s
+            timeout: 5s
+            retries: 120
+
+networks:
+    database:
+    polytopia:
+        driver: bridge
+        driver_opts:
+            com.docker.network.bridge.enable_icc: "true"
+
+volumes:
+    certs:
+        driver: local
