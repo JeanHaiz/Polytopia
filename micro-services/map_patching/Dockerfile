@@ -10,7 +10,7 @@ WORKDIR /app
 ADD ./map_patching /app/map_patching
 ADD ./database /app/database
 ADD ./common /app/common
-ADD map_patching.py map_patching.py
+ADD map_patching_main.py map_patching_main.py
 
 RUN apt-get update
 RUN apt-get install ffmpeg libsm6 libxext6  -y
@@ -25,4 +25,4 @@ RUN pip3 install -r requirements.txt
 # ENV NAME World
 
 # Run slash_bot_main.py when the container launches
-CMD ["python", "map_patching.py"]
+CMD ["python", "map_patching_main.py"]

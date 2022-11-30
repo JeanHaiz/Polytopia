@@ -10,7 +10,7 @@ WORKDIR /app
 ADD ./slash_bot_client /app/slash_bot_client
 ADD ./common /app/common
 ADD ./database /app/database
-ADD app.py app.py
+ADD slash_bot_main.py slash_bot_main.py
 
 
 RUN apt-get update
@@ -30,4 +30,4 @@ RUN pip3 install -r requirements.txt
 # ENV NAME World
 
 # Run slash_bot_main.py when the container launches
-CMD ["python", "app.py"]
+CMD ["python", "slash_bot_main.py"]
