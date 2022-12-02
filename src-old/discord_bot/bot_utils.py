@@ -313,8 +313,7 @@ async def reaction_removed_routine(
         else:
             source_operation = ImageOp.MAP_INPUT
         channel = bot_client.get_channel(payload.channel_id)
-        message = await channel.fetch_message(payload.message_id)
-        reset_resource(database_client, channel, message.id, source_operation)
+        reset_resource(database_client, channel, payload.message_id, source_operation)
 
 
 def reset_resource(

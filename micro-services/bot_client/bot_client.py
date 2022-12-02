@@ -1,12 +1,9 @@
 
 import os
 import discord
-import interactions
 import nest_asyncio
 import pandas as pd
 
-from interactions import CommandContext
-from interactions import File
 from discord.ext import commands
 from discord.ext.commands import Context
 
@@ -25,11 +22,6 @@ nest_asyncio.apply()
 DEBUG = os.getenv("POLYTOPIA_DEBUG")
 token = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
 print("token", token)
-slash_bot_client = interactions.Client(
-    token=token,
-    intents=interactions.Intents.DEFAULT | interactions.Intents.GUILD_MESSAGE_CONTENT,
-    prefix=":"
-)
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -105,214 +97,6 @@ async def on_raw_reaction_remove(payload: discord.RawReactionActionEvent) -> Non
     message = await bot_utils.get_message(bot_client, payload.channel_id, payload.message_id)
     if message is not None:
         await bot_utils.wrap_errors(message, bot_client, message.channel.guild.id, inner)
-
-
-@slash_bot_client.command(
-    name="activate",
-    description="Activates the bot in the channel. Will now respond to map patching and score recognition requests.",
-    options=[
-        interactions.Option(
-            name="size",
-            description="Map size",
-            type=interactions.OptionType.INTEGER,
-            required=True,
-            choices=[
-                interactions.Choice(name="11 x 11", value=121),
-                interactions.Choice(name="14 x 14", value=196),
-                interactions.Choice(name="16 x 16", value=256),
-                interactions.Choice(name="18 x 18", value=324),
-                interactions.Choice(name="20 x 20", value=400),
-                interactions.Choice(name="30 x 30", value=900),
-            ],
-        ),
-    ],
-)
-async def slash_activate(ctx: CommandContext, size: int) -> None:
-    async def inner() -> None:
-        logger.debug("activate channel %s" % ctx.channel_id)
-        channel = await ctx.get_channel()
-        guild = await ctx.get_guild()
-        activation_result = database_client.activate_channel(ctx.channel_id, channel.name, ctx.guild_id, guild.name)
-        database_client.set_game_map_size(ctx.channel.id, int(size))
-        if activation_result.rowcount == 1:
-            await ctx.send("channel activated")
-        else:
-            myid = '<@338067113639936003>'  # Jean's id
-            await ctx.send('There was an error. %s has been notified.' % myid)
-    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
-
-
-@slash_bot_client.command(
-    name="deactivate",
-    description="Deactivates the channel. Reactions and image uploads will not be tracked anymore."
-)
-async def slash_deactivate(ctx: CommandContext) -> None:
-    async def inner() -> None:
-        logger.debug("deactivate channel %s" % ctx.channel_id)
-        deactivation_result = database_client.deactivate_channel(ctx.channel_id)
-        if deactivation_result.rowcount == 1:
-            await ctx.send("channel deactivated")
-        else:
-            myid = '<@338067113639936003>'  # Jean's id
-            await ctx.send('There was an error. %s has been notified.' % myid)
-    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
-
-
-@slash_bot_client.command(
-    name="version",
-    description="Current bot version."
-)
-async def version(ctx: CommandContext) -> None:
-    await ctx.send("version %s" % VERSION)
-
-
-@slash_bot_client.command(
-    name="scores",
-    description="Shows saved scores plot. If player is specified, shows the player score history.",
-    options=[
-        interactions.Option(
-            name="player",
-            description="Retrieves score for the player",
-            type=interactions.OptionType.STRING,
-            required=False,
-        ),
-    ]
-)
-async def slash_get_channel_player_scores(ctx: CommandContext, player: str = None) -> None:
-    async def inner():
-        if player is None:
-            await bot_utils.get_scores(database_client, ctx)
-        else:
-            await bot_utils.get_player_scores(database_client, ctx, player)
-    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
-
-
-@slash_bot_client.command(
-    name="patch",
-    description="Patches saved maps together.",
-    options=[
-        interactions.Option(
-            name="number_of_images",
-            description="Maximum number of images to patch",
-            type=interactions.OptionType.INTEGER,
-            required=False
-        )
-    ]
-)
-async def slash_patch_map(ctx: CommandContext, number_of_images: int = None) -> None:
-    async def inner() -> None:
-        action_debug = ctx.author.id == 338067113639936003
-        channel = await ctx.get_channel()
-        answer_message = await ctx.send("processing")
-        turn = database_client.get_last_turn(ctx.channel_id)
-        turn, output_tuple, patching_errors = await bot_utils.generate_patched_map_bis(
-            database_client,
-            channel.id,
-            channel.name,
-            ctx.author.id,
-            ctx.author.name,
-            ctx.guild_id,
-            ctx.id,
-            turn,
-            bot_client.loop,
-            number_of_images,
-            action_debug)
-        if output_tuple is not None:
-            patch_path, patch_uuid, patch_filename = output_tuple
-            database_client.update_patching_process_output_filename(patch_uuid, patch_filename)
-            with open(patch_path, "rb") as fh:
-                attachment = File(fp=fh, filename=patch_filename + ".png")
-                if attachment is not None:
-                    await channel.send(files=attachment, content="Map patched for turn %s" % turn)
-                elif len(patching_errors) == 0 and attachment is None:
-                    patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_LOADED, None))
-                    my_id = '<@338067113639936003>'  # Jean's id
-                    await answer_message.edit('There was an error. %s has been notified.' % my_id)
-                fh.close()
-        await bot_utils.manage_slash_patching_errors(channel, answer_message, database_client, patching_errors)
-    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
-
-
-@slash_bot_client.command(
-    name="set-score",
-    description="Set score for a specific player and turn",
-    options=[
-        interactions.Option(
-            name="player_name",
-            description="player-name",
-            type=interactions.OptionType.STRING,
-            required=True
-        ),
-        interactions.Option(
-            name="turn",
-            description="turn",
-            type=interactions.OptionType.INTEGER,
-            required=True
-        ),
-        interactions.Option(
-            name="score",
-            description="score",
-            type=interactions.OptionType.INTEGER,
-            required=True
-        )
-    ]
-)
-async def slash_set_player_score(ctx: CommandContext, player_name: str, turn: int, score: int) -> None:
-    async def inner() -> None:
-        channel = await ctx.get_channel()
-        players = database_client.get_game_players(channel.id)
-        matching_players = [p for p in players if p["polytopia_player_name"] == player_name]
-        if len(matching_players) > 0:
-            player_id = matching_players[0]["game_player_uuid"]
-        else:
-            player_id = database_client.add_missing_player(player_name, channel.id)
-        scores = database_client.get_channel_scores(channel.id)
-        if scores is None or len(scores[(scores["turn"] == turn) & (scores["polytopia_player_name"] == player_name)]) == 0:
-            answer = database_client.add_score(channel.id, player_id, score, turn)
-        else:
-            answer = database_client.set_player_score(player_id, turn, score)
-        row_count = answer.rowcount
-        if row_count == 1:
-            await ctx.send("Score stored")
-        elif row_count == 0:
-            await ctx.send("No score entry was updated. \nTo to signal an error, react with ⁉️")
-        else:
-            myid = '<@338067113639936003>'  # Jean's id
-            await ctx.send('There was an error. %s has been notified.' % myid)
-    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
-
-
-@slash_bot_client.command(
-    name="clear_maps",
-    description="Clear the stack of maps to patch"
-)
-async def slash_clear_map_reactions(ctx: CommandContext) -> None:
-    async def inner() -> None:
-        message = await ctx.send("Processing")
-        slash_channel = await ctx.get_channel()
-        channel = bot_client.get_channel(int(slash_channel.id))
-        await bot_utils.clear_channel_map_reactions(database_client, channel, lambda: message.edit("Done"))
-    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
-
-
-@slash_bot_client.command(
-    name="channels",
-    description="admin command — lists all active channels in the server"
-)
-async def slash_list_active_channels(ctx: CommandContext) -> None:
-    async def inner() -> None:
-        if ctx.author.id == 338067113639936003:
-            logger.debug("list active channels")
-            active_channels = database_client.list_active_channels(ctx.guild_id)
-            if len(active_channels) > 0:
-                message = "active channels:\n- %s" % "\n- ".join(
-                    ["%s: <#%s>" % (a[1], a[0]) for a in active_channels if a[0] != ""])
-            else:
-                message = "no active channel"
-            await ctx.send(message)
-        else:
-            await ctx.send("The command is reserved for admins.")
-    await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
 
 
 @bot_client.command(
@@ -473,7 +257,7 @@ async def patch(ctx: Context, n_images: int = None, action_debug: bool = False) 
             ctx.guild.id,
             ctx.message.id,
             turn,
-            bot_client.loop,
+            asyncio.get_event_loop(),
             n_images,
             action_debug
         )
@@ -501,6 +285,16 @@ async def patch(ctx: Context, n_images: int = None, action_debug: bool = False) 
 async def say_hello(ctx: Context) -> None:
     async def inner():
         await ctx.send("Welcome to my botifull world!")
+    await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
+    
+
+@bot_client.command(
+    name="version",
+    description="bot version"
+)
+async def say_hello(ctx: Context) -> None:
+    async def inner():
+        await ctx.send("prefix bot version %s" % VERSION)
     await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
@@ -542,13 +336,14 @@ async def get_map_trace(ctx: Context) -> None:
 )
 async def clear_map_reactions(ctx: Context) -> None:
     async def inner() -> None:
-        await bot_utils.clear_channel_map_reactions(database_client, ctx.channel, lambda: bot_utils.add_success_reaction(ctx.message))
+        await bot_utils.clear_channel_map_reactions(
+            database_client, ctx.channel, lambda: bot_utils.add_success_reaction(ctx.message))
         
     await bot_utils.wrap_errors(ctx, bot_client, ctx.guild.id, inner)
 
 
 @bot_client.command(
-    name="setscore",
+    name="set_score",
     description="Set score for a specific player and turn"
 )
 async def set_player_score(ctx: Context, player_name: str, turn: int, score: int) -> None:
@@ -560,7 +355,8 @@ async def set_player_score(ctx: Context, player_name: str, turn: int, score: int
         else:
             player_id = database_client.add_missing_player(player_name, ctx.channel.id)
         scores = database_client.get_channel_scores(ctx.channel.id)
-        if scores is None or len(scores[(scores["turn"] == turn) & (scores["polytopia_player_name"] == player_name)]) == 0:
+        if scores is None or \
+                len(scores[(scores["turn"] == turn) & (scores["polytopia_player_name"] == player_name)]) == 0:
             answer = database_client.add_score(ctx.channel.id, player_id, score, turn)
         else:
             answer = database_client.set_player_score(player_id, turn, score)

@@ -13,8 +13,8 @@ from sklearn.cluster import DBSCAN
 from common import image_utils
 from common import image_processing_utils
 from common.image_operation import ImageOp
-from common.image_param import ImageParam
-from common.corner_orientation import CornerOrientation
+from map_patching.image_param import ImageParam
+from map_patching.corner_orientation import CornerOrientation
 from database_interaction.database_client import DatabaseClient
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))

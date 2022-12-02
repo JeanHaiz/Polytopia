@@ -5,7 +5,7 @@ from typing import Tuple
 
 from dataclasses import dataclass
 
-from common.corner_orientation import CornerOrientation
+from map_patching.corner_orientation import CornerOrientation
 
 
 @dataclass

@@ -5,7 +5,7 @@
 # Bot runtime data and test data
 /db-data/
 /es-data/
-/src/resources/
+/src-old/resources/
 *.log
 *.log.*
 /attachments/

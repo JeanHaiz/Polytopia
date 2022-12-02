@@ -10,8 +10,8 @@ from typing import Optional
 
 from common import image_utils
 from common.image_operation import ImageOp
-from common.image_param import ImageParam
-from common.corner_orientation import CornerOrientation
+from map_patching.image_param import ImageParam
+from map_patching.corner_orientation import CornerOrientation
 from database_interaction.database_client import DatabaseClient
 
 from map_patching import map_patching_analysis

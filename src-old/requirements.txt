@@ -1,6 +1,5 @@
 discord.py==2.0.1
 elasticsearch==8.4.0
-interactions-molter==1.0.1
 matplotlib
 nest-asyncio==1.5.4
 numpy==1.21.5

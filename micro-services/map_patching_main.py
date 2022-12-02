@@ -35,8 +35,7 @@ def send_patching_request(body):
 
 def do_work(conn, ch, delivery_tag, body):
     thread_id = threading.get_ident()
-    print('Thread id: %s Delivery tag: %s Message body: %s', thread_id,
-                delivery_tag, body)
+    print('Thread id: %s Delivery tag: %s Message body: %s' % (thread_id, delivery_tag, body))
     
     send_patching_request(body)
     

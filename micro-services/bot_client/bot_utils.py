@@ -19,11 +19,8 @@ from typing import Callable
 from typing import Optional
 from typing import Coroutine
 from difflib import SequenceMatcher
-from interactions import CommandContext
-from interactions import File
-from interactions import Embed
-from interactions import Channel
-from interactions import Message
+from discord import File
+from discord import Embed
 from discord.ext.commands import Bot
 from discord.ext.commands import Context
 
@@ -110,14 +107,7 @@ async def score_recognition_routine(
         return None
 
     game_players = database_client.get_game_players(channel_id)
-    # game_players = [p["polytopia_player_name"] or p["discord_player_name"] or "" for p in game_players_raw]
     print("game players", game_players)
-    # score_players = [s[0] for s in scores]
-
-    # similarity = np.zeros((n_players, n_players))
-    # for i in range(n_players):
-    #     for j in range(n_players):
-    #         similarity[i][j] = SequenceMatcher(None, score_players[i], game_players_other[j]).ratio()
 
     matching, remaining_scores = find_matching(game_players, scores, message.author.name)
 
@@ -183,29 +173,6 @@ async def manage_patching_errors(
                 except discord.errors.NotFound:
                     message = original_message
                 await message.reply(MAP_PATCHING_ERROR_MESSAGES[cause], mention_author=False)
-
-
-async def manage_slash_patching_errors(
-        channel: Channel,
-        answer_message: Message,
-        database_client: DatabaseClient,
-        patching_errors: list) -> None:
-
-    error_text = []
-    for cause, error_filename in patching_errors:
-        if error_filename is None:
-            error_text.append(MAP_PATCHING_ERROR_MESSAGES[cause])
-        else:
-            channel_id, message_id = database_client.get_resource_message(error_filename)
-            if channel_id is not None and message_id is not None:
-                message = await channel.get_message(message_id)
-                if message is None:
-                    error_text.append(MAP_PATCHING_ERROR_MESSAGES[cause])
-                else:
-                    await message.reply(MAP_PATCHING_ERROR_MESSAGES[cause])
-    my_id = '<@338067113639936003>'  # Jean's id
-    error_text.append('%s has been notified.' % my_id)
-    await answer_message.edit("\n".join(error_text))
 
 
 async def generate_patched_map_bis(
@@ -284,7 +251,7 @@ async def reaction_message_routine(
                     image, database_client, message.channel.name, message.channel.id, filename, action_debug=False)
 
                 turn, output_tuple, patching_errors = await map_patching_routine(
-                    database_client, message, image, bot_client.loop, False)
+                    database_client, message, image, asyncio.get_event_loop(), False)
                 
                 if output_tuple is not None:
                     patch_path, patch_uuid, patch_filename = output_tuple
@@ -436,7 +403,7 @@ async def process_map_patching(
                     database_client, channel.name, message, filename, ImageOp.INPUT)
 
                 turn, output_tuple, patching_errors = await map_patching_routine(
-                    database_client, message, image, bot_client.loop, False)
+                    database_client, message, image, asyncio.get_event_loop(), False)
 
                 if output_tuple is not None:
                     patch_path, patch_uuid, patch_filename = output_tuple
@@ -486,33 +453,6 @@ async def get_message(bot_client: Bot, channel_id: int, message_id: int) -> Opti
         return None
 
 
-async def wrap_slash_errors(
-        ctx: CommandContext,
-        bot_client: Bot,
-        guild_id: int,
-        fct: Callable[[], Coroutine]) -> None:
-    try:
-        is_test_server = str(guild_id) == "918195469245628446"
-        is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
-        if (is_dev_env and is_test_server) or (not is_test_server and not is_dev_env):
-            await asyncio.create_task(fct())
-    except discord.errors.Forbidden:
-        await ctx.send("Missing permission. <@338067113639936003> has been notified.")
-    except:
-        error = sys.exc_info()[0]
-        logger.error("##### ERROR #####")
-        logger.error(error)
-        logger.error(traceback.format_exc())
-        print("##### ERROR #####")
-        print(error)
-        traceback.print_exc()
-        error_channel = bot_client.get_channel(1035274340125659230)  # Polytopia Helper Testing server, Error channel
-        channel = await ctx.get_channel()
-        guild = await ctx.get_guild()
-        await error_channel.send(f"""Error in channel {channel.name}, {guild.name}:\n{traceback.format_exc()}\n""")
-        await ctx.send('There was an error. <@338067113639936003> has been notified.')
-
-
 async def wrap_errors(
         ctx: Union[Context, discord.Message],
         bot_client: Bot,
@@ -542,27 +482,26 @@ async def wrap_errors(
         await ctx.reply('There was an error. <@338067113639936003> has been notified.', mention_author=False)
 
 
-async def get_scores(database_client: DatabaseClient, ctx: CommandContext) -> None:
-    scores: pd.DataFrame = database_client.get_channel_scores(ctx.channel_id)
+async def get_scores(database_client: DatabaseClient, ctx: Context) -> None:
+    scores: pd.DataFrame = database_client.get_channel_scores(ctx.channel.id)
     if scores is not None and len(scores[scores['turn'] != -1]) > 0:
         scores = scores[scores['turn'] != -1]
-        channel = await ctx.get_channel()
         filepath, filename = score_visualisation.plot_scores(
-            database_client, scores, channel.id, channel.name, ctx.author.id)
+            database_client, scores, ctx.channel.id, ctx.channel.name, ctx.author.id)
         with open(filepath, "rb") as fh:
             attachment = File(fp=fh, filename=filename + ".png")
             image_utils.load_attachment(filepath, "Score visualisation")
-            await channel.send(files=attachment, content="score recognition")
+            await ctx.channel.send(files=[attachment], content="score recognition")
 
         score_text = score_visualisation.print_scores(scores)
         # await ctx.send(score_text)
         embed = discord.Embed(title='Game scores', description=score_text)
-        await ctx.send(embeds=embed)
+        await ctx.send(embeds=[embed])
     else:
         await ctx.send("No score found")
 
 
-async def get_player_scores(database_client: DatabaseClient, ctx: CommandContext, player: str) -> None:
+async def get_player_scores(database_client: DatabaseClient, ctx: Context, player: str) -> None:
     scores = database_client.get_channel_scores(ctx.channel.id)
     if scores is not None and len(scores[scores['turn'] != -1]) > 0:
         if player is not None and player not in scores["polytopia_player_name"].unique():
@@ -572,7 +511,7 @@ async def get_player_scores(database_client: DatabaseClient, ctx: CommandContext
         else:
             score_text = score_visualisation.print_player_scores(scores, player)
             embed = Embed(title='%s scores' % str(player), description=score_text)
-            await ctx.send(embeds=embed)
+            await ctx.send(embeds=[embed])
     else:
         await ctx.send("No score found for player %s" % str(player))
 
