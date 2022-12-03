@@ -30,13 +30,13 @@ async def get_or_fetch_image_check(
         message_id: int,
         filename: str,
         operation: ImageOp) -> bool:
-    print("filepath", channel_name, filename, type(channel_name), type(filename))
+    print("filepath", channel_name, filename, type(channel_name), type(filename), flush=True)
     file_path = __get_file_path(channel_name, operation, filename)
     image = cv2.imread(file_path)
     
     if image is None:
         if DEBUG:
-            print("Unknown image (%s): %s" % (operation, file_path))
+            print("Unknown image (%s): %s" % (operation, file_path), flush=True)
         
         if operation == ImageOp.INPUT:
             resource_number = database_client.get_resource_number(filename)
@@ -44,8 +44,8 @@ async def get_or_fetch_image_check(
             if DEBUG:
                 print("Saved image (%s): %s" % (operation, file_path))
             image = cv2.imread(file_path)
-        else:
-            await get_or_fetch_image_check(
+        elif operation == ImageOp.MAP_INPUT or operation == ImageOp.SCORE_INPUT:
+            check = await get_or_fetch_image_check(
                 database_client,
                 download_fct,
                 channel_name,
@@ -53,10 +53,21 @@ async def get_or_fetch_image_check(
                 filename,
                 ImageOp.INPUT
             )
-            move_input_image(channel_name, filename, operation)
-            resource_number = database_client.get_resource_number(filename)
-            database_client.set_resource_operation(message_id, operation, resource_number)
-            image = cv2.imread(file_path)
+            if check:
+                move_input_image(channel_name, filename, operation)
+                resource_number = database_client.get_resource_number(filename)
+                database_client.set_resource_operation(message_id, operation, resource_number)
+                image = cv2.imread(file_path)
+        elif operation == ImageOp.MAP_PROCESSED_IMAGE:
+            check = await get_or_fetch_image_check(
+                database_client,
+                download_fct,
+                channel_name,
+                message_id,
+                filename,
+                ImageOp.MAP_INPUT
+            )
+            return check
     else:
         if DEBUG:
             print("Existing image (%s): %s" % (operation, file_path))

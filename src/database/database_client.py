@@ -291,13 +291,18 @@ class DatabaseClient:
             };""").fetchall()
         return [dict(row) for row in resources]
     
-    def get_channel_message_resource_messages(self, channel_id: int, message_id: int, operation: ImageOp) -> List[dict]:
+    def get_channel_message_resource_messages(self, channel_id: int, message_id: int,
+                                              operation: Union[ImageOp, List[ImageOp]]) -> List[dict]:
         resources = self.execute(
             f"""SELECT source_message_id, operation, resource_number
                 FROM message_resources
                 WHERE source_channel_id = {channel_id}
                 AND source_message_id = {message_id}
-                AND operation = {operation.value};""").fetchall()
+                AND operation {
+            " = %d" % operation.value
+            if not hasattr(operation, '__iter__')
+            else " IN %s" % self.__format_list(operation, lambda x: x.value)
+            };""").fetchall()
         return [dict(row) for row in resources]
     
     def add_player_to_game(self, game_player_uuid: str, channel_id: int) -> CursorResult:
@@ -469,6 +474,11 @@ class DatabaseClient:
                 dict(row)["cloud_scale"],
                 dict(row)["corners"]) for row in result_proxy]
     
+    def delete_image_param(self, filename: str):
+        return self.execute(
+            f"""DELETE from map_patching_input_param
+                WHERE filename::text = '{filename}';""")
+
     def get_background_image_params(self, map_size: int) -> Optional[ImageParam]:
         result_proxy = self.execute(
             f"""SELECT *

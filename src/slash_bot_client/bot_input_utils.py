@@ -55,7 +55,7 @@ async def get_or_prepare_file_inputs(
                     message_i_id,
                     message_i,
                     resource_number,
-                    image_op if not hasattr(image_op, '__iter__') else image_op[0]
+                    image_op
                 )
                 
                 if check is None:
@@ -80,7 +80,7 @@ async def get_or_register_input(
         message_id: int,
         message: Optional[Message],  # TODO remove as only used for author, author could be passed
         resource_number: int,
-        image_op: ImageOp
+        image_op: Union[ImageOp, List[ImageOp]]
 ) -> Optional[str]:
     
     resource = database_client.get_resource(message_id, resource_number)
@@ -105,18 +105,36 @@ async def get_or_register_input(
             resource_number
         )
         print("filename", filename)
+        operation = ImageOp.INPUT
 
     else:
         filename = str(resource["filename"])
-        database_client.set_resource_operation(message_id, ImageOp.MAP_INPUT, resource_number)
+        operation = ImageOp(int(resource["operation"]))
+        # database_client.set_resource_operation(message_id, ImageOp.MAP_INPUT, resource_number)
 
-    await image_utils.get_or_fetch_image_check(
-        database_client,
-        download_fct,
-        channel.name,
-        message_id,
-        filename,
-        image_op
-    )
+    if hasattr(image_op, '__iter__'): # image_op is a sequence
+        for image_op_i in image_op:
+            check = await image_utils.get_or_fetch_image_check(
+                database_client,
+                download_fct,
+                channel.name,
+                message_id,
+                filename,
+                image_op_i
+            )
+            if check:
+                break
+    else:
+        check = await image_utils.get_or_fetch_image_check(
+            database_client,
+            download_fct,
+            channel.name,
+            message_id,
+            filename,
+            image_op
+        )
+        if check and operation != str(image_op.value):
+            print("setting new image operation", resource["operation"], str(image_op.value), flush=True)
+            database_client.set_resource_operation(message_id, image_op, resource_number)
     
     return filename

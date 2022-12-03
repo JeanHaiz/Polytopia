@@ -17,7 +17,7 @@ from common.image_param import ImageParam
 from map_patching import patching_callback_utils
 # from slash_bot_client import bot_utils_callbacks
 
-DEBUG = os.getenv("POLYTOPIA_DEBUG")
+DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
 database_client = DatabaseClient(
     user="discordBot",
@@ -71,15 +71,11 @@ def generate_patched_map_bis(
     else:
         status = "ERRORS - " + "; ".join(
             [str(str(error.name) + "(" + str(filename) + ")") for error, filename in patching_errors])
-    print("status", status)
+
     database_client.update_patching_process_status(patching_process_id, status)
     database_client.update_patching_process_output_filename(patching_process_id, filename)
     
-    print("patching done, callback triggered")
     patching_callback_utils.send_patching_completion(patching_process_id, channel_id, filename)
-    
-    # await bot_utils_callbacks.on_map_patching_complete(patching_process_id, channel_id, filename) TODO restore
-    # return turn, (output_file_path, patch_uuid, filename), patching_errors
 
 
 def patch_processed_images(
@@ -110,39 +106,9 @@ def patch_processed_images(
 
         if image_check and len(current_params) != 0:
             processed_params.append(current_params[0])
-            
-        """
-        if not image_check or len(current_params) == 0:
-            print("ANALYSING IMAGE:", filename, current_params)
-            
-            raw_image = image_utils.load_image(channel_name, filename, ImageOp.MAP_INPUT)
-            if raw_image is None:
-                print("Image not found %s" % filename)
-                patching_errors.append((MapPatchingErrors.NO_FILE_FOUND, filename))
-                continue
-            _, image_entry_params = map_analysis.analyse_map(
-                raw_image, database_client, channel_name, channel_id, filename, action_debug)
-            analysed_map_image = image_utils.load_image(
-                channel_name, filename, ImageOp.MAP_PROCESSED_IMAGE)
-            if analysed_map_image is None or image_entry_params is None or len(image_entry_params.corners) == 0:
-                patching_errors.append((MapPatchingErrors.MAP_NOT_RECOGNIZED, filename))
-                print("Could not analyse image %s:" % filename, analysed_map_image is None, image_entry_params is None)
-                continue
-            processed_params.append(image_entry_params)
-        else:
-            processed_params.append(current_params[0])
-        """
     
     background_params = load_background_params(map_size)
     background_image = load_processed_background(map_size)
-    
-    """
-    if background_image is None or background_params is None:
-        if DEBUG:
-            print("ANALYSING BACKGROUND")
-        _, background_params = map_analysis.analyse_background(database_client, map_size, action_debug)
-        background_image = load_processed_background(map_size)
-    """
     
     patched_image = patch_processed_image_files(background_image, background_params, channel_name, processed_params)
     
@@ -231,16 +197,24 @@ def patch_processed_image_files(
                 selected_corner_orientation_i
             ) or (0, 0)
             
+            print("corner details", CornerOrientation(selected_corner_orientation_i), selected_corner_i,
+                  background_selected_corner, image_param_i)
+            
             padding_i = (
                 background_selected_corner[0] - selected_corner_i[0],
                 background_selected_corner[1] - selected_corner_i[1])
             
+            print("padding before", padding_i, image_i.shape)
             cropped_image_i, padding_i = crop_padding(image_i, padding_i)
+            print("padding after", padding_i, cropped_image_i.shape)
             
             background_image = patch_image(
+                channel_name=channel_name,
+                filename=image_param_i.filename,
                 patch_work=background_image,
                 scaled_padding=padding_i,
-                reshaped_cropped_image_i=cropped_image_i)
+                reshaped_cropped_image_i=cropped_image_i
+            )
             del image_i, cropped_image_i,
         
         return background_image
@@ -306,12 +280,16 @@ def crop_padding_(
 
 
 def patch_image(
+        channel_name: str,
+        filename: str,
         patch_work: np.ndarray,
         scaled_padding: Tuple[int, int],
         reshaped_cropped_image_i: np.ndarray) -> np.ndarray:
     if DEBUG:
         print("patch work", patch_work.shape)
         print("cropped_image_i shape", reshaped_cropped_image_i.shape)
+        image_utils.save_image(reshaped_cropped_image_i, channel_name, filename + "-reshaped-cropped",
+                               ImageOp.MAP_PROCESSED_IMAGE)
     
     opacity: np.ndarray = reshaped_cropped_image_i[:, :, 3]
     size: Tuple[int, int] = reshaped_cropped_image_i.shape[0:2]
@@ -336,7 +314,9 @@ def patch_image(
                  :]
     
     if DEBUG:
-        cv2.imwrite("./patch-work-piece.png", background)
+        # cv2.imwrite("./patch-work-piece.png", background)
+        image_utils.save_image(background, channel_name, filename + "-patch-work-piece",
+                               ImageOp.MAP_PROCESSED_IMAGE)
         print("background shape", background.shape)
         
         print("shape for cropped bit", bit.shape)
@@ -359,8 +339,10 @@ def patch_image(
                   :]
     
     if DEBUG:
-        cv2.imwrite("./cropped_bit.png", cropped_bit)
+        # cv2.imwrite("./cropped_bit.png", cropped_bit)
         print("cropped bit shape", cropped_bit.shape)
+        image_utils.save_image(cropped_bit, channel_name, filename + "-cropped-bit",
+                               ImageOp.MAP_PROCESSED_IMAGE)
         
         print("shape for cropped opacity", opacity.shape)
         print(
@@ -382,7 +364,8 @@ def patch_image(
     
     if DEBUG:
         print("cropped opacity shape", cropped_opacity.shape)
-        cv2.imwrite("./cropped-opacity.png", cropped_opacity)
+        image_utils.save_image(cropped_opacity, channel_name, filename + "-cropped-opacity", ImageOp.MAP_PROCESSED_IMAGE)
+        # cv2.imwrite("./cropped-opacity.png", cropped_opacity)
         
         print("should match", background.shape, cv2.merge((cropped_opacity, cropped_opacity, cropped_opacity)).shape)
     

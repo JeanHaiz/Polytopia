@@ -57,19 +57,7 @@ params.socket_timeout = 5
 connection = pika.BlockingConnection(params)
 
 channel = connection.channel()
-"""channel.exchange_declare(
-    exchange="test_exchange",
-    exchange_type="direct",
-    passive=False,
-    durable=True,
-    auto_delete=False)"""
-channel.queue_declare(queue=QUEUE_NAME)  # , auto_delete=True)
-"""channel.queue_bind(
-    queue=QUEUE_NAME, exchange="test_exchange", routing_key="standard_key")
-# Note: prefetch is set to 1 here as an example only and to keep the number of threads created
-# to a reasonable amount. In production you will want to test with different prefetch values
-# to find which one provides the best performance and usability for your solution
-channel.basic_qos(prefetch_count=1)"""
+channel.queue_declare(queue=QUEUE_NAME)
 
 threads = []
 on_message_callback = functools.partial(on_message, args=(connection, threads))

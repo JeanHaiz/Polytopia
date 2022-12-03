@@ -160,6 +160,15 @@ async def register_process_inputs(
     resource = database_client.get_resource(message_id, resource_number)
     filename = str(resource["filename"])
     
+    check = image_utils.get_or_fetch_image_check(
+        database_client,
+        download_fct,
+        channel.name,
+        message_id,
+        filename,
+        ImageOp(resource["operation"])
+    )
+    
     """filename = await bot_input_utils.get_or_register_input(
         database_client,
         download_fct,
@@ -170,7 +179,7 @@ async def register_process_inputs(
         ImageOp.MAP_INPUT
     )"""
     
-    if filename is None:
+    if filename is None or not check:
         return []
 
     requirements = []
@@ -219,28 +228,34 @@ async def remove_map(ctx: CommandContext):
     message_resources = database_client.get_channel_message_resource_messages(
         ctx.channel_id,
         ctx.target.id,
-        ImageOp.MAP_INPUT
+        [ImageOp.MAP_INPUT, ImageOp.MAP_PROCESSED_IMAGE]
     )
     
     channel = await ctx.get_channel()
-    
+    print("message resources", len(message_resources), flush=True)
     for message_resource_i in message_resources:
         
-        resource_number = message_resource_i["resource_number"]
+        print("message_resource_i", message_resource_i, flush=True)
+        
+        resource_number = int(message_resource_i["resource_number"])
         operation = message_resource_i["operation"]
         
         filename = database_client.set_resource_operation(
-            ctx.message_id,
+            ctx.target.id,
             ImageOp.INPUT,
             resource_number
         )
+        print("filename", filename, flush=True)
         
         if filename is not None:
-            image_utils.move_back_input_image(
+            output = image_utils.move_back_input_image(
                 channel.name,
                 filename,
                 ImageOp(operation)
             )
+            print("map removal output", output, flush=True)
+        else:
+            print("Filename is none", flush=True)
 
 
 async def force_analyse_map_and_patch(
@@ -263,6 +278,11 @@ async def force_analyse_map_and_patch(
     # Registering message attachments
     for resource_number in range(n_resources):
         message.attachments[resource_number]._client = bot_http_client
+        
+        resource_i = database_client.get_resource(message.id, resource_number)
+        
+        database_client.delete_image_param(str(resource_i["filename"]))
+        database_client.set_resource_operation(message.id, ImageOp.MAP_INPUT, resource_number)
         
         await bot_input_utils.get_or_register_input(
             database_client,

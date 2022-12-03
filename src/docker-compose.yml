@@ -40,12 +40,12 @@ services:
             # kibana:
             #     condition: service_healthy
         build:
-            context: "/Users/jean/Documents/Coding/Polytopia/micro-services/"
+            context: "/Users/jean/Documents/Coding/Polytopia/src/"
             dockerfile: slash_bot_client/Dockerfile
         restart: "unless-stopped"
         container_name: slash_bot
         volumes:
-            - /Users/jean/Documents/Coding/Polytopia/micro-services:/app
+            - /Users/jean/Documents/Coding/Polytopia/src:/app
             - certs:/usr/share/elasticsearch/config/certs
         # /usr/share/elasticsearch/config/certs/ca/ca.crt
         env_file:
@@ -62,12 +62,12 @@ services:
             - database
             - rabbitmq
         build:
-            context: "/Users/jean/Documents/Coding/Polytopia/micro-services/"
+            context: "/Users/jean/Documents/Coding/Polytopia/src/"
             dockerfile: map_patching/Dockerfile
         restart: "unless-stopped"
         container_name: map_patching
         volumes:
-            - /Users/jean/Documents/Coding/Polytopia/micro-services:/app
+            - /Users/jean/Documents/Coding/Polytopia/src:/app
         env_file:
             - .env
         deploy:
@@ -82,12 +82,12 @@ services:
             - database
             - rabbitmq
         build:
-            context: "/Users/jean/Documents/Coding/Polytopia/micro-services/"
+            context: "/Users/jean/Documents/Coding/Polytopia/src/"
             dockerfile: map_analysis/Dockerfile
         restart: "unless-stopped"
         container_name: map_analysis
         volumes:
-            - /Users/jean/Documents/Coding/Polytopia/micro-services:/app
+            - /Users/jean/Documents/Coding/Polytopia/src:/app
         env_file:
             - .env
         deploy:
