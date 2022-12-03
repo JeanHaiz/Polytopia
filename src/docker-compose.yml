@@ -53,7 +53,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 500M
+                    memory: 200M
         networks:
             - database
 
@@ -73,7 +73,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 1g
+                    memory: 750M
         networks:
             - database
 
@@ -93,7 +93,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 1g
+                    memory: 750M
         networks:
             - database
 
