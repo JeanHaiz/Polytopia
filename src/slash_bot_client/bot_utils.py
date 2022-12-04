@@ -96,13 +96,14 @@ async def add_map_and_patch(
         )
 
     # Patching images registered for channel
-    await patch_images(ctx, bot_http_client, channel)
+    await patch_images(ctx, bot_http_client, channel, 3)
 
 
 async def patch_images(
         ctx: CommandContext,
         bot_http_client: HTTPClient,
         channel: Channel,
+        n_images: Optional[int]
 ):
     patch_process_id = database_client.add_patching_process(
         ctx.channel_id,
@@ -119,6 +120,8 @@ async def patch_images(
         [ImageOp.MAP_INPUT, ImageOp.MAP_PROCESSED_IMAGE]
     )
     
+    count = 0
+    
     for message_resource_i in message_resources:
         
         message_id = message_resource_i["source_message_id"]
@@ -134,7 +137,11 @@ async def patch_images(
         )
         
         requirements.extend(requirements_i)
-        
+        if n_images is not None and len(requirements_i) != 0:
+            count += 1
+            if count >= n_images:
+                break
+
     print("requirements", requirements, flush=True)
     
     for requirement_i in requirements:
@@ -295,7 +302,7 @@ async def force_analyse_map_and_patch(
         )
     
     # Patching images registered for channel
-    await patch_images(ctx, bot_http_client, channel)
+    await patch_images(ctx, bot_http_client, channel, 3)
 
 
 async def list_active_channels(ctx: CommandContext) -> None:
@@ -358,7 +365,8 @@ async def patch_map(
     await patch_images(
         ctx,
         bot_http_client,
-        channel
+        channel,
+        number_of_images
     )
     
     """
