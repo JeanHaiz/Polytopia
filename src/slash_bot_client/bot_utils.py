@@ -358,7 +358,7 @@ async def set_player_score(ctx: CommandContext, player_name: str, turn: int, sco
 async def patch_map(
         ctx: CommandContext,
         bot_http_client: HTTPClient,
-        number_of_images: int
+        number_of_images: Optional[int]
 ) -> None:
     
     channel = await ctx.get_channel()

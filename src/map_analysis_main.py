@@ -1,11 +1,10 @@
-import time
 import json
 import pika
 import sys
 import functools
 import threading
 
-from common import queue_utils
+from common import logger_utils
 from map_analysis import map_analysis
 
 
@@ -57,6 +56,7 @@ def main():
 
     channel = connection.channel()
     channel.queue_declare(queue=queue_name)
+    channel.basic_qos(prefetch_count=1)
 
     threads = []
     on_message_callback = functools.partial(on_message, args=(connection, threads))
