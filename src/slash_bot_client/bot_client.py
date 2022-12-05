@@ -1,0 +1,301 @@
+import asyncio
+import os
+import interactions
+
+from interactions import ApplicationCommandType, autodefer
+from interactions import CommandContext
+
+from slash_bot_client import bot_utils
+
+"""
+Slash bot command registry
+- manages bot events
+- manages user commands
+- sends requests to bot utils
+"""
+
+VERSION = "0.2.2"
+
+# TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
+
+DEBUG = os.getenv("POLYTOPIA_DEBUG")
+token = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
+
+
+async def create_client():
+    return interactions.Client(
+        token=token,
+        intents=interactions.Intents.DEFAULT | interactions.Intents.GUILD_MESSAGE_CONTENT,
+        prefix=":"
+    )
+
+slash_bot_client = asyncio.run(create_client())
+
+"""
+raw_socket_create
+on_start
+on_interaction
+on_command
+on_command_error
+on_component
+on_autocomplete
+on_modal
+"""
+
+# guild_ids = [918195469245628446]
+
+
+@slash_bot_client.command(
+    name="activate",
+    description="Activates the bot in the channel. Will now respond to map patching and score recognition requests.",
+    options=[
+        interactions.Option(
+            name="size",
+            description="Map size",
+            type=interactions.OptionType.INTEGER,
+            required=True,
+            choices=[
+                interactions.Choice(name="11 x 11", value=121),
+                interactions.Choice(name="14 x 14", value=196),
+                interactions.Choice(name="16 x 16", value=256),
+                interactions.Choice(name="18 x 18", value=324),
+                interactions.Choice(name="20 x 20", value=400),
+                # interactions.Choice(name="30 x 30", value=900),
+            ],
+        ),
+    ],
+)
+async def slash_activate(ctx: CommandContext, size: int) -> None:
+
+    await bot_utils.wrap_slash_errors(
+        ctx,
+        slash_bot_client,
+        ctx.guild_id,
+        lambda: bot_utils.activate(ctx, size)
+    )
+
+
+@slash_bot_client.command(
+    name="deactivate",
+    description="Deactivates the channel. Reactions and image uploads will not be tracked anymore."
+)
+async def slash_deactivate(ctx: CommandContext) -> None:
+
+    await bot_utils.wrap_slash_errors(
+        ctx,
+        slash_bot_client,
+        ctx.guild_id,
+        lambda: bot_utils.deactivate(ctx)
+    )
+
+
+@slash_bot_client.command(
+    name="version",
+    description="Current bot version."
+)
+async def version(ctx: CommandContext) -> None:
+    await ctx.send("slash bot version %s" % VERSION)
+
+
+@slash_bot_client.command(
+    name="scores",
+    description="Shows saved scores plot. If player is specified, shows the player score history.",
+    options=[
+        interactions.Option(
+            name="player",
+            description="Retrieves score for the player",
+            type=interactions.OptionType.STRING,
+            required=False,
+        ),
+    ]
+)
+async def slash_get_channel_player_scores(ctx: CommandContext, player: str = None) -> None:
+    
+    await bot_utils.wrap_slash_errors(
+        ctx,
+        slash_bot_client,
+        ctx.guild_id,
+        lambda: bot_utils.get_channel_player_score(ctx, player))
+
+
+@slash_bot_client.command(
+    name="patch",
+    description="Patches saved maps together.",
+    options=[
+        interactions.Option(
+            name="number_of_images",
+            description="Maximum number of images to patch",
+            type=interactions.OptionType.INTEGER,
+            required=False
+        )
+    ]
+)
+async def slash_patch_map(ctx: CommandContext, number_of_images: int = None) -> None:
+    await ctx.send("Loading")
+    print("slash bot bot_http_client", slash_bot_client)
+    print("interaction bot_http_client", ctx.client, ctx._client, slash_bot_client._http)
+    await bot_utils.wrap_slash_errors(
+        ctx,
+        slash_bot_client,
+        ctx.guild_id,
+        lambda: bot_utils.patch_map(
+            ctx,
+            slash_bot_client._http,
+            number_of_images
+        )
+    )
+    
+
+@slash_bot_client.command(
+    name="set-score",
+    description="Set score for a specific player and turn",
+    options=[
+        interactions.Option(
+            name="player_name",
+            description="player-name",
+            type=interactions.OptionType.STRING,
+            required=True
+        ),
+        interactions.Option(
+            name="turn",
+            description="turn",
+            type=interactions.OptionType.INTEGER,
+            required=True
+        ),
+        interactions.Option(
+            name="score",
+            description="score",
+            type=interactions.OptionType.INTEGER,
+            required=True
+        )
+    ]
+)
+async def slash_set_player_score(ctx: CommandContext, player_name: str, turn: int, score: int) -> None:
+    await bot_utils.wrap_slash_errors(
+        ctx,
+        slash_bot_client,
+        ctx.guild_id,
+        lambda: bot_utils.set_player_score(
+            ctx,
+            player_name,
+            turn,
+            score
+        )
+    )
+
+
+@slash_bot_client.command(
+    name="clear_maps",
+    description="Clear the stack of maps to patch"
+)
+async def slash_clear_map_reactions(ctx: CommandContext) -> None:
+    async def inner() -> None:
+        message = await ctx.send("Processing")
+        channel = await ctx.get_channel()
+        await bot_utils.clear_channel_map_reactions(channel, lambda: message.edit("Done"))
+    await bot_utils.wrap_slash_errors(ctx, slash_bot_client, ctx.guild_id, inner)
+
+
+@slash_bot_client.command(
+    name="channels",
+    description="admin command — lists all active channels in the server"
+)
+async def slash_list_active_channels(ctx: CommandContext) -> None:
+    await bot_utils.wrap_slash_errors(
+        ctx,
+        slash_bot_client,
+        ctx.guild_id,
+        lambda: bot_utils.list_active_channels(ctx)
+    )
+
+
+@slash_bot_client.command(
+    name="Add",
+    type=ApplicationCommandType.MESSAGE
+)
+@autodefer()
+async def add_patch_source(ctx: CommandContext):
+    async def inner():
+        if len(ctx.target.attachments) > 0:
+            message = await ctx.send("Loading")
+            
+            await bot_utils.add_map_and_patch(
+                ctx,
+                slash_bot_client._http
+            )
+            
+            await message.edit("Analysing")
+    
+        else:
+            await ctx.send("Please add a message with an image")
+
+    await bot_utils.wrap_slash_errors(
+        ctx,
+        slash_bot_client,
+        ctx.guild.id,
+        lambda: inner()
+    )
+
+
+@slash_bot_client.command(
+    name="Remove",
+    type=ApplicationCommandType.MESSAGE
+)
+async def remove_patch_source(ctx: CommandContext):
+    async def inner():
+        message = await ctx.send("Processing")
+        if len(ctx.target.attachments) > 0:
+            
+            await bot_utils.remove_map(ctx)
+            await message.edit("Done")
+            
+        else:
+            await message.edit("Please remove a message with an image")
+
+    await bot_utils.wrap_slash_errors(
+        ctx,
+        slash_bot_client,
+        ctx.guild.id,
+        lambda: inner()
+    )
+
+
+@slash_bot_client.command(
+    name="Renew",
+    type=ApplicationCommandType.MESSAGE
+)
+async def renew_map_patching(ctx: CommandContext):
+    async def inner():
+        if len(ctx.target.attachments) > 0:
+            message = await ctx.send("Loading")
+        
+            await bot_utils.force_analyse_map_and_patch(
+                ctx,
+                slash_bot_client._http
+            )
+        
+            await message.edit("Analysing")
+    
+        else:
+            await ctx.send("Please add a message with an image")
+
+    await bot_utils.wrap_slash_errors(
+        ctx,
+        slash_bot_client,
+        ctx.guild.id,
+        lambda: inner()
+    )
+
+
+@slash_bot_client.command(
+    name="trace",
+    description="Lists all map pieces used as input for patching"
+)
+async def get_map_trace(ctx: CommandContext) -> None:
+    
+    await bot_utils.wrap_slash_errors(
+        ctx,
+        slash_bot_client,
+        ctx.guild.id,
+        lambda: bot_utils.trace(ctx)
+    )

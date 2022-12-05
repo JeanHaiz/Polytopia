@@ -10,7 +10,7 @@ def init_logging():
     new_logger.setLevel(logging.DEBUG)
 
     log_format = "%(asctime)s - %(levelname)s - %(message)s"
-    handler = TimedRotatingFileHandler("discord_log/discord.log", when="midnight", interval=1)
+    handler = TimedRotatingFileHandler("discord.log", when="midnight", interval=1)
     handler.setLevel(logging.DEBUG if os.getenv("POLYTOPIA_DEBUG") == "1" else logging.INFO)
     formatter = logging.Formatter(log_format)
     handler.setFormatter(formatter)

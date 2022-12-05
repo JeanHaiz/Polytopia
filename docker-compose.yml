@@ -38,12 +38,12 @@ services:
             # kibana:
             #     condition: service_healthy
         build:
-            context: "/Users/jean/Documents/Coding/Polytopia/src/"
+            context: "/Users/jean/Documents/Coding/Polytopia/src-old/"
             dockerfile: Dockerfile
         restart: "unless-stopped"
         container_name: helper
         volumes:
-            - /Users/jean/Documents/Coding/Polytopia/src:/app
+            - /Users/jean/Documents/Coding/Polytopia/src-old:/app
             - certs:/usr/share/elasticsearch/config/certs
         # /usr/share/elasticsearch/config/certs/ca/ca.crt
         env_file:
