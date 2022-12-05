@@ -58,6 +58,7 @@ connection = pika.BlockingConnection(params)
 
 channel = connection.channel()
 channel.queue_declare(queue=QUEUE_NAME)
+channel.basic_qos(prefetch_count=1)
 
 threads = []
 on_message_callback = functools.partial(on_message, args=(connection, threads))

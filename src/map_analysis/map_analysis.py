@@ -88,7 +88,8 @@ def analyse_map(
 
     alpha, scale = get_cloud_alpha_quater(
         map_image_no_alpha, channel_name, filename, map_size, action_debug=action_debug)
-    image_utils.save_image(alpha, channel_name, filename + "_mask", ImageOp.MAP_PROCESSED_IMAGE)
+    if DEBUG:
+        image_utils.save_image(alpha, channel_name, filename + "_mask", ImageOp.MAP_PROCESSED_IMAGE)
     if DEBUG or action_debug:
         print("image scale", scale)
 

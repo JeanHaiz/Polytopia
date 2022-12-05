@@ -134,7 +134,7 @@ async def get_or_register_input(
             image_op
         )
         if check and operation != str(image_op.value):
-            print("setting new image operation", resource["operation"], str(image_op.value), flush=True)
+            print("setting new image operation", operation, str(image_op.value), flush=True)
             database_client.set_resource_operation(message_id, image_op, resource_number)
     
     return filename

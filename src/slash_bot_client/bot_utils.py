@@ -69,6 +69,20 @@ async def add_map_and_patch(
 ):
     
     # Fulfilling precondition: Game setup
+    channel_info = database_client.get_channel_info(ctx.channel_id)
+    print("channel info", channel_info, flush=True)
+    channel = await ctx.get_channel()
+    
+    if channel_info is None:
+        server = await ctx.get_guild()
+        
+        database_client.activate_channel(
+            ctx.channel_id,
+            channel.name,
+            ctx.guild_id,
+            server.name
+        )
+    
     database_client.add_player_n_game(
         ctx.channel_id,
         ctx.guild_id,
@@ -77,7 +91,6 @@ async def add_map_and_patch(
     )
     
     # Helper variables
-    channel = await ctx.get_channel()
     message = ctx.target
     n_resources = len(message.attachments)
     

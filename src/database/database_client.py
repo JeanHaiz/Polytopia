@@ -515,10 +515,14 @@ class DatabaseClient:
         )
         return [dict(row) for row in result]
     
-    def get_channel_info(self, channel_id):
-        return dict(self.execute(
+    def get_channel_info(self, channel_id) -> Optional[dict]:
+        channel_info = self.execute(
             f"""select * from discord_channel
-                where channel_discord_id = '{channel_id}';""").fetchone())
+                where channel_discord_id = '{channel_id}';""").fetchone()
+        if channel_info is not None:
+            return dict(channel_info)
+        else:
+            return None
     
     def add_visualisation(self, channel_id, author_id):
         visualisation_uuid = self.execute(
