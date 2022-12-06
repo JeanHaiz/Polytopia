@@ -13,7 +13,7 @@ Slash bot command registry
 - sends requests to bot utils
 """
 
-VERSION = "0.2.2"
+VERSION = "0.2.3"
 
 # TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
 
