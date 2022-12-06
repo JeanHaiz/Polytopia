@@ -301,8 +301,9 @@ async def force_analyse_map_and_patch(
         
         resource_i = database_client.get_resource(message.id, resource_number)
         
-        database_client.delete_image_param(str(resource_i["filename"]))
-        database_client.set_resource_operation(message.id, ImageOp.MAP_INPUT, resource_number)
+        if resource_i is not None:
+            database_client.delete_image_param(str(resource_i["filename"]))
+            database_client.set_resource_operation(message.id, ImageOp.MAP_INPUT, resource_number)
         
         await bot_input_utils.get_or_register_input(
             database_client,
