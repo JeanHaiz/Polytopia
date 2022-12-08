@@ -1,19 +1,13 @@
 import os
 
 from common.image_operation import ImageOp
-from database.database_client import DatabaseClient
+from database.database_client import get_database_client
 from slash_bot_client import bot_utils_callbacks
 from slash_bot_client import service_connector
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
-database_client = DatabaseClient(
-    user="discordBot",
-    password="password123",
-    port="5432",
-    database="polytopiaHelper_dev",
-    host="database"
-)
+database_client = get_database_client()
 
 
 async def get_or_analyse_map(

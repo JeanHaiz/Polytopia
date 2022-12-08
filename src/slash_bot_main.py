@@ -3,7 +3,7 @@ import asyncio
 import interactions
 import nest_asyncio
 
-from slash_bot_client.bot_client_obj import SlashBotExtension
+from slash_bot_client.bot_extension import SlashBotExtension
 from slash_bot_client import receiver_service
 from common.logger_utils import logger
 
@@ -20,7 +20,7 @@ token = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
 
 print(DEBUG, token, flush=True)
 
-logger.debug("token: %s" % token)
+logger.debug("TOKEN: %s" % token)
 
 
 async def create_client():

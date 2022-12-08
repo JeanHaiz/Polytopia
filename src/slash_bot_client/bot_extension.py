@@ -5,6 +5,7 @@ from interactions import ApplicationCommandType, autodefer
 from interactions import CommandContext
 
 from slash_bot_client import bot_utils
+from slash_bot_client import bot_error_utils
 
 """
 Slash bot command registry
@@ -13,12 +14,9 @@ Slash bot command registry
 - sends requests to bot utils
 """
 
-VERSION = "0.2.3"
-
-# TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
-
+VERSION = os.getenv("SLASH_BOT_VERSION")
 DEBUG = os.getenv("POLYTOPIA_DEBUG")
-token = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
+TOKEN = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
 
 """
 raw_socket_create
@@ -31,10 +29,6 @@ on_autocomplete
 on_modal
 """
 
-# guild_ids = [918195469245628446]
-
-
-# class SlashBotClient(interactions.Client):
 
 class SlashBotExtension(interactions.Extension):
     
@@ -62,8 +56,8 @@ class SlashBotExtension(interactions.Extension):
         ],
     )
     async def slash_activate(self, ctx: CommandContext, size: int) -> None:
-    
-        await bot_utils.wrap_slash_errors(
+        
+        await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
             ctx.guild_id,
@@ -75,8 +69,8 @@ class SlashBotExtension(interactions.Extension):
         description="Deactivates the channel. Reactions and image uploads will not be tracked anymore."
     )
     async def slash_deactivate(self, ctx: CommandContext) -> None:
-    
-        await bot_utils.wrap_slash_errors(
+        
+        await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
             ctx.guild_id,
@@ -104,7 +98,7 @@ class SlashBotExtension(interactions.Extension):
     )
     async def slash_get_channel_player_scores(self, ctx: CommandContext, player: str = None) -> None:
         
-        await bot_utils.wrap_slash_errors(
+        await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
             ctx.guild_id,
@@ -124,9 +118,7 @@ class SlashBotExtension(interactions.Extension):
     )
     async def slash_patch_map(self, ctx: CommandContext, number_of_images: int = None) -> None:
         await ctx.send("Loading")
-        print("slash bot bot_http_client", self.client)
-        print("interaction bot_http_client", ctx.client, ctx._client, self.client._http)
-        await bot_utils.wrap_slash_errors(
+        await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
             ctx.guild_id,
@@ -162,7 +154,7 @@ class SlashBotExtension(interactions.Extension):
         ]
     )
     async def slash_set_player_score(self, ctx: CommandContext, player_name: str, turn: int, score: int) -> None:
-        await bot_utils.wrap_slash_errors(
+        await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
             ctx.guild_id,
@@ -183,14 +175,15 @@ class SlashBotExtension(interactions.Extension):
             message = await ctx.send("Processing")
             channel = await ctx.get_channel()
             await bot_utils.clear_channel_map_reactions(channel, lambda: message.edit("Done"))
-        await bot_utils.wrap_slash_errors(ctx, self.client, ctx.guild_id, inner)
+        
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, ctx.guild_id, inner)
     
     @interactions.extension_command(
         name="channels",
         description="admin command — lists all active channels in the server"
     )
     async def slash_list_active_channels(self, ctx: CommandContext) -> None:
-        await bot_utils.wrap_slash_errors(
+        await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
             ctx.guild_id,
@@ -213,11 +206,11 @@ class SlashBotExtension(interactions.Extension):
                 )
                 
                 await message.edit("Analysing")
-        
+            
             else:
                 await ctx.send("Please add a message with an image")
-    
-        await bot_utils.wrap_slash_errors(
+        
+        await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
             ctx.guild.id,
@@ -230,16 +223,16 @@ class SlashBotExtension(interactions.Extension):
     )
     async def remove_patch_source(self, ctx: CommandContext):
         async def inner():
-            message = await ctx.send("Processing")
             if len(ctx.target.attachments) > 0:
+                message = await ctx.send("Processing")
                 
                 await bot_utils.remove_map(ctx)
                 await message.edit("Done")
-                
+            
             else:
-                await message.edit("Please remove a message with an image")
-    
-        await bot_utils.wrap_slash_errors(
+                await ctx.send("Please remove a message with an image")
+        
+        await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
             ctx.guild.id,
@@ -254,18 +247,18 @@ class SlashBotExtension(interactions.Extension):
         async def inner():
             if len(ctx.target.attachments) > 0:
                 message = await ctx.send("Loading")
-            
+                
                 await bot_utils.force_analyse_map_and_patch(
                     ctx,
                     self.client._http
                 )
-            
+                
                 await message.edit("Analysing")
-        
+            
             else:
                 await ctx.send("Please add a message with an image")
-    
-        await bot_utils.wrap_slash_errors(
+        
+        await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
             ctx.guild.id,
@@ -278,7 +271,7 @@ class SlashBotExtension(interactions.Extension):
     )
     async def get_map_trace(self, ctx: CommandContext) -> None:
         
-        await bot_utils.wrap_slash_errors(
+        await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
             ctx.guild.id,

@@ -15,19 +15,12 @@ from common import image_processing_utils
 from common.image_operation import ImageOp
 from common.image_param import ImageParam
 from common.corner_orientation import CornerOrientation
-from database.database_client import DatabaseClient
+from database.database_client import get_database_client
 from map_analysis import analysis_callback_utils
-
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
-database_client = DatabaseClient(
-    user="discordBot",
-    password="password123",
-    port="5432",
-    database="polytopiaHelper_dev",
-    host="database"
-)
+database_client = get_database_client()
 
 
 def map_analysis_request(
@@ -38,10 +31,11 @@ def map_analysis_request(
         message_id: int,
         resource_number: int,
         filename: str
-):
+) -> None:
     image = image_utils.load_image(channel_name, filename, ImageOp.MAP_INPUT)
-
-    print("image", image is None, image.shape, flush=True)
+    
+    if DEBUG:
+        print("image", image is None, image.shape, flush=True)
     
     filename, _ = analyse_map(
         image,
@@ -58,16 +52,13 @@ def map_analysis_request(
             resource_number
         )
     
-    print("map analysis done, callback sent", flush=True)
+    if DEBUG:
+        print("map analysis done, callback sent", flush=True)
     
     analysis_callback_utils.send_analysis_completion(
         patch_process_id,
         map_requirement_id
     )
-    """await bot_utils_callbacks.on_map_analysis_complete(
-        patch_process_id,
-        map_requirement_id
-    )"""  # TODO restore
 
 
 def analyse_map(
@@ -75,29 +66,29 @@ def analyse_map(
         channel_name: str,
         channel_id: int,
         filename: str,
-        action_debug: bool) -> Tuple[Optional[str], ImageParam]:
-
+        action_debug: bool
+) -> Tuple[Optional[str], ImageParam]:
     map_image_no_alpha = map_image[:, :, 0:3].astype(np.uint8)
     if DEBUG or action_debug:
-        print("DEBUG IMAGE")
+        print("DEBUG IMAGE", flush=True)
         print(type(map_image_no_alpha))
         print(map_image_no_alpha.dtype)
-        print(map_image_no_alpha.shape)
-
+        print(map_image_no_alpha.shape, flush=True)
+    
     map_size = database_client.get_game_map_size(channel_id) if database_client is not None else "400"
-
+    
     alpha, scale = get_cloud_alpha_quater(
         map_image_no_alpha, channel_name, filename, map_size, action_debug=action_debug)
     if DEBUG:
         image_utils.save_image(alpha, channel_name, filename + "_mask", ImageOp.MAP_PROCESSED_IMAGE)
     if DEBUG or action_debug:
-        print("image scale", scale)
-
+        print("image scale", scale, flush=True)
+    
     map_with_alpha = attach_alpha(map_image_no_alpha, alpha)
     scaled_image = scale_image(map_with_alpha, scale)
     corners = get_corners(scaled_image, channel_name, filename, action_debug)
     image_params = ImageParam(filename, scale, corners)
-
+    
     if DEBUG or action_debug:
         print(image_params)
     if database_client is not None and len(image_params.corners) != 0:
@@ -113,16 +104,16 @@ def analyse_background(
         background_template, "templates", "processed_background_template_%s" % map_size, map_size,
         action_debug=action_debug)
     scaled_image = scale_image(background_template, scale)
-
+    
     path, filename = image_utils.set_processed_background(scaled_image, map_size)
-
+    
     corners = get_corners(scaled_image, "templates", "processed_background_template_%s" % map_size, action_debug)
-
+    
     image_params = ImageParam(filename, scale, corners)
-
+    
     if DEBUG or action_debug:
         print(image_params)
-
+    
     store_background_image_params(map_size, image_params)
     return path, image_params
 
@@ -152,30 +143,42 @@ def store_transformed_image(image: np.ndarray, channel_name: str, filename: str)
 def match_full_clouds(
         blur: np.ndarray,
         img_alpha: np.ndarray,
-        template_alpha: np.ndarray) -> np.ndarray:
-
+        template_alpha: np.ndarray
+) -> np.ndarray:
     threshold = 60
     max_val = np.max(blur)
     hh, ww = template_alpha.shape[:2]
     rad = int(math.sqrt(hh * hh + ww * ww) / 8)
-
+    
     while max_val >= threshold:
-
+        
         # find max value of correlation image
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(blur)
-
+        min_val, max_val, min_loc, max_loc_raw = cv2.minMaxLoc(blur)
+        
+        max_loc = (
+            max_loc_raw[0] - int(hh / 2),
+            max_loc_raw[1] - int(ww / 2)
+        )
+        
+        print("Max loc", max_loc_raw, max_loc, flush=True)
         if max_val > threshold:
             # draw match on copy of input
-            background = img_alpha[max_loc[1]: max_loc[1] + hh, max_loc[0]: max_loc[0] + ww]
-            img_alpha[max_loc[1]: max_loc[1] + hh, max_loc[0]: max_loc[0] + ww] = \
-                background - template_alpha[:background.shape[0], :background.shape[1]] / 255.0
-
+            background = img_alpha[
+                         max_loc[1]: max_loc[1] + hh,
+                         max_loc[0]: max_loc[0] + ww]
+            img_alpha[
+                max_loc[1]: max_loc[1] + hh,
+                max_loc[0]: max_loc[0] + ww] = \
+                background - template_alpha[
+                             :background.shape[0],
+                             :background.shape[1]] / 255.0
+            
             # write black circle at max_loc in corr_img
-            cv2.circle(blur, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
-
+            cv2.circle(blur, (max_loc_raw), radius=rad, color=0, thickness=cv2.FILLED)
+        
         else:
             break
-
+    
     return img_alpha
 
 
@@ -185,17 +188,18 @@ def pad_matching_template(
         partial_template_alpha: np.ndarray,
         channel_name: str,
         filename: str,
-        action_debug: bool) -> np.ndarray:
+        action_debug: bool
+) -> np.ndarray:
     padded_blur = get_template_matching(blur, partial_template, partial_template_alpha, 7, 15)
-
+    
     if DEBUG or action_debug:
         image_utils.save_image(padded_blur, channel_name, filename + "_padded_blur", ImageOp.MAP_PROCESSED_IMAGE)
     return padded_blur
 
 
 def pad_image(
-    cropped_image: np.ndarray,
-    reference_image: np.ndarray
+        cropped_image: np.ndarray,
+        reference_image: np.ndarray
 ) -> np.ndarray:
     missing_height = reference_image.shape[0] - cropped_image.shape[0]
     top = int(missing_height / 2)
@@ -203,8 +207,8 @@ def pad_image(
     missing_width = reference_image.shape[1] - cropped_image.shape[1]
     left = int(missing_width / 2)
     right = missing_width - left
-
-    return cv2.copyMakeBorder(cropped_image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=0)
+    
+    return cv2.copyMakeBorder(cropped_image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=0)  # TODO here
 
 
 def match_border_clouds(
@@ -215,88 +219,86 @@ def match_border_clouds(
         grid_image: np.ndarray,
         channel_name: str,
         filename: str,
-        action_debug: bool) -> np.ndarray:
-
+        action_debug: bool
+) -> np.ndarray:
     full_hh, full_ww = template_alpha.shape[:2]
     rad = int(math.sqrt(full_hh * full_hh + full_ww * full_ww) / 4)
-
+    
     border_threshold = 30
-
+    
     border_width = max(full_hh, full_ww)
-
+    
     img_shape = img_alpha.shape
-
+    
     if img_shape[0] > img_shape[1]:
-        print("left-right borders")
-
+        if DEBUG:
+            print("left-right borders")
+        
         left_template_alpha = template_alpha[:, :int(full_ww / 2)]
         right_template_alpha = template_alpha[:, int(full_ww / 2):]
-
+        
         left_template = template[:, :int(full_ww / 2)]
         right_template = template[:, int(full_ww / 2):]
-
+        
         blur_left = pad_matching_template(map_image, left_template, left_template_alpha, channel_name,
                                           filename + "_left", action_debug)
         blur_right = pad_matching_template(map_image, right_template, right_template_alpha, channel_name,
                                            filename + "_right", action_debug)
-
-        # grid_blur_left = cv2.bitwise_and(blur_left, grid_image[:, :, 0])
-        # grid_blur_right = cv2.bitwise_and(blur_right, grid_image[:, :, 0])
-
+        
         grid_blur_left = blur_left
         grid_blur_right = blur_right
-
+        
         borders = [
             ((0, 0), grid_blur_right[:, :border_width], right_template_alpha),
             ((0, img_shape[1] - border_width), grid_blur_left[:, -border_width:], left_template_alpha)]
     else:
         print("top-bottom borders")
-
+        
         top_template = template[:int(full_hh / 2), :]
         bottom_template = template[int(full_hh / 2):, :]
-
+        
         top_template_alpha = template_alpha[:int(full_hh / 2), :]
         bottom_template_alpha = template_alpha[int(full_hh / 2):, :]
-
+        
         blur_top = pad_matching_template(map_image, top_template, top_template_alpha, channel_name, filename + "_top",
                                          action_debug)
         blur_bottom = pad_matching_template(map_image, bottom_template, bottom_template_alpha, channel_name,
                                             filename + "_bottom", action_debug)
-
+        
         grid_blur_top = cv2.bitwise_and(blur_top, grid_image[:, :, 0])
         grid_blur_bottom = cv2.bitwise_and(blur_bottom, grid_image[:, :, 0])
-
+        
         borders = [
             ((0, 0), grid_blur_bottom[:border_width, :], bottom_template_alpha),
             ((img_shape[0] - border_width, 0), grid_blur_top[-border_width:, :], top_template_alpha)]
-
+    
     for padding, border_image, partial_template_alpha in borders:
-
+        
         hh, ww = partial_template_alpha.shape
-
+        
         max_val = np.max(border_image)
-
+        
         while max_val > border_threshold:
-
+            
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(border_image)
-
+            
             padded_max_loc = max_loc[0] + padding[1] - int(hh / 2), max_loc[1] + padding[0] - int(ww / 2)  # y, x
-
+            
             if max_val > border_threshold:
-
+                
                 background = img_alpha[
-                    padded_max_loc[1]: padded_max_loc[1] + hh,
-                    padded_max_loc[0]: padded_max_loc[0] + ww]
-
+                             padded_max_loc[1]: padded_max_loc[1] + hh,
+                             padded_max_loc[0]: padded_max_loc[0] + ww]
+                
                 img_alpha[
-                    padded_max_loc[1]: padded_max_loc[1] + hh,
-                    padded_max_loc[0]: padded_max_loc[0] + ww] = \
+                padded_max_loc[1]: padded_max_loc[1] + hh,
+                padded_max_loc[0]: padded_max_loc[0] + ww] = \
                     background - partial_template_alpha[:background.shape[0], :background.shape[1]]
-
+                
                 cv2.circle(border_image, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
             else:
                 break
-
+    
     return img_alpha
 
 
@@ -315,11 +317,11 @@ def get_template_matching(
 def resize_template(template: np.ndarray, scale: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     new_dim = (int(template.shape[1] / scale), int(template.shape[0] / scale))
     resized_template = cv2.resize(template[:, :, 0:3], new_dim, interpolation=cv2.INTER_AREA)
-
+    
     resized_template_alpha_layer = cv2.resize(template[:, :, 3], new_dim, interpolation=cv2.INTER_AREA)
     resized_template_alpha = cv2.merge(
         [resized_template_alpha_layer, resized_template_alpha_layer, resized_template_alpha_layer])
-
+    
     return resized_template, resized_template_alpha, resized_template_alpha_layer
 
 
@@ -337,32 +339,32 @@ def get_inter_point_space(centers: List[np.ndarray]) -> int:
 def match_template(template: np.ndarray, edges: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     light_colour = (0, 0, 0)
     dark_colour = (10, 10, 10)
-
+    
     background = 255 - cv2.inRange(template, light_colour, dark_colour)
     contours, _ = cv2.findContours(background, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     selected_contour = sorted([(c, cv2.contourArea(c)) for c in contours], key=lambda x: -x[1])[0]
     mask = cv2.drawContours(np.zeros_like(background), [selected_contour[0]], -1, (255, 255, 255), thickness=cv2.FILLED)
-
+    
     shape = template.shape
-
+    
     masked_edges = cv2.bitwise_and(edges, edges, mask=mask)
-
+    
     frame = cv2.copyMakeBorder(
         masked_edges,
         int(shape[0] / 2),
         int(shape[0] / 2) - (1 if shape[0] % 2 == 0 else 0),
         int(shape[1] / 2),
         int(shape[1] / 2) - (1 if shape[1] % 2 == 0 else 0),
-        cv2.BORDER_CONSTANT, 0)
-
+        cv2.BORDER_CONSTANT, 0)  # TODO here !!!
+    
     corr_img = cv2.matchTemplate(frame, masked_edges, cv2.TM_CCOEFF, mask=mask)
-
+    
     correlation_raw = (255 * (corr_img - np.min(corr_img)) / (np.max(corr_img) - np.min(corr_img))).astype(np.uint8)
-
+    
     masked_correlation_raw = cv2.bitwise_and(correlation_raw, correlation_raw, mask=mask)
-
+    
     (_, thresh) = cv2.threshold(masked_correlation_raw, 30, 255, cv2.THRESH_BINARY)
-
+    
     return masked_correlation_raw, mask, thresh
 
 
@@ -372,24 +374,21 @@ def get_scale(
         filename: str,
         action_debug: bool) -> float:
     edges = image_processing_utils.get_one_color_edges(template)
-    # template_edge = get_one_color_edges(template)
-    # if DEBUG or action_debug:
-    #     image_utils.save_image(edges, channel_name, filename + "_self_edges", ImageOp.MAP_PROCESSED_IMAGE)
-
+    
     correlation_raw, mask, thresh = match_template(template, edges)
-
+    
     if DEBUG or action_debug:
         image_utils.save_image(correlation_raw, channel_name, filename + "_self_matching", ImageOp.MAP_PROCESSED_IMAGE)
         image_utils.save_image(mask, channel_name, filename + "_self_mask", ImageOp.MAP_PROCESSED_IMAGE)
         image_utils.save_image(thresh, channel_name, filename + "_self_masked_matching", ImageOp.MAP_PROCESSED_IMAGE)
-
+    
     contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     centers = [np.reshape(np.mean(c, axis=0).astype(np.int32), (1, 1, 2)) for c in contours]
-
+    
     if DEBUG or action_debug:
         contour_mask = cv2.drawContours(np.zeros((1080, 2312, 3)), centers, -1, (255, 255, 255))
         image_utils.save_image(contour_mask, channel_name, filename + "_self_contour", ImageOp.MAP_PROCESSED_IMAGE)
-
+    
     return get_inter_point_space(centers)
 
 
@@ -399,63 +398,50 @@ def get_cloud_alpha_quater(
         filename: str,
         map_size: str,
         action_debug: bool = False) -> Tuple[np.ndarray, float]:
-
     template = image_utils.get_cloud_template()
-
+    
     raw_scale = get_scale(map_image, channel_name, filename, action_debug)
     scale = 1.0 / (raw_scale / template.shape[0])
-
+    
     resized_template, resized_template_alpha, resized_template_alpha_layer = resize_template(template, scale)
-
+    
     k_size = int(resized_template.shape[0] * 0.3)
     if k_size % 2 == 0:
         k_size += 1
-
+    
     sigma = int(resized_template.shape[0] / 25)
-
+    
     blur = get_template_matching(map_image, resized_template, resized_template_alpha, k_size, sigma)
-
-    # grid_image = get_grid(channel_name, filename, map_size)
-
+    
     grid_image = find_cloud_grid(map_image, channel_name, filename, map_size)
-
+    
     grid_blur = cv2.bitwise_and(blur, grid_image[:, :, 0])
-
+    
     if DEBUG or action_debug:
         maximum = np.max(grid_blur)
-
+    
     img_alpha = np.ones((map_image.shape[0:2]))
-
+    
     img_alpha = match_full_clouds(grid_blur, img_alpha, resized_template_alpha_layer)
-
+    
     cloud_less_map_image = cv2.bitwise_and(map_image, map_image, mask=img_alpha.astype(np.uint8))
-
+    
     if DEBUG or action_debug:
         image_utils.save_image(
             cloud_less_map_image, channel_name, filename + "_cloudless_map", ImageOp.MAP_PROCESSED_IMAGE)
-
-    """ img_alpha = match_border_clouds(
-        cloud_less_map_image,
-        img_alpha,
-        resized_template,
-        resized_template_alpha_layer,
-        grid_image,
-        channel_name,
-        filename,
-        action_debug) """
-
+    
     if DEBUG or action_debug:
         image_utils.save_image(
             img_alpha.clip(0, 1) * 255, channel_name, filename + "_borderless_map", ImageOp.MAP_PROCESSED_IMAGE)
-
+    
     img_alpha_c = img_alpha.clip(0, 1).astype(np.uint8) * 255
-
+    
     if DEBUG or action_debug:
         alpha_area = np.sum(img_alpha_c == 0) / (img_alpha_c.shape[0] * img_alpha_c.shape[1])
-        print("result set", scale, maximum, maximum / scale, alpha_area)
+        print("result set", scale, maximum, maximum / scale, alpha_area, flush=True)
         image_utils.save_image(
             img_alpha_c, channel_name, filename + "_cloud_matching", ImageOp.MAP_PROCESSED_IMAGE)
-
+    
     return img_alpha_c, scale
 
 
@@ -463,47 +449,47 @@ def find_cloud_grid(map_image, channel_name, filename, map_size, k_size: int = 7
     template = image_utils.get_cloud_template()
     raw_scale = get_scale(map_image, channel_name, filename, action_debug)
     scale = 1.0 / (raw_scale / template.shape[0])
-
+    
     resized_template, resized_template_alpha, resized_template_alpha_layer = resize_template(template, scale)
-
+    
     template_width = resized_template.shape[0]
     template_height = resized_template.shape[1]
     half_template_width = template_width / 2
     half_template_height = template_height / 2
-
+    
     blur = get_template_matching(map_image, resized_template, resized_template_alpha, k_size, sigma)
-
+    
     hh, ww = resized_template.shape[:2]
     rad = int(math.sqrt(hh * hh + ww * ww) / 8)
-
+    
     map_width = int(math.sqrt(int(map_size)))
-
+    
     voting_map = np.zeros((blur.shape[0], blur.shape[1], 3), dtype=np.uint8)
-
+    
     for max_i in range(3):
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(blur)
-
+        
         for origin_x in range(map_width):
             for origin_y in range(map_width):
                 centre = (
                     int(max_loc[1] - (origin_x + origin_y) * half_template_width),
                     int(max_loc[0] + origin_x * half_template_height - origin_y * half_template_height)
                 )
-
+                
                 for grid_step_x in range(map_width):
                     for grid_step_y in range(map_width):
                         voting_point = (
                             int(centre[1] - grid_step_x * half_template_height + grid_step_y * half_template_height),
                             int(centre[0] + (grid_step_x + grid_step_y) * half_template_width)
                         )
-
+                        
                         cv2.circle(
                             voting_map,
                             (voting_point[0], voting_point[1]),
                             3, (255, 255, 255), cv2.FILLED)
-
+        
         cv2.circle(blur, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
-
+    
     return voting_map
 
 
@@ -523,27 +509,23 @@ def get_corners(
         channel_name: str,
         filename: str,
         action_debug: bool) -> List[Tuple[int, int, int]]:
-
-    # hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-
     light_colour = (0, 0, 0)
     dark_colour = (10, 10, 10)
-
+    
     mask = cv2.inRange(image[:, :, 0:3], light_colour, dark_colour)
-
+    
     contours, _ = cv2.findContours(255 - mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     selected_contour = sorted([(c, cv2.contourArea(c)) for c in contours], key=lambda x: -x[1])[0]
     contour_mask = cv2.drawContours(np.zeros_like(mask), [selected_contour[0]], 0, (255, 255, 255))
-    # edges = image_processing_utils.get_one_color_edges(mask)
-
+    
     if DEBUG or action_debug:
         image_utils.save_image(mask, channel_name, filename + "_background_edges", ImageOp.MAP_PROCESSED_IMAGE)
         image_utils.save_image(contour_mask, channel_name, filename + "_edges", ImageOp.MAP_PROCESSED_IMAGE)
-
+    
     blur_edges = cv2.GaussianBlur(contour_mask, (11, 11), 3)
-
+    
     _, threshold_edges = cv2.threshold(blur_edges, 3, np.max(blur_edges), cv2.THRESH_BINARY)
-
+    
     lines = cv2.HoughLinesP(
         threshold_edges,
         10,
@@ -552,42 +534,42 @@ def get_corners(
         None,
         int(max(image.shape[0], image.shape[0]) / 10),
         int(max(image.shape[0], image.shape[0]) / 20))
-
+    
     if DEBUG:
         print("all lines %d" % len(lines))
-
+    
     if DEBUG or action_debug:
         lines_image = image.copy()
         for i in range(0, len(lines)):
             line_i = lines[i][0]
             cv2.line(lines_image, (line_i[0], line_i[1]), (line_i[2], line_i[3]), (0, 0, 255, 255), 3, cv2.LINE_AA)
         image_utils.save_image(lines_image, channel_name, filename + "_all_lines", ImageOp.MAP_PROCESSED_IMAGE)
-
+    
     lines = [line for line in lines if slope_in_range(line[0], 0.5, 0.7)]
     if DEBUG:
         print("filtered lines %d" % len(lines))
-
+    
     if DEBUG or action_debug:
         lines_image = image.copy()
         for i in range(0, len(lines)):
             line_i = lines[i][0]
             cv2.line(lines_image, (line_i[0], line_i[1]), (line_i[2], line_i[3]), (0, 0, 255, 255), 3, cv2.LINE_AA)
         image_utils.save_image(lines_image, channel_name, filename + "_filtered_lines", ImageOp.MAP_PROCESSED_IMAGE)
-
+    
     slopes = norm([get_line_slope(line[0]) for line in lines])
     heights = norm([get_line_h0(line[0]) for line in lines])
-
+    
     labels = cluster_lines(slopes, heights)
-
+    
     selected_lines = select_lines_by_length(lines, labels)
-
+    
     if DEBUG or action_debug:
         lines_image = image.copy()
         for i in range(0, len(selected_lines)):
             line_i = selected_lines[i][0]
             cv2.line(lines_image, (line_i[0], line_i[1]), (line_i[2], line_i[3]), (0, 0, 255, 255), 3, cv2.LINE_AA)
         image_utils.save_image(lines_image, channel_name, filename + "_selected_lines", ImageOp.MAP_PROCESSED_IMAGE)
-
+    
     return find_all_intersections(selected_lines)
 
 
@@ -608,9 +590,8 @@ def get_squared_length(line: List[int]) -> int:
 
 
 def find_all_intersections(
-    selected_lines: List[List[List[np.int32]]]
+        selected_lines: List[List[List[np.int32]]]
 ) -> List[Tuple[int, int, int]]:
-
     corners = []
     for line1 in selected_lines:
         for line2 in selected_lines:
@@ -625,15 +606,13 @@ def find_all_intersections(
 
 
 def get_corner_orientation(
-    line1: List[np.int32],
-    line2: List[np.int32],
-    intersection: Tuple[int, int]
+        line1: List[np.int32],
+        line2: List[np.int32],
+        intersection: Tuple[int, int]
 ) -> Optional[CornerOrientation]:
-    # print(line1)
-    # print(line2)
     center1 = ((line1[0] + line1[2]) / 2, (line1[1] + line1[3]) / 2)
     center2 = ((line2[0] + line2[2]) / 2, (line2[1] + line2[3]) / 2)
-
+    
     if center1[0] <= intersection[0] <= center2[0] or center2[0] <= intersection[0] <= center1[0]:  # top or bottom
         if intersection[1] >= center1[1] and intersection[1] >= center2[1]:
             return CornerOrientation.BOTTOM
@@ -650,7 +629,7 @@ def get_corner_orientation(
             return None
     else:
         return None
-    
+
 
 def get_intersection(first_line: List[List[np.int32]], second_line: List[List[np.int32]]) -> Optional[Tuple[int, int]]:
     h1 = get_line_h0(first_line[0])
@@ -690,7 +669,7 @@ def get_line_slope(line: List[np.int32]) -> float:
     return dy / dx if dx != 0 else 100
 
 
-for map_size_i in [121, 196, 256, 324, 400]: # missing 900 map
+for map_size_i in [121, 196, 256, 324, 400]:  # TODO add missing 900 map
     print("checking map size", map_size_i)
     background_params = database_client.get_background_image_params(map_size_i)
     background_image = image_utils.get_processed_background_template(str(map_size_i))

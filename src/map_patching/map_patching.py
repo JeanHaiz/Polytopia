@@ -7,25 +7,18 @@ from typing import List
 from typing import Tuple
 from typing import Optional
 
-from database.database_client import DatabaseClient
+from database.database_client import get_database_client
 from common import image_utils
 from common.logger_utils import logger
 from common.image_operation import ImageOp
-from map_patching.map_patching_errors import MapPatchingErrors
+from common.error_utils import MapPatchingErrors
 from common.corner_orientation import CornerOrientation
 from common.image_param import ImageParam
 from map_patching import patching_callback_utils
-# from slash_bot_client import bot_utils_callbacks
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
-database_client = DatabaseClient(
-    user="discordBot",
-    password="password123",
-    port="5432",
-    database="polytopiaHelper_dev",
-    host="database"
-)
+database_client = get_database_client()
 
 
 def generate_patched_map_bis(

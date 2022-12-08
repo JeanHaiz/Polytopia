@@ -1,6 +1,6 @@
 from discord.ext import commands
 
-TOKEN = "bot token of tester bot"
+TOKEN = "bot TOKEN of tester bot"
 bot = commands.Bot(command_prefix='?/')
 target_id = "ID of bot to be tested"
 channel_id = "ID of channel of where it will be tested"

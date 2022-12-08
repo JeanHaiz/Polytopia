@@ -13,7 +13,7 @@ ADD ./common /app/common
 ADD map_analysis_main.py map_analysis_main.py
 
 RUN apt-get update
-RUN apt-get install ffmpeg libsm6 libxext6  -y
+RUN apt-get install gcc ffmpeg libsm6 libxext6 libpq-dev python3.9-dev -y
 
 # Install any needed packages specified in requirements.txt
 COPY ./map_analysis/requirements.txt requirements.txt

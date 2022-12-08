@@ -14,7 +14,7 @@ ADD slash_bot_main.py slash_bot_main.py
 
 
 RUN apt-get update
-RUN apt-get install ffmpeg libsm6 libxext6  -y
+RUN apt-get install gcc ffmpeg libsm6 libxext6 libpq-dev python3.9-dev -y
 
 # RUN apt-get install -y python3-opencv libgl1-mesa-glx python3-lxml libxml2-dev libxslt-dev python-dev libleptonica-dev
 # RUN apt-get install -y tesseract-ocr

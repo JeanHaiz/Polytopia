@@ -1,15 +1,9 @@
 import time
 
 from slash_bot_client import bot_utils_callbacks
-from database.database_client import DatabaseClient
+from database.database_client import get_database_client
 
-database_client = DatabaseClient(
-    user="discordBot",
-    password="password123",
-    port="5432",
-    database="polytopiaHelper_dev",
-    host="database"
-)
+database_client = get_database_client()
 
 
 def __get_turn(image, channel_name: str) -> int:

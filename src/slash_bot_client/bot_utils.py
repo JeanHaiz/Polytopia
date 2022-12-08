@@ -1,8 +1,5 @@
 import os
-import sys
-import asyncio
 import datetime
-import traceback
 
 from io import BytesIO
 
@@ -15,13 +12,10 @@ from typing import Coroutine
 from interactions import Channel
 from interactions import HTTPClient
 from interactions import Optional
-from interactions import Client
 from interactions import CommandContext
 from interactions import Message
-from interactions import Snowflake
-from interactions import get
 
-from database.database_client import DatabaseClient
+from database.database_client import get_database_client
 from slash_bot_client import command_context_store as cxs
 from slash_bot_client import bot_input_utils
 from slash_bot_client import map_analysis_interface
@@ -42,13 +36,7 @@ Supports generic bot activities
 
 DEBUG = os.getenv("POLYTOPIA_DEBUG")
 
-database_client = DatabaseClient(
-    user="discordBot",
-    password="password123",
-    port="5432",
-    database="polytopiaHelper_dev",
-    host="database"
-)
+database_client = get_database_client()
 
 
 async def __download_attachment(
@@ -67,10 +55,8 @@ async def add_map_and_patch(
         ctx: CommandContext,
         bot_http_client: HTTPClient
 ):
-    
     # Fulfilling precondition: Game setup
     channel_info = database_client.get_channel_info(ctx.channel_id)
-    print("channel info", channel_info, flush=True)
     channel = await ctx.get_channel()
     
     if channel_info is None:
@@ -97,7 +83,7 @@ async def add_map_and_patch(
     # Registering message attachments
     for resource_number in range(n_resources):
         message.attachments[resource_number]._client = bot_http_client
-
+        
         await bot_input_utils.get_or_register_input(
             database_client,
             lambda i: message.attachments[i].download(),
@@ -107,7 +93,7 @@ async def add_map_and_patch(
             resource_number,
             ImageOp.MAP_INPUT
         )
-
+    
     # Patching images registered for channel
     await patch_images(ctx, bot_http_client, channel, 3)
 
@@ -123,9 +109,9 @@ async def patch_images(
         ctx.author.id,
         ctx.id
     )
-
+    
     cxs.put(patch_process_id, ctx)
-
+    
     requirements = []
     
     message_resources = database_client.get_channel_resource_messages(
@@ -139,13 +125,12 @@ async def patch_images(
         
         message_id = message_resource_i["source_message_id"]
         resource_number = message_resource_i["resource_number"]
-
+        
         requirements_i = await register_process_inputs(
             lambda i: __download_attachment(channel, message_id, resource_number, bot_http_client),
             patch_process_id,
             channel,
             message_id,
-            None,
             resource_number
         )
         
@@ -155,17 +140,22 @@ async def patch_images(
             if count >= n_images:
                 break
 
-    print("requirements", requirements, flush=True)
-    
-    for requirement_i in requirements:
-        
-        await analyse_map(
-            patch_process_id,
-            requirement_i[0],
-            requirement_i[1],
-            requirement_i[2],
-            requirement_i[3]
-        )
+    if DEBUG:
+        print("requirements", requirements, flush=True)
+
+    if len(requirements) == 0:
+        await ctx.send("No map added. Please add maps to create a collage.")
+    elif len(requirements) == 1:
+        await ctx.send("One map only. Please add a second map to create a collage.")
+    else:
+        for requirement_i in requirements:
+            await analyse_map(
+                patch_process_id,
+                requirement_i[0],
+                requirement_i[1],
+                requirement_i[2],
+                requirement_i[3]
+            )
 
 
 async def register_process_inputs(
@@ -173,14 +163,12 @@ async def register_process_inputs(
         patch_process_id: str,
         channel: Channel,
         message_id: int,
-        message: Optional[Message],
         resource_number: int
 ) -> List[Tuple[int, int, str, str]]:
-    
     resource = database_client.get_resource(message_id, resource_number)
     filename = str(resource["filename"])
     
-    check = image_utils.get_or_fetch_image_check(
+    check = await image_utils.get_or_fetch_image_check(
         database_client,
         download_fct,
         channel.name,
@@ -189,19 +177,9 @@ async def register_process_inputs(
         ImageOp(resource["operation"])
     )
     
-    """filename = await bot_input_utils.get_or_register_input(
-        database_client,
-        download_fct,
-        channel,
-        message_id,
-        message,
-        resource_number,
-        ImageOp.MAP_INPUT
-    )"""
-    
     if filename is None or not check:
         return []
-
+    
     requirements = []
     
     turn_requirement_id = database_client.add_patching_process_requirement(
@@ -210,7 +188,7 @@ async def register_process_inputs(
         "TURN"
     )
     requirements.append((message_id, resource_number, turn_requirement_id, "TURN"))
-
+    
     map_requirement_id = database_client.add_patching_process_requirement(
         patch_process_id,
         filename,
@@ -219,7 +197,7 @@ async def register_process_inputs(
     requirements.append((message_id, resource_number, map_requirement_id, "MAP"))
     
     return requirements
-    
+
 
 async def analyse_map(
         patch_process_id: str,
@@ -252,10 +230,13 @@ async def remove_map(ctx: CommandContext):
     )
     
     channel = await ctx.get_channel()
-    print("message resources", len(message_resources), flush=True)
+    if DEBUG:
+        print("message resources", len(message_resources), flush=True)
+    
     for message_resource_i in message_resources:
         
-        print("message_resource_i", message_resource_i, flush=True)
+        if DEBUG:
+            print("message_resource_i", message_resource_i, flush=True)
         
         resource_number = int(message_resource_i["resource_number"])
         operation = message_resource_i["operation"]
@@ -265,17 +246,16 @@ async def remove_map(ctx: CommandContext):
             ImageOp.INPUT,
             resource_number
         )
-        print("filename", filename, flush=True)
         
         if filename is not None:
-            output = image_utils.move_back_input_image(
+            image_utils.move_back_input_image(
                 channel.name,
                 filename,
                 ImageOp(operation)
             )
-            print("map removal output", output, flush=True)
         else:
-            print("Filename is none", flush=True)
+            if DEBUG:
+                print("Filename is none", flush=True)
 
 
 async def force_analyse_map_and_patch(
@@ -320,7 +300,7 @@ async def force_analyse_map_and_patch(
 
 
 async def list_active_channels(ctx: CommandContext) -> None:
-    if ctx.author.id == 338067113639936003:
+    if ctx.author.id == os.getenv("DISCORD_ADMIN_USER"):
         logger.debug("list active channels")
         active_channels = database_client.list_active_channels(ctx.guild_id)
         if len(active_channels) > 0:
@@ -365,8 +345,7 @@ async def set_player_score(ctx: CommandContext, player_name: str, turn: int, sco
     elif row_count == 0:
         await ctx.send("No score entry was updated. \nTo to signal an error, react with ⁉️")
     else:
-        jean_id = '<@338067113639936003>'  # Jean's discord id TODO refactor
-        await ctx.send('There was an error. %s has been notified.' % jean_id)
+        await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
 
 
 async def patch_map(
@@ -374,7 +353,6 @@ async def patch_map(
         bot_http_client: HTTPClient,
         number_of_images: Optional[int]
 ) -> None:
-    
     channel = await ctx.get_channel()
     await patch_images(
         ctx,
@@ -382,34 +360,6 @@ async def patch_map(
         channel,
         number_of_images
     )
-    
-    """
-    patch_process_id = database_client.add_patching_process(
-        ctx.channel_id,
-        ctx.author.id,
-        ctx.id
-    )
-    
-    await ctx.send("Loading")
-    
-    cxs.put(patch_process_id, ctx)
-    
-    resources = database_client.get_channel_resource_messages(ctx.channel_id, ImageOp.MAP_INPUT)
-
-    for resource_i in resources:
-        message_id = resource_i["source_message_id"]
-        message = await channel.get_message(message_id)
-        resource_number = resource_i["resource_number"]
-        
-        await analyse_map(
-            patch_process_id,
-            message_id,
-            resource_number
-        )
-    
-    # Not needed to trigger the patching if an analysis is done
-    # await map_patching_interface.send_map_patching_request(patch_process_id, number_of_images)
-    """
 
 
 async def activate(ctx: CommandContext, size: int) -> None:
@@ -421,8 +371,7 @@ async def activate(ctx: CommandContext, size: int) -> None:
     if activation_result.rowcount == 1:
         await ctx.send("channel activated")
     else:
-        my_id = '<@338067113639936003>'  # Jean's id
-        await ctx.send('There was an error. %s has been notified.' % my_id)
+        await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
 
 
 async def deactivate(ctx: CommandContext) -> None:
@@ -431,8 +380,7 @@ async def deactivate(ctx: CommandContext) -> None:
     if deactivation_result.rowcount == 1:
         await ctx.send("channel deactivated")
     else:
-        my_id = '<@338067113639936003>'  # Jean's id
-        await ctx.send('There was an error. %s has been notified.' % my_id)
+        await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
 
 
 async def get_channel_player_score(ctx: CommandContext, player: str):
@@ -451,34 +399,6 @@ async def get_channel_player_score(ctx: CommandContext, player: str):
 
 def now() -> str:
     return datetime.datetime.now().strftime('%Y%m%d_%H%M%S_')
-
-
-async def wrap_slash_errors(
-        ctx: CommandContext,
-        client: Client,
-        guild_id: Snowflake,
-        fct: Callable[[], Coroutine]) -> None:
-    try:
-        is_test_server = str(guild_id) == "918195469245628446"
-        is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
-        if (is_dev_env and is_test_server) or (not is_test_server and not is_dev_env):
-            await asyncio.create_task(fct())
-    # except interactions.errors.Forbidden:
-    #    await ctx.send("Missing permission. <@338067113639936003> has been notified.")
-    except:
-        error = sys.exc_info()[0]
-        logger.error("##### ERROR #####")
-        logger.error(error)
-        logger.error(traceback.format_exc())
-        print("##### ERROR #####")
-        print(error)
-        traceback.print_exc()
-        error_channel = await get(client, Channel, object_id=1035274340125659230)
-        # error_channel = ctx.get_channel(1035274340125659230)  # Polytopia Helper Testing server, Error channel
-        channel = await ctx.get_channel()
-        guild = await ctx.get_guild()
-        await error_channel.send(f"""Error in channel {channel.name}, {guild.name}:\n{traceback.format_exc()}\n""")
-        await ctx.send('There was an error. <@338067113639936003> has been notified.')
 
 
 async def add_success_reaction(message: Message) -> None:
@@ -521,19 +441,19 @@ async def trace(ctx: CommandContext) -> None:
         ctx.channel_id,
         [ImageOp.MAP_INPUT, ImageOp.MAP_PROCESSED_IMAGE]
     )
-    print("messages", messages)
     channel = await ctx.get_channel()
     for i, m in enumerate(messages):
         try:
             message = await channel.get_message(m['source_message_id'])
             sent_message = await message.reply("%s %d" % (ImageOp(m['operation']).name, i))
         except BaseException as e:
-            print(e, flush=True)
+            print("ERROR", e, flush=True)
             sent_message = await ctx.send("Message not found: %d" % m['source_message_id'])
         await add_delete_reaction(sent_message)
     if len(messages) == 0:
         await ctx.send("Trace empty")
     await answer_message.edit("Done")
+
 
 """
 async def renew_patching(dry_run=False):

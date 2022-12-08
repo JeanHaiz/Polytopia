@@ -33,3 +33,7 @@ env
 # Compilation
 **/__pycache__/
 /__pycache__/
+
+# Depracated
+*.json
+/src-old/

@@ -6,6 +6,7 @@ services:
             context: ../database
             dockerfile: Dockerfile
         container_name: database
+        platform: ${PLATFORM:-linux/amd64}
         command: postgres -c stats_temp_directory=/tmp
         restart: "always"
         deploy:
@@ -44,6 +45,7 @@ services:
             dockerfile: slash_bot_client/Dockerfile
         restart: "unless-stopped"
         container_name: slash_bot
+        platform: ${PLATFORM:-linux/amd64}
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/src:/app
             - certs:/usr/share/elasticsearch/config/certs
@@ -65,6 +67,7 @@ services:
             context: "/Users/jean/Documents/Coding/Polytopia/src/"
             dockerfile: map_patching/Dockerfile
         restart: "unless-stopped"
+        platform: ${PLATFORM:-linux/amd64}
         container_name: map_patching
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/src:/app
@@ -85,6 +88,7 @@ services:
             context: "/Users/jean/Documents/Coding/Polytopia/src/"
             dockerfile: map_analysis/Dockerfile
         restart: "unless-stopped"
+        platform: ${PLATFORM:-linux/amd64}
         container_name: map_analysis
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/src:/app
@@ -99,6 +103,7 @@ services:
 
     rabbitmq:
         image: 'rabbitmq:3.11-management-alpine'
+        platform: ${PLATFORM:-linux/amd64}
         container_name: "rabbitmq"
         ports:
             - "5672:5672"

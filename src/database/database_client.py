@@ -1,3 +1,4 @@
+import os
 import re
 import uuid
 
@@ -21,7 +22,7 @@ class DatabaseClient:
     def __init__(self, user: str, password: str, port: str, database: str, host: str) -> None:
         self.database = database
         self.database_url = f"""postgresql://{user}:{password}@{host}:{port}/{database}"""
-        self.engine = sqlalchemy.create_engine(self.database_url, echo=True, poolclass=NullPool)
+        self.engine = sqlalchemy.create_engine(self.database_url, echo=os.getenv("DEBUG"), poolclass=NullPool)
     
     def dispose(self) -> None:
         self.engine.dispose()
@@ -589,3 +590,20 @@ class DatabaseClient:
     @staticmethod
     def __format_list(s: List, fct: Callable[[Any], str]) -> str:
         return "(%s)" % (", ".join([str(fct(s_i)) for s_i in s]))
+
+
+print("Database config", os.getenv("PGUSER"),
+        os.getenv("PGPASS"),
+        os.getenv("PGPORT"),
+        os.getenv("PGDATABASE"),
+        os.getenv("PGHOST")
+      )
+
+def get_database_client() -> DatabaseClient:
+    return DatabaseClient(
+        user=os.getenv("PGUSER"),
+        password=os.getenv("PGPASS"),
+        port=os.getenv("PGPORT"),
+        database=os.getenv("PGDATABASE"),
+        host=os.getenv("PGHOST")
+    )

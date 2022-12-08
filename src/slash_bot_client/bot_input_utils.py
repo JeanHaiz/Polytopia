@@ -110,7 +110,6 @@ async def get_or_register_input(
     else:
         filename = str(resource["filename"])
         operation = ImageOp(int(resource["operation"]))
-        # database_client.set_resource_operation(message_id, ImageOp.MAP_INPUT, resource_number)
 
     if hasattr(image_op, '__iter__'): # image_op is a sequence
         for image_op_i in image_op:
