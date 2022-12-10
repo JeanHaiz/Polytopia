@@ -191,7 +191,7 @@ class SlashBotExtension(interactions.Extension):
         )
     
     @interactions.extension_command(
-        name="Add",
+        name="Add map",
         type=ApplicationCommandType.MESSAGE
     )
     @autodefer()

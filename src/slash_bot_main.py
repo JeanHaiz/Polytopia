@@ -48,26 +48,3 @@ async def create_client():
     loop.run_until_complete(gathered)
 
 asyncio.run(create_client())
-
-# slash_bot_client.start()
-"""
-async def start_slash_bot_client():
-    slash_bot_client.start()
-
-print("starting async listener", flush=True)
-
-receiver_service.get_async_connection(
-    "bot_client",
-    receiver_service.action_reaction_request
-)
-"""
-# loop = asyncio.get_event_loop()
-
-"""
-async def start_slash_bot_client():
-    slash_bot_client.start()
-
-slash_bot_client_task = loop.create_task(start_slash_bot_client())
-
-loop.run_until_complete(slash_bot_client_task)
-"""

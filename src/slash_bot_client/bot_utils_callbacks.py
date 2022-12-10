@@ -2,6 +2,7 @@ import os
 import re
 from typing import List
 from typing import Tuple
+from typing import Optional
 
 from interactions import File, Channel, Client
 from interactions.utils.get import get
@@ -23,11 +24,30 @@ async def on_analysis_error(
         client: Client,
         error: str
 ):
+    await __on_error(patch_id, map_requirement_id, client, error)
+
+
+async def on_patching_error(
+        patch_id: str,
+        client: Client,
+        error: str
+):
+    await __on_error(patch_id, None, client, error)
+
+
+async def __on_error(
+        patch_id: str,
+        requirement_id: Optional[str],
+        client: Client,
+        error: str
+):
     if DEBUG:
-        print("Error message received", patch_id, map_requirement_id, client, error, flush=True)
+        print("Error message received", patch_id, requirement_id, client, error, flush=True)
 
     database_client.update_patching_process_status(patch_id, "ERROR - %s" % error)
-    database_client.update_patching_process_requirement(patch_id, map_requirement_id, "ERROR - %s" % error)
+    
+    if requirement_id is not None:
+        database_client.update_patching_process_requirement(patch_id, requirement_id, "ERROR - %s" % error)
     
     patch_info = database_client.get_patching_process(patch_id)
     error_channel = await get(client, Channel, object_id=int(os.getenv("DISCORD_ERROR_CHANNEL")))

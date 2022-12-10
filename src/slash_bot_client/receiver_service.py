@@ -53,7 +53,7 @@ async def get_async_connection(queue, client, loop: asyncio.AbstractEventLoop):
         def run_async(fct, **xargs):
             loop.call_soon_threadsafe(
                 lambda: loop.run_until_complete(fct(**xargs)))
-            
+        
         print("action received", body)
         action_params: dict = json.loads(body)
         action = action_params.pop("action", "")
@@ -64,8 +64,8 @@ async def get_async_connection(queue, client, loop: asyncio.AbstractEventLoop):
         elif action == "HEADER_RECOGNITION_COMPLETE":
             bot_utils_callbacks.on_turn_recognition_complete(**action_params)
         elif action == "MAP_ANALYSIS_ERROR":
-            loop.call_soon_threadsafe(other_inner)
-            # run_async(bot_utils_callbacks.on_analysis_error, client=client, **action_params)
+            # loop.call_soon_threadsafe(other_inner)
+            run_async(bot_utils_callbacks.on_analysis_error, client=client, **action_params)
     
     print("setting up listener", flush=True)
     url = "amqp://guest:guest@rabbitmq:5672/"

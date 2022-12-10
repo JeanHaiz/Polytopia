@@ -1,10 +1,13 @@
 version: '3.3'
 
+# NOTE: this file has not been adjusted since being moved to the src-old directory.
+# Relative paths could be stale
+
 services:
     database:
         build:
-            context: ./database
-            dockerfile: Dockerfile
+            context: ../database
+            dockerfile: ../database/Dockerfile
         container_name: database
         command: postgres -c stats_temp_directory=/tmp
         restart: "always"
@@ -47,7 +50,7 @@ services:
             - certs:/usr/share/elasticsearch/config/certs
         # /usr/share/elasticsearch/config/certs/ca/ca.crt
         env_file:
-            - .env
+            - ../.env
         deploy:
             resources:
                 limits:

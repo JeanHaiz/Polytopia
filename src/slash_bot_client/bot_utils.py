@@ -55,47 +55,51 @@ async def add_map_and_patch(
         ctx: CommandContext,
         bot_http_client: HTTPClient
 ):
-    # Fulfilling precondition: Game setup
-    channel_info = database_client.get_channel_info(ctx.channel_id)
-    channel = await ctx.get_channel()
-    
-    if channel_info is None:
-        server = await ctx.get_guild()
+    size = database_client.get_game_map_size(ctx.channel_id)
+    if size is None:
+        await ctx.send("Please set the channel map size with the 'activate' slash command")
+    else:
+        # Fulfilling precondition: Game setup
+        channel_info = database_client.get_channel_info(ctx.channel_id)
+        channel = await ctx.get_channel()
         
-        database_client.activate_channel(
+        if channel_info is None:
+            server = await ctx.get_guild()
+            
+            database_client.activate_channel(
+                ctx.channel_id,
+                channel.name,
+                ctx.guild_id,
+                server.name
+            )
+        
+        database_client.add_player_n_game(
             ctx.channel_id,
-            channel.name,
             ctx.guild_id,
-            server.name
+            ctx.author.id,
+            ctx.author.name
         )
-    
-    database_client.add_player_n_game(
-        ctx.channel_id,
-        ctx.guild_id,
-        ctx.author.id,
-        ctx.author.name
-    )
-    
-    # Helper variables
-    message = ctx.target
-    n_resources = len(message.attachments)
-    
-    # Registering message attachments
-    for resource_number in range(n_resources):
-        message.attachments[resource_number]._client = bot_http_client
         
-        await bot_input_utils.get_or_register_input(
-            database_client,
-            lambda i: message.attachments[i].download(),
-            channel,
-            message.id,
-            message,
-            resource_number,
-            ImageOp.MAP_INPUT
-        )
-    
-    # Patching images registered for channel
-    await patch_images(ctx, bot_http_client, channel, 3)
+        # Helper variables
+        message = ctx.target
+        n_resources = len(message.attachments)
+        
+        # Registering message attachments
+        for resource_number in range(n_resources):
+            message.attachments[resource_number]._client = bot_http_client
+            
+            await bot_input_utils.get_or_register_input(
+                database_client,
+                lambda i: message.attachments[i].download(),
+                channel,
+                message.id,
+                message,
+                resource_number,
+                ImageOp.MAP_INPUT
+            )
+        
+        # Patching images registered for channel
+        await patch_images(ctx, bot_http_client, channel, 3)
 
 
 async def patch_images(
@@ -223,80 +227,88 @@ async def analyse_map(
 
 
 async def remove_map(ctx: CommandContext):
-    message_resources = database_client.get_channel_message_resource_messages(
-        ctx.channel_id,
-        ctx.target.id,
-        [ImageOp.MAP_INPUT, ImageOp.MAP_PROCESSED_IMAGE]
-    )
-    
-    channel = await ctx.get_channel()
-    if DEBUG:
-        print("message resources", len(message_resources), flush=True)
-    
-    for message_resource_i in message_resources:
-        
-        if DEBUG:
-            print("message_resource_i", message_resource_i, flush=True)
-        
-        resource_number = int(message_resource_i["resource_number"])
-        operation = message_resource_i["operation"]
-        
-        filename = database_client.set_resource_operation(
+    size = database_client.get_game_map_size(ctx.channel_id)
+    if size is None:
+        await ctx.send("Please set the channel map size with the 'activate' slash command")
+    else:
+        message_resources = database_client.get_channel_message_resource_messages(
+            ctx.channel_id,
             ctx.target.id,
-            ImageOp.INPUT,
-            resource_number
+            [ImageOp.MAP_INPUT, ImageOp.MAP_PROCESSED_IMAGE]
         )
         
-        if filename is not None:
-            image_utils.move_back_input_image(
-                channel.name,
-                filename,
-                ImageOp(operation)
-            )
-        else:
+        channel = await ctx.get_channel()
+        if DEBUG:
+            print("message resources", len(message_resources), flush=True)
+        
+        for message_resource_i in message_resources:
+            
             if DEBUG:
-                print("Filename is none", flush=True)
+                print("message_resource_i", message_resource_i, flush=True)
+            
+            resource_number = int(message_resource_i["resource_number"])
+            operation = message_resource_i["operation"]
+            
+            filename = database_client.set_resource_operation(
+                ctx.target.id,
+                ImageOp.INPUT,
+                resource_number
+            )
+            
+            if filename is not None:
+                image_utils.move_back_input_image(
+                    channel.name,
+                    filename,
+                    ImageOp(operation)
+                )
+            else:
+                if DEBUG:
+                    print("Filename is none", flush=True)
 
 
 async def force_analyse_map_and_patch(
         ctx: CommandContext,
         bot_http_client: HTTPClient
 ):
-    # Fulfilling precondition: Game setup
-    database_client.add_player_n_game(
-        ctx.channel_id,
-        ctx.guild_id,
-        ctx.author.id,
-        ctx.author.name
-    )
-    
-    # Helper variables
-    channel = await ctx.get_channel()
-    message = ctx.target
-    n_resources = len(message.attachments)
-    
-    # Registering message attachments
-    for resource_number in range(n_resources):
-        message.attachments[resource_number]._client = bot_http_client
-        
-        resource_i = database_client.get_resource(message.id, resource_number)
-        
-        if resource_i is not None:
-            database_client.delete_image_param(str(resource_i["filename"]))
-            database_client.set_resource_operation(message.id, ImageOp.MAP_INPUT, resource_number)
-        
-        await bot_input_utils.get_or_register_input(
-            database_client,
-            lambda i: message.attachments[i].download(),
-            channel,
-            message.id,
-            message,
-            resource_number,
-            ImageOp.MAP_INPUT
+    size = database_client.get_game_map_size(ctx.channel_id)
+    if size is None:
+        await ctx.send("Please set the channel map size with the 'activate' slash command")
+    else:
+        # Fulfilling precondition: Game setup
+        database_client.add_player_n_game(
+            ctx.channel_id,
+            ctx.guild_id,
+            ctx.author.id,
+            ctx.author.name
         )
-    
-    # Patching images registered for channel
-    await patch_images(ctx, bot_http_client, channel, 3)
+        
+        # Helper variables
+        channel = await ctx.get_channel()
+        message = ctx.target
+        n_resources = len(message.attachments)
+        
+        # Registering message attachments
+        for resource_number in range(n_resources):
+            message.attachments[resource_number]._client = bot_http_client
+            
+            resource_i = database_client.get_resource(message.id, resource_number)
+            
+            if resource_i is not None:
+                database_client.delete_image_param(str(resource_i["filename"]))
+                database_client.set_resource_operation(message.id, ImageOp.MAP_INPUT, resource_number)
+            
+            await bot_input_utils.get_or_register_input(
+                database_client,
+                lambda i: message.attachments[i].download(),
+                channel,
+                message.id,
+                message,
+                resource_number,
+                ImageOp.MAP_INPUT
+            )
+        
+        # Patching images registered for channel
+        await patch_images(ctx, bot_http_client, channel, 3)
 
 
 async def list_active_channels(ctx: CommandContext) -> None:
@@ -353,13 +365,18 @@ async def patch_map(
         bot_http_client: HTTPClient,
         number_of_images: Optional[int]
 ) -> None:
-    channel = await ctx.get_channel()
-    await patch_images(
-        ctx,
-        bot_http_client,
-        channel,
-        number_of_images
-    )
+    
+    size = database_client.get_game_map_size(ctx.channel_id)
+    if size is None:
+        await ctx.send("Please set the channel map size with the 'activate' slash command")
+    else:
+        channel = await ctx.get_channel()
+        await patch_images(
+            ctx,
+            bot_http_client,
+            channel,
+            number_of_images
+        )
 
 
 async def activate(ctx: CommandContext, size: int) -> None:
