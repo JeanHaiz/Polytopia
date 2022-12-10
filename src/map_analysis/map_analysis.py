@@ -17,6 +17,7 @@ from common.image_param import ImageParam
 from common.corner_orientation import CornerOrientation
 from database.database_client import get_database_client
 from map_analysis import analysis_callback_utils
+from map_analysis.map_analysis_error import AnalysisException
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
@@ -51,6 +52,8 @@ def map_analysis_request(
             ImageOp.MAP_PROCESSED_IMAGE,
             resource_number
         )
+    else:
+        raise AnalysisException("IMAGE ANALYSIS - IMAGE NOT SAVED")
     
     if DEBUG:
         print("map analysis done, callback sent", flush=True)
@@ -91,8 +94,11 @@ def analyse_map(
     
     if DEBUG or action_debug:
         print(image_params)
-    if database_client is not None and len(image_params.corners) != 0:
+    if len(corners) != 0:
         store_image_params(image_params)
+    else:
+        raise AnalysisException("IMAGE ANALYSIS - NO CORNER FOUND")
+
     return store_transformed_image(scaled_image, channel_name, filename), image_params
 
 
@@ -150,7 +156,10 @@ def match_full_clouds(
     hh, ww = template_alpha.shape[:2]
     rad = int(math.sqrt(hh * hh + ww * ww) / 8)
     
+    iteration = 0
     while max_val >= threshold:
+        if iteration > 900:
+            raise AnalysisException("IMAGE ANALYSIS - MAX CLOUD ITERATIONS EXCEEDED")
         
         # find max value of correlation image
         min_val, max_val, min_loc, max_loc_raw = cv2.minMaxLoc(blur)
@@ -160,7 +169,6 @@ def match_full_clouds(
             max_loc_raw[1] - int(ww / 2)
         )
         
-        print("Max loc", max_loc_raw, max_loc, flush=True)
         if max_val > threshold:
             # draw match on copy of input
             background = img_alpha[
@@ -175,6 +183,8 @@ def match_full_clouds(
             
             # write black circle at max_loc in corr_img
             cv2.circle(blur, (max_loc_raw), radius=rad, color=0, thickness=cv2.FILLED)
+
+            iteration += 1
         
         else:
             break
@@ -208,7 +218,7 @@ def pad_image(
     left = int(missing_width / 2)
     right = missing_width - left
     
-    return cv2.copyMakeBorder(cropped_image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=0)  # TODO here
+    return cv2.copyMakeBorder(cropped_image, top, bottom, left, right, cv2.BORDER_CONSTANT, value=0)
 
 
 def match_border_clouds(
@@ -278,7 +288,11 @@ def match_border_clouds(
         
         max_val = np.max(border_image)
         
+        iteration = 0
+        
         while max_val > border_threshold:
+            if iteration > 1000:
+                raise AnalysisException("IMAGE ANALYSIS - MAX BORDER CLOUD ITERATIONS EXCEEDED")
             
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(border_image)
             
@@ -291,11 +305,14 @@ def match_border_clouds(
                              padded_max_loc[0]: padded_max_loc[0] + ww]
                 
                 img_alpha[
-                padded_max_loc[1]: padded_max_loc[1] + hh,
-                padded_max_loc[0]: padded_max_loc[0] + ww] = \
+                    padded_max_loc[1]: padded_max_loc[1] + hh,
+                    padded_max_loc[0]: padded_max_loc[0] + ww] = \
                     background - partial_template_alpha[:background.shape[0], :background.shape[1]]
                 
                 cv2.circle(border_image, (max_loc), radius=rad, color=0, thickness=cv2.FILLED)
+                
+                iteration += 1
+                
             else:
                 break
     
@@ -355,7 +372,7 @@ def match_template(template: np.ndarray, edges: np.ndarray) -> Tuple[np.ndarray,
         int(shape[0] / 2) - (1 if shape[0] % 2 == 0 else 0),
         int(shape[1] / 2),
         int(shape[1] / 2) - (1 if shape[1] % 2 == 0 else 0),
-        cv2.BORDER_CONSTANT, 0)  # TODO here !!!
+        cv2.BORDER_CONSTANT, 0)
     
     corr_img = cv2.matchTemplate(frame, masked_edges, cv2.TM_CCOEFF, mask=mask)
     
@@ -549,6 +566,11 @@ def get_corners(
     if DEBUG:
         print("filtered lines %d" % len(lines))
     
+    if len(lines) == 0:
+        raise AnalysisException("IMAGE ANALYSIS - NO BORDER LINE FOUND")
+    elif len(lines) == 1:
+        raise AnalysisException("IMAGE ANALYSIS - ONLY ONE BORDER LINE FOUND")
+    
     if DEBUG or action_debug:
         lines_image = image.copy()
         for i in range(0, len(lines)):
@@ -575,12 +597,17 @@ def get_corners(
 
 def select_lines_by_length(lines: List[np.ndarray], labels: np.ndarray) -> List[List[List[np.int32]]]:
     selected_lines = []
-    for i in range(max(labels) + 1):
-        label_lines = [(line, get_squared_length(line[0])) for j, line in enumerate(lines) if labels[j] == i]
-        label_lines.sort(key=lambda x: -x[1])
-        longest_line = label_lines[0][0]
-        selected_lines.append(longest_line.tolist())
-    return selected_lines
+    if len(lines) == 0:
+        raise AnalysisException("IMAGE ANALYSIS - NO BORDER LINE SELECTED")
+    elif len(lines) == 1:
+        raise AnalysisException("IMAGE ANALYSIS - ONLY ONE BORDER LINE SELECTED")
+    else:
+        for i in range(max(labels) + 1):
+            label_lines = [(line, get_squared_length(line[0])) for j, line in enumerate(lines) if labels[j] == i]
+            label_lines.sort(key=lambda x: -x[1])
+            longest_line = label_lines[0][0]
+            selected_lines.append(longest_line.tolist())
+        return selected_lines
 
 
 def get_squared_length(line: List[int]) -> int:
@@ -670,10 +697,12 @@ def get_line_slope(line: List[np.int32]) -> float:
 
 
 for map_size_i in [121, 196, 256, 324, 400]:  # TODO add missing 900 map
-    print("checking map size", map_size_i)
+    if DEBUG:
+        print("checking map size", map_size_i)
     background_params = database_client.get_background_image_params(map_size_i)
     background_image = image_utils.get_processed_background_template(str(map_size_i))
-    print("existing values", background_image is None, background_params, flush=True)
+    if DEBUG:
+        print("existing values", background_image is None, background_params, flush=True)
     if background_image is None or background_params is None:
         if DEBUG:
             print("ANALYSING BACKGROUND", flush=True)

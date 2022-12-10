@@ -1,17 +1,44 @@
+import os
 import json
 import pika
 import sys
 import functools
 import threading
+import traceback
 
-from common import logger_utils
 from map_analysis import map_analysis
+from map_analysis import analysis_callback_utils
+from map_analysis.map_analysis_error import AnalysisException
+
+DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
 
 def send_analysis_request(body):
     print("received analysis callback", flush=True)
     params = json.loads(body)
-    map_analysis.map_analysis_request(**params)
+    try:
+        map_analysis.map_analysis_request(**params)
+    except AnalysisException as e:
+        if DEBUG:
+            print("Analysis error:", body)
+        patch_process_id = params["patch_process_id"] if "patch_process_id" in params else None
+        map_requirement_id = params["map_requirement_id"] if "map_requirement_id" in params else None
+        if DEBUG:
+            print("Analysis error details:\npatch_process_id: %s\nmap_requirement_id: %s\nmessage: %s" %
+                  (patch_process_id, map_requirement_id, e.message))
+        analysis_callback_utils.send_error(
+            patch_process_id,
+            map_requirement_id,
+            e.message
+        )
+    except BaseException as e:
+        patch_process_id = params["patch_process_id"] if "patch_process_id" in params else None
+        map_requirement_id = params["map_requirement_id"] if "map_requirement_id" in params else None
+        analysis_callback_utils.send_error(
+            patch_process_id,
+            map_requirement_id,
+            traceback.format_exc()
+        )
 
 
 def ack_message(ch, delivery_tag):

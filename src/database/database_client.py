@@ -36,6 +36,15 @@ class DatabaseClient:
                 WHERE channel_discord_id = {channel_id};""").fetchone()
         return is_active is not None and len(is_active) > 0 and is_active[0]
     
+    def get_server_name(self, server_id) -> Optional[str]:
+        server_name = self.execute(
+            f"""SELECT server_name FROM discord_server
+                        WHERE server_discord_id = {server_id};""").fetchone()
+        if server_name is not None and len(server_name) > 0:
+            return server_name[0]
+        else:
+            return None
+
     def activate_channel(self, channel_id: int, channel_name: str, server_id: int, server_name: str) -> CursorResult:
         channel_name = re.sub(r"[^a-zA-Z0-9]", "", channel_name)[:40]
         server_name = re.sub(r"[^a-zA-Z0-9]", "", server_name)[:40]
@@ -399,6 +408,15 @@ class DatabaseClient:
                 WHERE patch_uuid::text = '{patch_uuid}'
                 AND input_filename = '{filename}'
                 RETURNING patch_input_uuid::text;""").fetchone()
+        return patch_input_uuid is not None and len(patch_input_uuid) > 0
+    
+    def update_patching_process_requirement(self, patch_uuid: str, requirement_id: str, status: str) -> bool:
+        patch_input_uuid = self.execute(
+            f"""UPDATE map_patching_process_requirement
+                SET status = '{status}'
+                WHERE patch_uuid::text = '{patch_uuid}'
+                AND patch_requirement_uuid::text = '{requirement_id}'
+                RETURNING patch_uuid::text;""").fetchone()
         return patch_input_uuid is not None and len(patch_input_uuid) > 0
     
     def add_patching_process_requirement(self, patch_uuid: str, filename: str, requirement_type: str) -> Optional[str]:

@@ -17,6 +17,41 @@ DEBUG = os.getenv("DEBUG")
 database_client = get_database_client()
 
 
+async def on_analysis_error(
+        patch_id: str,
+        map_requirement_id: str,
+        client: Client,
+        error: str
+):
+    if DEBUG:
+        print("Error message received", patch_id, map_requirement_id, client, error, flush=True)
+
+    database_client.update_patching_process_status(patch_id, "ERROR - %s" % error)
+    database_client.update_patching_process_requirement(patch_id, map_requirement_id, "ERROR - %s" % error)
+    
+    patch_info = database_client.get_patching_process(patch_id)
+    error_channel = await get(client, Channel, object_id=int(os.getenv("DISCORD_ERROR_CHANNEL")))
+    
+    if DEBUG:
+        print("Error management", patch_info is not None, patch_info, error_channel, flush=True)
+        
+    if patch_info is not None:
+        channel_id = patch_info["channel_discord_id"]
+        channel = await get(client, Channel, object_id=channel_id)
+        await channel.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
+        
+        channel_info = database_client.get_channel_info(channel_id)
+        server_name = database_client.get_server_name(channel_info["server_discord_id"])
+        await error_channel.send(
+            f"""Hey <@{os.getenv("DISCORD_ADMIN_USER")}>,\n""" +
+            f"""Error in channel {channel.name} on server {server_name}:\n{error}\n""")
+    else:
+        
+        await error_channel.send(
+            f"""Hey <@{os.getenv("DISCORD_ADMIN_USER")}>,\n""" +
+            f"""Error in unknown channel for\npatch {patch_id}, \nrequirement {requirement_id}""")
+
+
 def on_map_analysis_complete(
         patch_id: str,
         map_requirement_id: str
@@ -31,7 +66,7 @@ def on_map_analysis_complete(
     if __check_patching_complete(patch_id):
         if DEBUG:
             print("sending patching request")
-
+        
         map_patching_interface.send_map_patching_request(
             patch_id,
             number_of_images=None
@@ -46,7 +81,7 @@ async def on_map_patching_complete(
 ):
     if DEBUG:
         print("Done patching, callback completed", patch_uuid, flush=True)
-
+    
     turn = database_client.get_last_turn(
         channel_id
     )
@@ -81,7 +116,7 @@ def get_patching_errors(
         patch_uuid: str
 ) -> List[Tuple[str, str]]:
     patching_status = database_client.get_patching_status(patch_uuid)
-
+    
     if DEBUG:
         print("patching status", patching_status, flush=True)
     
@@ -103,8 +138,8 @@ def on_turn_recognition_complete(patch_id, turn_requirement_id):
 def __check_patching_complete(patch_process_id: str):
     requirements = database_client.get_patching_process_requirement(patch_process_id)
     all_requirement_check = all([r["complete"] for r in requirements])
-
+    
     if DEBUG:
         print("requirements", all_requirement_check, requirements, flush=True)
-
+    
     return all_requirement_check

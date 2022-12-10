@@ -1,3 +1,4 @@
+import os
 import json
 import pika
 
@@ -5,6 +6,8 @@ import pika
 from pika import exceptions
 
 from common import queue_utils
+
+DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
 url = "amqp://guest:guest@rabbitmq/"
 queue_name = "bot_client"
@@ -28,6 +31,34 @@ def send_analysis_completion(
         "patch_id": patch_id,
         "map_requirement_id": map_requirement_id
     })
+    try:
+        queue_channel.basic_publish(
+            exchange='',
+            routing_key=queue_name,
+            body=body
+        )
+    except pika.exceptions.StreamLostError:
+        queue_channel = queue_utils.get_blocking_channel(params)
+        send_analysis_completion(
+            patch_id,
+            map_requirement_id
+        )
+
+
+def send_error(
+        patch_id,
+        map_requirement_id,
+        error: str
+):
+    global queue_channel
+    body = json.dumps({
+        "action": "MAP_ANALYSIS_ERROR",
+        "patch_id": patch_id,
+        "map_requirement_id": map_requirement_id,
+        "error": error
+    })
+    if DEBUG:
+        print("Sending error:", body, flush=True)
     try:
         queue_channel.basic_publish(
             exchange='',

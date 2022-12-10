@@ -5,10 +5,8 @@ import pika
 import asyncio
 import threading
 import nest_asyncio
-import functools
 
 from slash_bot_client import bot_utils_callbacks
-from common.async_queue_utils_bis import ExampleConsumer, get_async_channel, get_blocking_channel
 
 nest_asyncio.apply()
 
@@ -33,7 +31,7 @@ class RabbitmqReceive(threading.Thread):
         self.channel.add_on_cancel_callback(
             lambda mf: print("Channel cancelled", mf, flush=True)
         )
-
+    
     def run(self):
         self.channel.start_consuming()
 
@@ -48,6 +46,14 @@ async def get_async_connection(queue, client, loop: asyncio.AbstractEventLoop):
     def action_reaction_request(channel, method, properties, body):
         def inner():
             return loop.run_until_complete(bot_utils_callbacks.on_map_patching_complete(client=client, **action_params))
+        
+        def other_inner():
+            return loop.run_until_complete(bot_utils_callbacks.on_analysis_error(client=client, **action_params))
+        
+        def run_async(fct, **xargs):
+            loop.call_soon_threadsafe(
+                lambda: loop.run_until_complete(fct(**xargs)))
+            
         print("action received", body)
         action_params: dict = json.loads(body)
         action = action_params.pop("action", "")
@@ -55,31 +61,18 @@ async def get_async_connection(queue, client, loop: asyncio.AbstractEventLoop):
             bot_utils_callbacks.on_map_analysis_complete(**action_params)
         elif action == "MAP_PATCHING_COMPLETE":
             loop.call_soon_threadsafe(inner)
-            """loop.call_soon_threadsafe(
-                functools.partial(bot_utils_callbacks.on_map_patching_complete, client=client, **action_params)
-            )"""
-            loop.call_soon_threadsafe(
-                functools.partial(print, "FUCKING PRINTED", flush=True))
-            # loop.call_soon_threadsafe(_to_task(
-            #   bot_utils_callbacks.on_map_patching_complete(client=client, **action_params), True, loop))
-            # asyncio_run(bot_utils_callbacks.on_map_patching_complete(client=client, **action_params))
-            # coroutine = bot_utils_callbacks.on_map_patching_complete(client=client, **action_params)
-            # patching_callback = loop.create_task(coroutine)
-            # asyncio.create_task()
-            # loop.run_until_complete(coroutine)
-            # patching_callback = loop.create_task(coroutine)
-            # loop.run_until_complete(patching_callback)
         elif action == "HEADER_RECOGNITION_COMPLETE":
             bot_utils_callbacks.on_turn_recognition_complete(**action_params)
-            
+        elif action == "MAP_ANALYSIS_ERROR":
+            loop.call_soon_threadsafe(other_inner)
+            # run_async(bot_utils_callbacks.on_analysis_error, client=client, **action_params)
+    
     print("setting up listener", flush=True)
     url = "amqp://guest:guest@rabbitmq:5672/"
-
+    
     params = pika.URLParameters(url)
     params.socket_timeout = 5
-    # channel = get_async_channel(params, queue, action)
-    # channel = get_blocking_channel(params, queue, action)
-
+    
     rabbit_receive = RabbitmqReceive(queue, action_reaction_request)
     rabbit_receive.start()
     print("thread is running", flush=True)
