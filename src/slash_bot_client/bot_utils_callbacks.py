@@ -66,7 +66,7 @@ async def __on_error(
             f"""Hey <@{os.getenv("DISCORD_ADMIN_USER")}>,\n""" +
             f"""Error in channel {channel.name} on server {server_name}:\n{error}\n""")
     else:
-        
+        print(error, flush=True)
         await error_channel.send(
             f"""Hey <@{os.getenv("DISCORD_ADMIN_USER")}>,\n""" +
             f"""Error in unknown channel for\npatch {patch_id}, \nrequirement {requirement_id}""")

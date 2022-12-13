@@ -617,6 +617,7 @@ print("Database config", os.getenv("PGUSER"),
         os.getenv("PGHOST")
       )
 
+
 def get_database_client() -> DatabaseClient:
     return DatabaseClient(
         user=os.getenv("PGUSER"),

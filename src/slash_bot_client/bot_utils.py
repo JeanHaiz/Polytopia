@@ -149,8 +149,8 @@ async def patch_images(
 
     if len(requirements) == 0:
         await ctx.send("No map added. Please add maps to create a collage.")
-    elif len(requirements) == 1:
-        await ctx.send("One map only. Please add a second map to create a collage.")
+    elif len(requirements) == 2:
+        await ctx.send("Found one map only. Please add a second map to create a collage.")
     else:
         for requirement_i in requirements:
             await analyse_map(
@@ -384,6 +384,7 @@ async def activate(ctx: CommandContext, size: int) -> None:
     channel = await ctx.get_channel()
     guild = await ctx.get_guild()
     activation_result = database_client.activate_channel(ctx.channel_id, channel.name, ctx.guild_id, guild.name)
+    database_client.add_player_n_game(ctx.channel_id, ctx.guild_id, ctx.author.id, ctx.author.name)
     database_client.set_game_map_size(ctx.channel_id, int(size))
     if activation_result.rowcount == 1:
         await ctx.send("channel activated")
