@@ -1,10 +1,15 @@
+import os
 import functools
 import logging
 import threading
 import json
 import pika
+import traceback
 
-from map_patching import map_patching
+from map_patching import map_patching, patching_callback_utils
+from map_patching.map_patching_error import PatchingException
+
+DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
 LOG_FORMAT = ('%(levelname) -10s %(asctime)s %(name) -30s %(funcName) '
               '-35s %(lineno) -5d: %(message)s')
@@ -30,7 +35,27 @@ def ack_message(ch, delivery_tag):
 
 def send_patching_request(body):
     action_params = json.loads(body)
-    map_patching.generate_patched_map_bis(**action_params)
+    
+    try:
+        map_patching.generate_patched_map_bis(**action_params)
+    except PatchingException as e:
+        patch_process_id = action_params["patch_process_id"] if "patch_process_id" in action_params else None
+        if DEBUG:
+            print("Analysis error details:\npatch_process_id: %s\nmessage: %s" %
+                  (patch_process_id, e.message))
+        patching_callback_utils.send_error(
+            patch_process_id,
+            e.message
+        )
+    except BaseException:
+        patch_process_id = action_params["patch_process_id"] if "patch_process_id" in action_params else None
+        if DEBUG:
+            print("Analysis error details:\npatch_process_id: %s\nmessage: %s" %
+                  (patch_process_id, traceback.format_exc()))
+        patching_callback_utils.send_error(
+            patch_process_id,
+            traceback.format_exc()
+        )
 
 
 def do_work(conn, ch, delivery_tag, body):

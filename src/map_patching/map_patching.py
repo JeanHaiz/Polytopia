@@ -15,6 +15,7 @@ from common.error_utils import MapPatchingErrors
 from common.corner_orientation import CornerOrientation
 from common.image_param import ImageParam
 from map_patching import patching_callback_utils
+from map_patching.map_patching_error import PatchingException
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
@@ -29,20 +30,17 @@ def generate_patched_map_bis(
         author_name: str,
         guild_id: int,
         interaction_id: int,
-        turn: Optional[str],
         files: List[str],
         n_images: Optional[int] = 4,
-        action_debug: bool = False) -> Tuple[Optional[str], Optional[Tuple[str, str, str]], list]:
-    # patch_uuid = database_client.add_patching_process(channel_id, author_id, interaction_id)
+        action_debug: bool = False) -> None:
     map_size = database_client.get_game_map_size(channel_id)
     
     if map_size is None:
-        return turn, None, [(MapPatchingErrors.MISSING_MAP_SIZE, None)]  # TODO
-    
+        raise PatchingException("PATCHING ERROR - MISSING MAP SIZE", MapPatchingErrors.MISSING_MAP_SIZE)
     if len(files) == 0:
-        return turn, None, [(MapPatchingErrors.NO_FILE_FOUND, None)]  # TODO
+        raise PatchingException("PATCHING ERROR - NO FILE FOUND", MapPatchingErrors.NO_FILE_FOUND)
     elif len(files) == 1:
-        return turn, None, [(MapPatchingErrors.ONLY_ONE_FILE, None)]  # TODO
+        raise PatchingException("PATCHING ERROR - ONLY ONE FILE", MapPatchingErrors.ONLY_ONE_FILE)
     
     if n_images is not None:
         n_images = max(n_images, 2)
@@ -55,17 +53,11 @@ def generate_patched_map_bis(
     for i, filename_i in enumerate(files):
         database_client.add_patching_process_input(patching_process_id, filename_i, i)
     
-    output_file_path, filename, patching_errors = patch_processed_images(
+    output_file_path, filename = patch_processed_images(
         files, map_size, guild_id, channel_id, channel_name,
         interaction_id, author_id, author_name, action_debug)
     
-    if len(patching_errors) == 0:
-        status = "DONE"
-    else:
-        status = "ERRORS - " + "; ".join(
-            [str(str(error.name) + "(" + str(filename) + ")") for error, filename in patching_errors])
-
-    database_client.update_patching_process_status(patching_process_id, status)
+    database_client.update_patching_process_status(patching_process_id, "DONE")
     database_client.update_patching_process_output_filename(patching_process_id, filename)
     
     patching_callback_utils.send_patching_completion(patching_process_id, channel_id, filename)
@@ -80,8 +72,7 @@ def patch_processed_images(
         message_id: int,
         author_id: int,
         author_name: str,
-        action_debug: bool) -> Tuple[str, str, list]:
-    patching_errors = []
+        action_debug: bool) -> Tuple[str, str]:
     
     images_n_check = check_processed_images(image_filenames, channel_name)
     
@@ -111,8 +102,7 @@ def patch_processed_images(
     output_filename = database_client.add_resource(
         guild_id, channel_id, message_id, author_id, author_name, ImageOp.MAP_PATCHING_OUTPUT)
     if output_filename is None:
-        output_path = None
-        patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_SAVED, ""))
+        raise PatchingException("PATCHING ERROR - ATTACHMENT NOT SAVED", MapPatchingErrors.ATTACHMENT_NOT_SAVED)
     else:
         output = crop_output(patched_image, background_params.get_position(), background_params.get_size())
         
@@ -121,9 +111,9 @@ def patch_processed_images(
         
         output_path = image_utils.save_image(output, channel_name, output_filename, ImageOp.MAP_PATCHING_OUTPUT)
         if output_path is None:
-            patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_SAVED, ""))
+            raise PatchingException("PATCHING ERROR - ATTACHMENT NOT SAVED", MapPatchingErrors.ATTACHMENT_NOT_SAVED)
     
-    return output_path, output_filename, patching_errors
+    return output_path, output_filename
 
 
 def crop_output(
@@ -171,7 +161,7 @@ def patch_processed_image_files(
             
             if len(image_param_i.corners) == 0:
                 print("no corner found for image", image_param_i)
-                continue
+                continue  # TODO should this raise an error?
             
             corner_orientations = [CornerOrientation(c[2]) for c in image_param_i.corners]
             
@@ -289,7 +279,6 @@ def patch_image(
     bit: np.ndarray = reshaped_cropped_image_i[:, :, 0:3]
     
     if DEBUG:
-        # print(len(opacity))
         print("opacity", opacity.shape)
         print("bit", bit.shape)
         print("padding", scaled_padding)
@@ -307,7 +296,6 @@ def patch_image(
                  :]
     
     if DEBUG:
-        # cv2.imwrite("./patch-work-piece.png", background)
         image_utils.save_image(background, channel_name, filename + "-patch-work-piece",
                                ImageOp.MAP_PROCESSED_IMAGE)
         print("background shape", background.shape)
@@ -332,7 +320,6 @@ def patch_image(
                   :]
     
     if DEBUG:
-        # cv2.imwrite("./cropped_bit.png", cropped_bit)
         print("cropped bit shape", cropped_bit.shape)
         image_utils.save_image(cropped_bit, channel_name, filename + "-cropped-bit",
                                ImageOp.MAP_PROCESSED_IMAGE)
@@ -357,8 +344,12 @@ def patch_image(
     
     if DEBUG:
         print("cropped opacity shape", cropped_opacity.shape)
-        image_utils.save_image(cropped_opacity, channel_name, filename + "-cropped-opacity", ImageOp.MAP_PROCESSED_IMAGE)
-        # cv2.imwrite("./cropped-opacity.png", cropped_opacity)
+        image_utils.save_image(
+            cropped_opacity,
+            channel_name,
+            filename + "-cropped-opacity",
+            ImageOp.MAP_PROCESSED_IMAGE
+        )
         
         print("should match", background.shape, cv2.merge((cropped_opacity, cropped_opacity, cropped_opacity)).shape)
     

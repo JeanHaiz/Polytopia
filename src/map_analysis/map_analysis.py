@@ -35,6 +35,9 @@ def map_analysis_request(
 ) -> None:
     image = image_utils.load_image(channel_name, filename, ImageOp.MAP_INPUT)
     
+    if image is None:
+        raise AnalysisException("IMAGE ANALYSIS - IMAGE NOT FOUND: %s, %s" % (channel_name, filename))
+
     if DEBUG:
         print("image", image is None, image.shape, flush=True)
     

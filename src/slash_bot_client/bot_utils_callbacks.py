@@ -28,11 +28,11 @@ async def on_analysis_error(
 
 
 async def on_patching_error(
-        patch_id: str,
+        patch_uuid: str,
         client: Client,
         error: str
 ):
-    await __on_error(patch_id, None, client, error)
+    await __on_error(patch_uuid, None, client, error)
 
 
 async def __on_error(

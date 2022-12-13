@@ -68,7 +68,6 @@ def send_patch_request(
         author_name,
         server_id,
         interaction_id,
-        turn,
         files,
         number_of_images
 ):
@@ -81,7 +80,6 @@ def send_patch_request(
         "author_name": author_name,
         "guild_id": server_id,
         "interaction_id": interaction_id,
-        "turn": turn,
         "files": files,
         "n_images": number_of_images
     })
@@ -101,7 +99,6 @@ def send_patch_request(
             author_name,
             server_id,
             interaction_id,
-            turn,
             files,
             number_of_images
         )

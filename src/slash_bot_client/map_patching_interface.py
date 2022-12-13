@@ -35,7 +35,6 @@ def send_map_patching_request(
         player["discord_player_name"],
         channel_info["server_discord_id"],
         patching_info["interaction_id"],
-        "0",  # TODO get actual turn
         files,
         number_of_images
     )

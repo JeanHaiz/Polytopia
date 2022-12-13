@@ -43,3 +43,27 @@ def send_patching_completion(
             channel_id,
             filename
         )
+
+
+def send_error(
+        patch_id: str,
+        error: str
+):
+    global queue_channel
+    body = json.dumps({
+        "action": "MAP_PATCHING_ERROR",
+        "patch_uuid": patch_id,
+        "error": error
+    })
+    try:
+        queue_channel.basic_publish(
+            exchange='',
+            routing_key=queue_name,
+            body=body
+        )
+    except pika.exceptions.StreamLostError:
+        queue_channel = queue_utils.get_blocking_channel(params)
+        send_patching_completion(
+            patch_id,
+            error
+        )

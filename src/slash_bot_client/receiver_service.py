@@ -44,12 +44,7 @@ def _to_task(future, as_task, loop):
 
 async def get_async_connection(queue, client, loop: asyncio.AbstractEventLoop):
     def action_reaction_request(channel, method, properties, body):
-        def inner():
-            return loop.run_until_complete(bot_utils_callbacks.on_map_patching_complete(client=client, **action_params))
-        
-        def other_inner():
-            return loop.run_until_complete(bot_utils_callbacks.on_analysis_error(client=client, **action_params))
-        
+
         def run_async(fct, **xargs):
             loop.call_soon_threadsafe(
                 lambda: loop.run_until_complete(fct(**xargs)))
@@ -60,12 +55,13 @@ async def get_async_connection(queue, client, loop: asyncio.AbstractEventLoop):
         if action == "MAP_ANALYSIS_COMPLETE":
             bot_utils_callbacks.on_map_analysis_complete(**action_params)
         elif action == "MAP_PATCHING_COMPLETE":
-            loop.call_soon_threadsafe(inner)
+            run_async(bot_utils_callbacks.on_map_patching_complete, client=client, **action_params)
         elif action == "HEADER_RECOGNITION_COMPLETE":
             bot_utils_callbacks.on_turn_recognition_complete(**action_params)
         elif action == "MAP_ANALYSIS_ERROR":
-            # loop.call_soon_threadsafe(other_inner)
             run_async(bot_utils_callbacks.on_analysis_error, client=client, **action_params)
+        elif action == "MAP_PATCHING_ERROR":
+            run_async(bot_utils_callbacks.on_patching_error, client=client, **action_params)
     
     print("setting up listener", flush=True)
     url = "amqp://guest:guest@rabbitmq:5672/"
