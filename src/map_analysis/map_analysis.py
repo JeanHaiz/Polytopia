@@ -58,8 +58,7 @@ def map_analysis_request(
     else:
         raise AnalysisException("IMAGE ANALYSIS - IMAGE NOT SAVED")
     
-    if DEBUG:
-        print("map analysis done, callback sent", flush=True)
+    print("map analysis done, callback sent", flush=True)
     
     analysis_callback_utils.send_analysis_completion(
         patch_process_id,
@@ -438,7 +437,7 @@ def get_cloud_alpha_quater(
     
     blur = get_template_matching(map_image, resized_template, resized_template_alpha, k_size, sigma)
     
-    grid_image = find_cloud_grid(map_image, channel_name, filename, map_size)
+    grid_image = find_cloud_grid(map_image, channel_name, filename, map_size, action_debug=action_debug)
     
     grid_blur = cv2.bitwise_and(blur, grid_image[:, :, 0])
     
@@ -518,9 +517,10 @@ def find_cloud_grid(map_image, channel_name, filename, map_size, k_size: int = 7
     return voting_map
 
 
-def get_grid(channel_name, filename, grid_size):
+def get_grid(channel_name, filename, grid_size, action_debug):
     image = image_utils.load_image(channel_name, filename, ImageOp.MAP_INPUT)
-    return find_cloud_grid(image[:, :, 0:3].astype(np.uint8), channel_name, filename, grid_size)
+    return find_cloud_grid(
+        image[:, :, 0:3].astype(np.uint8), channel_name, filename, grid_size, action_debug=action_debug)
 
 
 def cluster_lines(slopes: np.ndarray, heights: np.ndarray) -> np.ndarray:

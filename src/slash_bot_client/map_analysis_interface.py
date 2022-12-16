@@ -24,9 +24,10 @@ async def get_or_analyse_map(
 
     filename = str(resource["filename"])
     
-    print("get or analyse map", patch_process_id, map_requirement_id, message_id, flush=True)
-    print("processed image", operation, ImageOp.MAP_PROCESSED_IMAGE.value, operation == ImageOp.MAP_PROCESSED_IMAGE.value, flush=True)
-    print("processed image", operation, ImageOp.MAP_INPUT.value, operation == ImageOp.MAP_INPUT.value, flush=True)
+    if DEBUG:
+        print("get or analyse map", patch_process_id, map_requirement_id, message_id, flush=True)
+        print("processed image", operation, ImageOp.MAP_PROCESSED_IMAGE.value, operation == ImageOp.MAP_PROCESSED_IMAGE.value, flush=True)
+        print("processed image", operation, ImageOp.MAP_INPUT.value, operation == ImageOp.MAP_INPUT.value, flush=True)
     if operation == ImageOp.MAP_PROCESSED_IMAGE.value:
         bot_utils_callbacks.on_map_analysis_complete(
             patch_process_id,
