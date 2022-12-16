@@ -349,6 +349,8 @@ def get_inter_point_space(centers: List[np.ndarray]) -> int:
     center_pd = pd.DataFrame(np.reshape(centers, (len(centers), 2)), columns=['x', 'y'])
     grouped_centers = center_pd.groupby(by="x").agg(list)
     values = [c[i] - c[i + 1] for i, c in grouped_centers["y"].iteritems() for i in range(len(c) - 1)]
+    if len(values) == 0:
+        raise AnalysisException("IMAGE ANALYSIS - MAP GRID NOT RECOGNISED")
     num, bins = np.histogram(values, bins=int((np.max(values) - np.min(values)) / 5) + 1)
     max_index = np.argmax(num)
     min_bin = bins[max_index]
@@ -403,6 +405,9 @@ def get_scale(
         image_utils.save_image(thresh, channel_name, filename + "_self_masked_matching", ImageOp.MAP_PROCESSED_IMAGE)
     
     contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    if len(contours) == 0:
+        raise AnalysisException("IMAGE ANALYSIS - MAP GRID NOT RECOGNISED")
+
     centers = [np.reshape(np.mean(c, axis=0).astype(np.int32), (1, 1, 2)) for c in contours]
     
     if DEBUG or action_debug:

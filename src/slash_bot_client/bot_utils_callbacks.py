@@ -106,7 +106,7 @@ async def on_map_patching_complete(
         channel_id
     )
     channel = await get(client, Channel, object_id=channel_id)
-    await channel.send("Done patching")
+    # await channel.send("Done patching")
     channel_info = database_client.get_channel_info(channel_id)
     
     patch_path = image_utils.__get_file_path(
