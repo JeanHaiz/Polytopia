@@ -63,7 +63,7 @@ def send_error(
         )
     except pika.exceptions.StreamLostError:
         queue_channel = queue_utils.get_blocking_channel(params)
-        send_patching_completion(
+        send_error(
             patch_id,
             error
         )

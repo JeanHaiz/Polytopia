@@ -111,7 +111,7 @@ async def get_or_register_input(
         filename = str(resource["filename"])
         operation = ImageOp(int(resource["operation"]))
 
-    if hasattr(image_op, '__iter__'): # image_op is a sequence
+    if hasattr(image_op, '__iter__'):  # image_op is a sequence
         for image_op_i in image_op:
             check = await image_utils.get_or_fetch_image_check(
                 database_client,

@@ -32,6 +32,7 @@ def send_analysis_request(body):
             e.message
         )
     except BaseException as e:
+        print(e)
         patch_process_id = params["patch_process_id"] if "patch_process_id" in params else None
         map_requirement_id = params["map_requirement_id"] if "map_requirement_id" in params else None
         analysis_callback_utils.send_error(
