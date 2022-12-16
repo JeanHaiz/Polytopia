@@ -189,6 +189,18 @@ class SlashBotExtension(interactions.Extension):
             ctx.guild_id,
             lambda: bot_utils.list_active_channels(ctx)
         )
+
+    @interactions.extension_command(
+        name="drop",
+        description="admin command — deletes the channel from our memory"
+    )
+    async def drop_channel(self, ctx: CommandContext) -> None:
+        await bot_error_utils.wrap_slash_errors(
+            ctx,
+            self.client,
+            ctx.guild_id,
+            lambda: bot_utils.drop_channel(ctx)
+        )
     
     @interactions.extension_command(
         name="Add map",

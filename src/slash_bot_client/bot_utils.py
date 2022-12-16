@@ -325,6 +325,19 @@ async def list_active_channels(ctx: CommandContext) -> None:
         await ctx.send("The command is reserved for admins.")
 
 
+async def drop_channel(ctx: CommandContext) -> None:
+    if ctx.author.id == os.getenv("DISCORD_ADMIN_USER"):
+        logger.debug("drop channel")
+        active = database_client.is_channel_active(ctx.channel_id)
+        if active:
+            message = database_client.drop_channel(ctx.channel_id)
+            await ctx.send(message)
+        else:
+            await ctx.send("channel not active")
+    else:
+        await ctx.send("The command is reserved for admins.")
+
+
 async def set_player_score(ctx: CommandContext, player_name: str, turn: int, score: int) -> None:
     players = database_client.get_game_players(
         ctx.channel_id

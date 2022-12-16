@@ -600,6 +600,50 @@ class DatabaseClient:
             return status[0]
         else:
             return None
+
+    def drop_channel(self, channel_id: int):
+        dropped = self.execute(
+            f"""DELETE FROM message_resource_header
+                WHERE filename in (
+                    SELECT filename FROM message_resources
+                    WHERE source_channel_id = {channel_id}
+                );
+                
+                DELETE FROM map_patching_input_param
+                WHERE filename in (
+                    SELECT filename FROM message_resources
+                    WHERE source_channel_id = {channel_id}
+                );
+            
+                DELETE FROM map_patching_process_requirement
+                WHERE patch_uuid in (
+                    SELECT patch_uuid FROM map_patching_process
+                    WHERE channel_discord_id = {channel_id}
+                );
+                
+                DELETE FROM map_patching_process_input
+                WHERE patch_uuid in (
+                    SELECT patch_uuid FROM map_patching_process
+                    WHERE channel_discord_id = {channel_id}
+                );
+                
+                DELETE FROM map_patching_process
+                WHERE channel_discord_id = {channel_id};
+                
+                DELETE FROM message_resources
+                WHERE source_channel_id = {channel_id};
+                
+                DELETE FROM game_players
+                WHERE channel_discord_id = {channel_id};
+                
+                DELETE FROM polytopia_game
+                WHERE channel_discord_id = {channel_id};
+                
+                DELETE FROM discord_channel
+                WHERE channel_discord_id = {channel_id}
+                RETURNING channel_discord_id::text;""").fetchone()
+        if dropped is not None and len(dropped) > 0:
+            return dropped[0]
     
     @staticmethod
     def __format_tuple_list(s: List) -> str:
