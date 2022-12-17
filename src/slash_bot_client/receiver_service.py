@@ -63,7 +63,6 @@ async def get_async_connection(queue, client, loop: asyncio.AbstractEventLoop):
         elif action == "MAP_PATCHING_ERROR":
             run_async(bot_utils_callbacks.on_patching_error, client=client, **action_params)
     
-    print("setting up listener", flush=True)
     url = "amqp://guest:guest@rabbitmq:5672/"
     
     params = pika.URLParameters(url)
@@ -71,15 +70,7 @@ async def get_async_connection(queue, client, loop: asyncio.AbstractEventLoop):
     
     rabbit_receive = RabbitmqReceive(queue, action_reaction_request)
     rabbit_receive.start()
-    print("thread is running", flush=True)
-    
-    """
-    consumer = ExampleConsumer(amqp_url, queue, action)
-    consumer.run()
-    consumer.start_consuming()
-    """
-    print("consumer running")
-    # return channel
+    print("Slash bot message queue listener is running", flush=True)
 
 
 """
