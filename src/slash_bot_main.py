@@ -33,12 +33,13 @@ async def create_client():
     print("STARTING BOT at %s" % datetime.datetime.now().strftime('%Y.%m.%d_%H:%M:%S'))
     loop = asyncio.get_event_loop()
     
-    def __quit_coroutine(message, sleep_time=None):
+    async def __quit_coroutine(message, sleep_time=None):
         logger.warning(message)
         print(message, flush=True)
         if sleep_time is not None:
             time.sleep(sleep_time)
-
+        await slash_bot_client._websocket.close()
+        
         loop.run_until_complete(run_bot())
     
     async def check_health():
@@ -76,7 +77,7 @@ async def create_client():
                 await asyncio.sleep(30)
                 await inner()
             else:
-                __quit_coroutine("BOT DEAD", 30)
+                await __quit_coroutine("BOT DEAD", 30)
 
         print("starting threads", flush=True)
         await inner()
@@ -85,10 +86,10 @@ async def create_client():
         try:
             slash_bot_client.start()
         except (aiohttp.client_exceptions.ClientConnectorError, socket.gaierror):
-            __quit_coroutine("BOT CONNECTION ERROR", 30)
+            await __quit_coroutine("BOT CONNECTION ERROR", 30)
         except BaseException as e:
             print("Exception:\n", e)
-            __quit_coroutine("BOT FATAL FAILURE", 30)
+            await __quit_coroutine("BOT FATAL FAILURE", 30)
     
     nest_asyncio.apply(loop)
     
