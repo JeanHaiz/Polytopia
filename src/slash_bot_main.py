@@ -27,9 +27,14 @@ print(DEBUG, token, flush=True)
 
 logger.debug("TOKEN: %s" % token)
 
+exceptions = (
+    aiohttp.client_exceptions.ClientConnectorError,
+    socket.gaierror,
+    interactions.api.error.LibraryException
+)
+
 
 async def create_client():
-    
     print("STARTING BOT at %s" % datetime.datetime.now().strftime('%Y.%m.%d_%H:%M:%S'))
     loop = asyncio.get_event_loop()
     
@@ -39,6 +44,9 @@ async def create_client():
         if sleep_time is not None:
             time.sleep(sleep_time)
         await slash_bot_client._websocket.close()
+        
+        all_tasks = asyncio.all_tasks(loop)
+        print("All tasks:", len(all_tasks), list(all_tasks)[0] if len(all_tasks) > 0 else None)
         
         loop.run_until_complete(run_bot())
     
@@ -53,11 +61,12 @@ async def create_client():
                 client_commands = await slash_bot_client._http.get_application_commands(
                     slash_bot_client.me.id  # , os.getenv("DISCORD_TEST_SERVER", None)
                 )
-                print("Client commands", slash_bot_client.me.id, len(client_commands), flush=True) # 1036220176577863680
+                print("Client commands", slash_bot_client.me.id, len(client_commands),
+                      flush=True)  # 1036220176577863680
                 
                 if client_info is None:  # or client_info[0] is not None or isinstance(client_info[0], BaseException):
                     alive = False
-
+                
                 """print("HTTP Client info", client_info, flush=True)
                 print(
                     "Websocket ready",
@@ -67,7 +76,7 @@ async def create_client():
                 if not slash_bot_client._websocket.ready.is_set():  # or slash_bot_client._websocket._client.closed:
                     alive = False
                 # print("Ping", await slash_bot_client._websocket._client.ping(b"hello"), flush=True)
-            except (aiohttp.client_exceptions.ClientConnectorError, socket.gaierror):
+            except exceptions:
                 alive = False
             except BaseException as e:
                 print("Unrecognised error:", e)
@@ -78,14 +87,14 @@ async def create_client():
                 await inner()
             else:
                 await __quit_coroutine("BOT DEAD", 30)
-
+        
         print("starting threads", flush=True)
         await inner()
-
+    
     async def start_bot():
         try:
             slash_bot_client.start()
-        except (aiohttp.client_exceptions.ClientConnectorError, socket.gaierror):
+        except exceptions:
             await __quit_coroutine("BOT CONNECTION ERROR", 30)
         except BaseException as e:
             print("Exception:\n", e)
@@ -102,6 +111,10 @@ async def create_client():
     extensions = SlashBotExtension(slash_bot_client)
     
     async def run_bot():
+        
+        all_tasks = asyncio.all_tasks(loop)
+        print("All tasks at run bot:", len(all_tasks), list(all_tasks)[0] if len(all_tasks) > 0 else None)
+        
         task2 = loop.create_task(receiver_service.get_async_connection(
             "bot_client",
             slash_bot_client,
@@ -111,7 +124,7 @@ async def create_client():
         task3 = loop.create_task(check_health())
         
         tasks = [task2, task1, task3]
-    
+        
         try:
             results = await asyncio.gather(*tasks)
         finally:
@@ -120,6 +133,8 @@ async def create_client():
             for t in tasks:
                 if not t.done():
                     t.cancel()
+    
     await run_bot()
+
 
 asyncio.run(create_client())
