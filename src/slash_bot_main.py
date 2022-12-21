@@ -57,9 +57,11 @@ async def create_client():
             alive = True
             print("HEALTH CHECK START", flush=True)
             try:
-                await slash_bot_client._websocket.wait_until_ready()
                 print("Readiness before:", slash_bot_client._websocket.ready, flush=True)
+                await slash_bot_client._websocket.wait_until_ready()
+                print("Bot ready, getting info", flush=True)
                 client_info = await slash_bot_client._http.get_current_bot_information()
+                print("client info", client_info is not None)
                 client_commands = await slash_bot_client._http.get_application_commands(
                     slash_bot_client.me.id  # , os.getenv("DISCORD_TEST_SERVER", None)
                 )
@@ -78,7 +80,8 @@ async def create_client():
                 if not slash_bot_client._websocket.ready.is_set():  # or slash_bot_client._websocket._client.closed:
                     alive = False
                 # print("Ping", await slash_bot_client._websocket._client.ping(b"hello"), flush=True)
-            except exceptions:
+            except exceptions as e:
+                print("Recognised error", e)
                 alive = False
             except BaseException as e:
                 print("Unrecognised error:", e)
