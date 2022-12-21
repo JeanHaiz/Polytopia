@@ -14,7 +14,7 @@ if [ "$HEADHASH" != "$UPSTREAMHASH" ]
 then
 	echo Not up to date with origin. Pulling and Restarting.
 	git pull git@github.com:JeanHaiz/Polytopia.git master
-	/usr/local/bin/docker-compose restart helper
+	cd src && /usr/local/bin/docker-compose restart slash_bot
 	echo End of Pulling
 else
 	echo Current branch is up to date with origin/master.
