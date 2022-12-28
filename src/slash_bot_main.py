@@ -82,10 +82,12 @@ async def create_client():
                     alive = False
                 # print("Ping", await slash_bot_client._websocket._client.ping(b"hello"), flush=True)
             except exceptions as e:
-                print("Recognised error", e)
+                print("RECOGNISED EXCEPTION", e, flush=True)
+                logger.warning("RECOGNISED EXCEPTION" + str(e))
                 alive = False
             except BaseException as e:
-                print("Unrecognised error:", e)
+                print("UN-RECOGNISED EXCEPTION:", e, flush=True)
+                logger.warning("UN-RECOGNISED EXCEPTION" + str(e))
                 alive = False
             # print("HEALTH CHECK END", alive, flush=True)
             if alive:
@@ -100,11 +102,10 @@ async def create_client():
     async def start_bot():
         try:
             slash_bot_client.start()
-        except exceptions:
-            await __quit_coroutine("BOT CONNECTION ERROR", 30)
+        except exceptions as e:
+            await __quit_coroutine("BOT CONNECTION ERROR:\n" + str(e), 30)
         except BaseException as e:
-            print("Exception:\n", e)
-            await __quit_coroutine("BOT FATAL FAILURE", 30)
+            await __quit_coroutine("BOT FATAL FAILURE:\n" + str(e), 30)
     
     nest_asyncio.apply(loop)
     
