@@ -52,11 +52,13 @@ async def wrap_slash_errors(
         is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
         if (is_dev_env and is_test_server) or (not is_test_server and not is_dev_env):
             await asyncio.create_task(fct())
+        else:
+            logger.warning("CALLABLE NOT CALLED - ENVIRONMENT NOT OK")
     except:
         error = sys.exc_info()[0]
-        logger.error("##### ERROR #####")
-        logger.error(error)
-        logger.error(traceback.format_exc())
+        logger.warning("##### ERROR #####")
+        logger.warning(error)
+        logger.warning(traceback.format_exc())
         print("##### ERROR #####")
         print(error)
         traceback.print_exc()

@@ -96,7 +96,7 @@ async def create_client():
             else:
                 await __quit_coroutine("BOT DEAD", 30)
         
-        print("starting threads", flush=True)
+        # print("starting threads", flush=True)
         await inner()
     
     async def start_bot():

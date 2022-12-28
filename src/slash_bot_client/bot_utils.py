@@ -541,7 +541,7 @@ async def has_access(client: Client, ctx: CommandContext):
                     datetime.datetime.now().year == 2022:  # TODO add trial period
                 time_embed = interactions.Embed()
                 time_embed.description = (
-                        """You have passed your action limit for this month. """ +
+                        """You have passed your action limit for this month. \n""" +
                         """Here is a free trial for the poly helper bot.\n""" +
                         """For now, we're granting you unlimited actions.\n To support, """ +
                         """please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper)."""

@@ -6,6 +6,7 @@ from interactions import CommandContext
 
 from slash_bot_client import bot_utils
 from slash_bot_client import bot_error_utils
+from common.logger_utils import logger
 
 """
 Slash bot command registry
@@ -35,6 +36,10 @@ class SlashBotExtension(interactions.Extension):
     def __init__(self, client: interactions.Client) -> None:
         self.client: interactions.Client = client
     
+        @self.client.event()
+        async def on_command_error():
+            print("ERROR")
+    
     @interactions.extension_listener()
     async def listener(self, something):
         print("LISTENER", something, flush=True)
@@ -60,7 +65,7 @@ class SlashBotExtension(interactions.Extension):
         ],
     )
     async def slash_activate(self, ctx: CommandContext, size: int) -> None:
-        
+        logger.info("ACTIVATE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
@@ -73,6 +78,7 @@ class SlashBotExtension(interactions.Extension):
         description="Deactivates the channel. Reactions and image uploads will not be tracked anymore."
     )
     async def slash_deactivate(self, ctx: CommandContext) -> None:
+        logger.info("DEACTIVATE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
         await bot_error_utils.wrap_slash_errors(
             ctx,
@@ -86,6 +92,7 @@ class SlashBotExtension(interactions.Extension):
         description="Current bot version."
     )
     async def version(self, ctx: CommandContext) -> None:
+        logger.info("VERSION - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         await ctx.send("slash bot version %s" % VERSION)
     
     @interactions.extension_command(
@@ -101,6 +108,7 @@ class SlashBotExtension(interactions.Extension):
         ]
     )
     async def slash_get_channel_player_scores(self, ctx: CommandContext, player: str = None) -> None:
+        logger.info("PLAYER SCORE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
         await bot_error_utils.wrap_slash_errors(
             ctx,
@@ -121,6 +129,8 @@ class SlashBotExtension(interactions.Extension):
         ]
     )
     async def slash_patch_map(self, ctx: CommandContext, number_of_images: int = None) -> None:
+        logger.info("PATCH - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+        
         async def inner():
             if await bot_utils.has_access(self.client, ctx):
                 await bot_utils.patch_map(
@@ -161,6 +171,8 @@ class SlashBotExtension(interactions.Extension):
         ]
     )
     async def slash_set_player_score(self, ctx: CommandContext, player_name: str, turn: int, score: int) -> None:
+        logger.info("SET SCORE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+        
         await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
@@ -178,6 +190,8 @@ class SlashBotExtension(interactions.Extension):
         description="Clear the stack of maps to patch"
     )
     async def slash_clear_map_reactions(self, ctx: CommandContext) -> None:
+        logger.info("CLEAR MAPS - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+        
         async def inner() -> None:
             message = await ctx.send("Processing")
             channel = await ctx.get_channel()
@@ -189,7 +203,10 @@ class SlashBotExtension(interactions.Extension):
         name="channels",
         description="admin command — lists all active channels in the server"
     )
+    @interactions.autodefer(30)
     async def slash_list_active_channels(self, ctx: CommandContext) -> None:
+        logger.info("CHANNELS - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+        
         await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
@@ -202,6 +219,8 @@ class SlashBotExtension(interactions.Extension):
         description="admin command — deletes the channel from our memory"
     )
     async def drop_channel(self, ctx: CommandContext) -> None:
+        logger.info("DROP - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+        
         await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
@@ -215,6 +234,8 @@ class SlashBotExtension(interactions.Extension):
     )
     @autodefer()
     async def add_patch_source(self, ctx: CommandContext):
+        logger.info("ADD MAP - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+        
         async def inner():
             if await bot_utils.has_access(self.client, ctx):
                 if len(ctx.target.attachments) > 0:
@@ -238,10 +259,12 @@ class SlashBotExtension(interactions.Extension):
         )
     
     @interactions.extension_command(
-        name="Remove",
+        name="Remove image",
         type=ApplicationCommandType.MESSAGE
     )
     async def remove_patch_source(self, ctx: CommandContext):
+        logger.info("REMOVE IMAGE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+        
         async def inner():
             if len(ctx.target.attachments) > 0:
                 message = await ctx.send("Processing")
@@ -260,10 +283,12 @@ class SlashBotExtension(interactions.Extension):
         )
     
     @interactions.extension_command(
-        name="Renew",
+        name="Renew action",
         type=ApplicationCommandType.MESSAGE
     )
     async def renew_map_patching(self, ctx: CommandContext):
+        logger.info("RENEW ACTION - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+        
         async def inner():
             if await bot_utils.has_access(self.client, ctx):
                 if len(ctx.target.attachments) > 0:
@@ -291,6 +316,7 @@ class SlashBotExtension(interactions.Extension):
         description="Lists all map pieces used as input for patching"
     )
     async def get_map_trace(self, ctx: CommandContext) -> None:
+        logger.info("TRACE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
         await bot_error_utils.wrap_slash_errors(
             ctx,
@@ -304,6 +330,7 @@ class SlashBotExtension(interactions.Extension):
         description="Tells you if you are on the user white list"
     )
     async def is_white_list(self, ctx: CommandContext) -> None:
+        logger.info("IS WHITE LIST - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
     
         await bot_error_utils.wrap_slash_errors(
             ctx,
@@ -317,6 +344,8 @@ class SlashBotExtension(interactions.Extension):
         description="admin command — lists all active channels in the server"
     )
     async def get_roles(self, ctx: CommandContext) -> None:
+        logger.info("ROLES - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+        
         has_access = await bot_utils.has_access(self.client, ctx)
         if has_access:
             await ctx.send("Welcome to poly helper, please submit your action")
@@ -326,6 +355,7 @@ class SlashBotExtension(interactions.Extension):
         type=ApplicationCommandType.USER
     )
     async def white_list_user(self, ctx: CommandContext):
+        logger.info("PUT WHITE LIST USER - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
 
         await bot_error_utils.wrap_slash_errors(
             ctx,
@@ -339,6 +369,7 @@ class SlashBotExtension(interactions.Extension):
         type=ApplicationCommandType.USER
     )
     async def de_white_list_user(self, ctx: CommandContext):
+        logger.info("POP WHITE LIST USER - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
 
         await bot_error_utils.wrap_slash_errors(
             ctx,
@@ -361,7 +392,8 @@ class SlashBotExtension(interactions.Extension):
         ]
     )
     async def renew_patching_runs(self, ctx: CommandContext, dry_run: bool = True):
-
+        logger.info("RENEW PATCHINGS - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+        
         await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
