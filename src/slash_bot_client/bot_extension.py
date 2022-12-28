@@ -36,10 +36,6 @@ class SlashBotExtension(interactions.Extension):
     def __init__(self, client: interactions.Client) -> None:
         self.client: interactions.Client = client
     
-        @self.client.event()
-        async def on_command_error():
-            print("ERROR")
-    
     @interactions.extension_listener()
     async def listener(self, something):
         print("LISTENER", something, flush=True)
@@ -66,12 +62,7 @@ class SlashBotExtension(interactions.Extension):
     )
     async def slash_activate(self, ctx: CommandContext, size: int) -> None:
         logger.info("ACTIVATE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild_id,
-            lambda: bot_utils.activate(ctx, size)
-        )
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.activate(ctx, size))
     
     @interactions.extension_command(
         name="deactivate",
@@ -80,12 +71,7 @@ class SlashBotExtension(interactions.Extension):
     async def slash_deactivate(self, ctx: CommandContext) -> None:
         logger.info("DEACTIVATE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild_id,
-            lambda: bot_utils.deactivate(ctx)
-        )
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.deactivate(ctx))
     
     @interactions.extension_command(
         name="version",
@@ -110,11 +96,8 @@ class SlashBotExtension(interactions.Extension):
     async def slash_get_channel_player_scores(self, ctx: CommandContext, player: str = None) -> None:
         logger.info("PLAYER SCORE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild_id,
-            lambda: bot_utils.get_channel_player_score(ctx, player))
+        await bot_error_utils.wrap_slash_errors(ctx, self.client,
+                                                lambda: bot_utils.get_channel_player_score(ctx, player))
     
     @interactions.extension_command(
         name="patch",
@@ -138,13 +121,8 @@ class SlashBotExtension(interactions.Extension):
                     self.client._http,
                     number_of_images
                 )
-            
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild_id,
-            lambda: inner()
-        )
+        
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: inner())
     
     @interactions.extension_command(
         name="set-score",
@@ -173,17 +151,12 @@ class SlashBotExtension(interactions.Extension):
     async def slash_set_player_score(self, ctx: CommandContext, player_name: str, turn: int, score: int) -> None:
         logger.info("SET SCORE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
-        await bot_error_utils.wrap_slash_errors(
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.set_player_score(
             ctx,
-            self.client,
-            ctx.guild_id,
-            lambda: bot_utils.set_player_score(
-                ctx,
-                player_name,
-                turn,
-                score
-            )
-        )
+            player_name,
+            turn,
+            score
+        ))
     
     @interactions.extension_command(
         name="clear_maps",
@@ -197,7 +170,7 @@ class SlashBotExtension(interactions.Extension):
             channel = await ctx.get_channel()
             await bot_utils.clear_channel_map_reactions(channel, lambda: message.edit("Done"))
         
-        await bot_error_utils.wrap_slash_errors(ctx, self.client, ctx.guild_id, inner)
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, inner)
     
     @interactions.extension_command(
         name="channels",
@@ -207,13 +180,8 @@ class SlashBotExtension(interactions.Extension):
     async def slash_list_active_channels(self, ctx: CommandContext) -> None:
         logger.info("CHANNELS - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild_id,
-            lambda: bot_utils.list_active_channels(ctx)
-        )
-
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.list_active_channels(ctx))
+    
     @interactions.extension_command(
         name="drop",
         description="admin command — deletes the channel from our memory"
@@ -221,12 +189,7 @@ class SlashBotExtension(interactions.Extension):
     async def drop_channel(self, ctx: CommandContext) -> None:
         logger.info("DROP - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild_id,
-            lambda: bot_utils.drop_channel(ctx)
-        )
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.drop_channel(ctx))
     
     @interactions.extension_command(
         name="Add map",
@@ -251,12 +214,7 @@ class SlashBotExtension(interactions.Extension):
                 else:
                     await ctx.send("Please add a message with an image")
         
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild.id,
-            lambda: inner()
-        )
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: inner())
     
     @interactions.extension_command(
         name="Remove image",
@@ -275,12 +233,7 @@ class SlashBotExtension(interactions.Extension):
             else:
                 await ctx.send("Please remove a message with an image")
         
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild.id,
-            lambda: inner()
-        )
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: inner())
     
     @interactions.extension_command(
         name="Renew action",
@@ -303,13 +256,8 @@ class SlashBotExtension(interactions.Extension):
                 
                 else:
                     await ctx.send("Please add a message with an image")
-
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild.id,
-            lambda: inner()
-        )
+        
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: inner())
     
     @interactions.extension_command(
         name="trace",
@@ -318,27 +266,17 @@ class SlashBotExtension(interactions.Extension):
     async def get_map_trace(self, ctx: CommandContext) -> None:
         logger.info("TRACE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild.id,
-            lambda: bot_utils.trace(ctx)
-        )
-
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.trace(ctx))
+    
     @interactions.extension_command(
         name="whitelist",
         description="Tells you if you are on the user white list"
     )
     async def is_white_list(self, ctx: CommandContext) -> None:
         logger.info("IS WHITE LIST - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+        
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.white_list(ctx))
     
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild.id,
-            lambda: bot_utils.white_list(ctx)
-        )
-
     @interactions.extension_command(
         name="roles",
         description="admin command — lists all active channels in the server"
@@ -349,35 +287,25 @@ class SlashBotExtension(interactions.Extension):
         has_access = await bot_utils.has_access(self.client, ctx)
         if has_access:
             await ctx.send("Welcome to poly helper, please submit your action")
-
+    
     @interactions.extension_command(
         name="White list user",
         type=ApplicationCommandType.USER
     )
     async def white_list_user(self, ctx: CommandContext):
         logger.info("PUT WHITE LIST USER - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
-
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild.id,
-            lambda: bot_utils.white_list_user(ctx)
-        )
-
+        
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.white_list_user(ctx))
+    
     @interactions.extension_command(
         name="De white list user",
         type=ApplicationCommandType.USER
     )
     async def de_white_list_user(self, ctx: CommandContext):
         logger.info("POP WHITE LIST USER - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
-
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild.id,
-            lambda: bot_utils.de_white_list_user(ctx)
-        )
-
+        
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.de_white_list_user(ctx))
+    
     @interactions.extension_command(
         name="renew-incomplete-patching-runs",
         description="Tells you if you are on the user white list",
@@ -394,9 +322,5 @@ class SlashBotExtension(interactions.Extension):
     async def renew_patching_runs(self, ctx: CommandContext, dry_run: bool = True):
         logger.info("RENEW PATCHINGS - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
-        await bot_error_utils.wrap_slash_errors(
-            ctx,
-            self.client,
-            ctx.guild.id,
-            lambda: bot_utils.renew_patching(self.client, ctx, dry_run)
-        )
+        await bot_error_utils.wrap_slash_errors(ctx, self.client,
+                                                lambda: bot_utils.renew_patching(self.client, ctx, dry_run))

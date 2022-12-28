@@ -7,7 +7,6 @@ from typing import Callable
 from typing import Coroutine
 
 from interactions import Client
-from interactions import Snowflake
 from interactions import get
 
 from common.logger_utils import logger
@@ -45,15 +44,10 @@ async def manage_slash_patching_errors(
 async def wrap_slash_errors(
         ctx: CommandContext,
         client: Client,
-        guild_id: Snowflake,
-        fct: Callable[[], Coroutine]) -> None:
+        fct: Callable[[], Coroutine]
+) -> None:
     try:
-        is_test_server = str(guild_id) == os.getenv("DISCORD_TEST_SERVER")
-        is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
-        if (is_dev_env and is_test_server) or (not is_test_server and not is_dev_env):
-            await asyncio.create_task(fct())
-        else:
-            logger.warning("CALLABLE NOT CALLED - ENVIRONMENT NOT OK")
+        await asyncio.create_task(fct())
     except:
         error = sys.exc_info()[0]
         logger.warning("##### ERROR #####")
@@ -70,6 +64,7 @@ async def wrap_slash_errors(
         guild = await ctx.get_guild()
         
         await error_channel.send(
-            f"""Hey <@{os.getenv("DISCORD_ADMIN_USER")}>,\nError in channel {channel.name} on server {guild.name}:\n{traceback.format_exc()}\n""")
+            f"""Hey <@{os.getenv("DISCORD_ADMIN_USER")}>,\n""" +
+            f"""Error in channel {channel.name} on server {guild.name}:\n{traceback.format_exc()}\n""")
         
         await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
