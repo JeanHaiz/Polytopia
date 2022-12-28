@@ -1,5 +1,6 @@
 import os
 import datetime
+import interactions
 
 from io import BytesIO
 
@@ -14,6 +15,8 @@ from interactions import HTTPClient
 from interactions import Optional
 from interactions import CommandContext
 from interactions import Message
+from interactions import Client
+from interactions import get
 
 from database.database_client import get_database_client
 from slash_bot_client import command_context_store as cxs
@@ -143,13 +146,15 @@ async def patch_images(
             count += 1
             if count >= n_images:
                 break
-
+    
     if DEBUG:
-        print("requirements", requirements, flush=True)
-
+        print("Patching requirements", requirements, flush=True)
+    
     if len(requirements) == 0:
+        database_client.update_patching_process_status(patch_process_id, "NO-IMAGE")
         await ctx.send("No map added. Please add maps to create a collage.")
     elif len(requirements) == 2:
+        database_client.update_patching_process_status(patch_process_id, "ONE-IMAGE")
         await ctx.send("Found one map only. Please add a second map to create a collage.")
     else:
         for requirement_i in requirements:
@@ -378,7 +383,6 @@ async def patch_map(
         bot_http_client: HTTPClient,
         number_of_images: Optional[int]
 ) -> None:
-    
     size = database_client.get_game_map_size(ctx.channel_id)
     if size is None:
         await ctx.send("Please set the channel map size with the 'activate' slash command")
@@ -486,14 +490,146 @@ async def trace(ctx: CommandContext) -> None:
     await answer_message.edit("Done")
 
 
-"""
-async def renew_patching(dry_run=False):
-    database_client = DatabaseClient(
-        user="discordBot", password="password123", port="5432", database="polytopiaHelper_dev",
-        host="database")
-    incomplete_channel_list = database_client.get_incomplete_patching_run()
+def is_fervent(role: str) -> bool:
+    return role == "FERVENT"
+
+
+def is_hustler(role: str) -> bool:
+    return role == "HUSTLER"
+
+
+async def has_access(client: Client, ctx: CommandContext):
+    # general_channel = await get(client, Channel, object_id=int(os.getenv("DISCORD_ERROR_CHANNEL")))
+    # permissions = await general_channel.get_permissions_for(ctx.author)
+    target_guild_id = os.getenv("DISCORD_TEST_SERVER") if DEBUG else os.getenv("DISCORD_GENERAL_SERVER")
+    general_guild = [g for g in client.guilds if g.id == target_guild_id][0]
     
-    for incomplete_run in incomplete_channel_list:
-        print(incomplete_run)
-        # channel_details = database_client.get_channel_info(channel_id)
-"""
+    is_white_listed = database_client.is_white_listed(ctx.author.id)
+    if is_white_listed:
+        # print("action whitelisted")
+        return True
+    
+    try:
+        member = await general_guild.get_member(ctx.author.id)
+        count = database_client.get_request_count(member.id)
+        general_guild_member_roles = [(await general_guild.get_role(r)).name for r in member.roles]
+        if os.getenv("DISCORD_PATREON_FERVENT") in general_guild_member_roles:  # fervent
+            limit = 15
+        elif os.getenv("DISCORD_PATREON_HUSTLER") in general_guild_member_roles:  # hustler
+            limit = 50
+        elif member is not None:
+            limit = 3
+            if count < limit:
+                embed = interactions.Embed()
+                embed.description = (
+                        f"""You have {limit - count - 1} actions remaining this month.\n""" +
+                        """For more actions, """ +
+                        """please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper).""")
+                await ctx.send(embeds=embed)
+                return True
+        else:
+            embed = interactions.Embed()
+            embed.description = (
+                    """Your profile was not found on the poly helper guild.\n""" +
+                    """Please join the [poly helper discord server](https://discord.gg/6kk6nJnf)""")
+            await ctx.send(embeds=embed)
+            return False
+        # await ctx.send(str(limit) + ", " + str(count) + ", " + str(general_guild_member_roles))
+        
+        if count >= limit:
+            if (datetime.datetime.now().year == 2023 and datetime.datetime.now().month <= 1) or \
+                    datetime.datetime.now().year == 2022:  # TODO add trial period
+                time_embed = interactions.Embed()
+                time_embed.description = (
+                        """You have passed your action limit for this month. """ +
+                        """Here is a free trial for the poly helper bot.\n""" +
+                        """For now, we're granting you unlimited actions.\n To support, """ +
+                        """please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper)."""
+                )
+                await ctx.send(embeds=time_embed)
+                return True
+            else:
+                embed = interactions.Embed()
+                embed.description = (
+                        """You have passed your action limit for this month.\n""" +
+                        """Please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper).""")
+                await ctx.send(embeds=embed)
+                return False
+        else:
+            # count is below limit for known user, access granted
+            return True
+    
+    except interactions.api.error as e:
+        await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
+        print("ROLE ERROR\n" + e)
+        logger.warning("ROLE ERROR\n" + e)
+        
+        return False
+
+
+async def white_list(ctx: CommandContext):
+    is_white_listed = database_client.is_white_listed(ctx.author.id)
+    if is_white_listed is not None and is_white_listed:
+        embed = interactions.Embed()
+        embed.description = (
+                f"""Hi {ctx.author.name}, you are white-listed. You have unlimited access.\n""" +
+                """To support the bot and its creators,""" +
+                """please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper).""")
+        await ctx.send(embeds=embed)
+    else:
+        embed = interactions.Embed()
+        embed.description = (
+                f"""You are NOT white-listed.\n""" +
+                """To support the bot and its creators and access more functionalities, """ +
+                """please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper).""")
+        await ctx.send(embeds=embed)
+
+
+async def white_list_user(ctx: CommandContext):
+    if ctx.author.id == os.getenv("DISCORD_ADMIN_USER"):
+        target_user = ctx.target
+        database_client.white_list_user(target_user.id)
+        await ctx.send("User whitelisted")
+    else:
+        await ctx.send("The command is reserved for admins.")
+
+
+async def de_white_list_user(ctx: CommandContext):
+    if ctx.author.id == os.getenv("DISCORD_ADMIN_USER"):
+        target_user = ctx.target
+        database_client.de_white_list_user(target_user.id)
+        await ctx.send("User removed from white-list")
+    else:
+        await ctx.send("The command is reserved for admins.")
+
+
+async def renew_patching(client: Client, ctx: CommandContext, dry_run):
+    def print_channel(channel_id):
+        channel_details = database_client.get_channel_info(channel_id)
+        server_name = database_client.get_server_name(channel_details["server_discord_id"])
+        return server_name + " " + channel_details["channel_name"]
+        
+    if ctx.author.id == os.getenv("DISCORD_ADMIN_USER"):
+        incomplete_channel_list = database_client.get_incomplete_patching_run()
+        
+        if dry_run:
+            if len(incomplete_channel_list) > 0:
+                message = "\n".join(
+                    [
+                        print_channel(icl["channel_discord_id"]) + " on %s at %s" % (
+                            icl["max_started_on_started"].strftime('%Y.%m.%d'),
+                            icl["max_started_on_started"].strftime('%H:%M:%S')
+                        )
+                        for icl in incomplete_channel_list
+                    ]
+                )
+            else:
+                message = "All patching runs are complete."
+            await ctx.send(message)
+        else:
+            for incomplete_run in incomplete_channel_list:
+                print(incomplete_run["patch_uuid"], incomplete_run)
+                channel = await get(client, Channel, object_id=incomplete_run["channel_discord_id"])
+                await patch_images(ctx, client._http, channel, 3)
+    else:
+        await ctx.send("The command is reserved for admins.")

@@ -55,20 +55,21 @@ async def create_client():
         
         async def inner():
             alive = True
-            print("HEALTH CHECK START", flush=True)
+            # print("HEALTH CHECK START", flush=True)
             try:
-                print("Readiness before:", slash_bot_client._websocket.ready, flush=True)
+                # print("Readiness before:", slash_bot_client._websocket.ready.is_set(), flush=True)
                 await slash_bot_client._websocket.wait_until_ready()
-                print("Bot ready, getting info", flush=True)
+                # print("Bot ready, getting info", flush=True)
                 client_info = await slash_bot_client._http.get_current_bot_information()
-                print("client info", client_info is not None)
+                # print("client info", client_info is not None)
                 client_commands = await slash_bot_client._http.get_application_commands(
                     slash_bot_client.me.id  # , os.getenv("DISCORD_TEST_SERVER", None)
                 )
-                print("Client commands", slash_bot_client.me.id, len(client_commands),
-                      flush=True)  # 1036220176577863680
-                
-                if client_info is None:  # or client_info[0] is not None or isinstance(client_info[0], BaseException):
+                # slash bot app id 1036220176577863680
+                # print("Client commands", slash_bot_client.me.id, len(client_commands), flush=True)
+
+                # or client_info[0] is not None or isinstance(client_info[0], BaseException):
+                if client_info is None or not slash_bot_client._websocket.ready.is_set():
                     alive = False
                 
                 """print("HTTP Client info", client_info, flush=True)
@@ -86,7 +87,7 @@ async def create_client():
             except BaseException as e:
                 print("Unrecognised error:", e)
                 alive = False
-            print("HEALTH CHECK END", alive, flush=True)
+            # print("HEALTH CHECK END", alive, flush=True)
             if alive:
                 await asyncio.sleep(30)
                 await inner()

@@ -35,6 +35,10 @@ class SlashBotExtension(interactions.Extension):
     def __init__(self, client: interactions.Client) -> None:
         self.client: interactions.Client = client
     
+    @interactions.extension_listener()
+    async def listener(self, something):
+        print("LISTENER", something, flush=True)
+    
     @interactions.extension_command(
         name="activate",
         description="Activates the bot in the channel. Will respond to map patching and score recognition requests.",
@@ -117,16 +121,19 @@ class SlashBotExtension(interactions.Extension):
         ]
     )
     async def slash_patch_map(self, ctx: CommandContext, number_of_images: int = None) -> None:
-        await ctx.send("Loading")
+        async def inner():
+            if await bot_utils.has_access(self.client, ctx):
+                await bot_utils.patch_map(
+                    ctx,
+                    self.client._http,
+                    number_of_images
+                )
+            
         await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
             ctx.guild_id,
-            lambda: bot_utils.patch_map(
-                ctx,
-                self.client._http,
-                number_of_images
-            )
+            lambda: inner()
         )
     
     @interactions.extension_command(
@@ -209,18 +216,19 @@ class SlashBotExtension(interactions.Extension):
     @autodefer()
     async def add_patch_source(self, ctx: CommandContext):
         async def inner():
-            if len(ctx.target.attachments) > 0:
-                message = await ctx.send("Loading")
+            if await bot_utils.has_access(self.client, ctx):
+                if len(ctx.target.attachments) > 0:
+                    message = await ctx.send("Loading")
+                    
+                    await bot_utils.add_map_and_patch(
+                        ctx,
+                        self.client._http
+                    )
+                    
+                    await message.edit("Analysing")
                 
-                await bot_utils.add_map_and_patch(
-                    ctx,
-                    self.client._http
-                )
-                
-                await message.edit("Analysing")
-            
-            else:
-                await ctx.send("Please add a message with an image")
+                else:
+                    await ctx.send("Please add a message with an image")
         
         await bot_error_utils.wrap_slash_errors(
             ctx,
@@ -257,19 +265,20 @@ class SlashBotExtension(interactions.Extension):
     )
     async def renew_map_patching(self, ctx: CommandContext):
         async def inner():
-            if len(ctx.target.attachments) > 0:
-                message = await ctx.send("Loading")
+            if await bot_utils.has_access(self.client, ctx):
+                if len(ctx.target.attachments) > 0:
+                    message = await ctx.send("Loading")
+                    
+                    await bot_utils.force_analyse_map_and_patch(
+                        ctx,
+                        self.client._http
+                    )
+                    
+                    await message.edit("Analysing")
                 
-                await bot_utils.force_analyse_map_and_patch(
-                    ctx,
-                    self.client._http
-                )
-                
-                await message.edit("Analysing")
-            
-            else:
-                await ctx.send("Please add a message with an image")
-        
+                else:
+                    await ctx.send("Please add a message with an image")
+
         await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
@@ -288,4 +297,74 @@ class SlashBotExtension(interactions.Extension):
             self.client,
             ctx.guild.id,
             lambda: bot_utils.trace(ctx)
+        )
+
+    @interactions.extension_command(
+        name="whitelist",
+        description="Tells you if you are on the user white list"
+    )
+    async def is_white_list(self, ctx: CommandContext) -> None:
+    
+        await bot_error_utils.wrap_slash_errors(
+            ctx,
+            self.client,
+            ctx.guild.id,
+            lambda: bot_utils.white_list(ctx)
+        )
+
+    @interactions.extension_command(
+        name="roles",
+        description="admin command — lists all active channels in the server"
+    )
+    async def get_roles(self, ctx: CommandContext) -> None:
+        has_access = await bot_utils.has_access(self.client, ctx)
+        if has_access:
+            await ctx.send("Welcome to poly helper, please submit your action")
+
+    @interactions.extension_command(
+        name="White list user",
+        type=ApplicationCommandType.USER
+    )
+    async def white_list_user(self, ctx: CommandContext):
+
+        await bot_error_utils.wrap_slash_errors(
+            ctx,
+            self.client,
+            ctx.guild.id,
+            lambda: bot_utils.white_list_user(ctx)
+        )
+
+    @interactions.extension_command(
+        name="De white list user",
+        type=ApplicationCommandType.USER
+    )
+    async def de_white_list_user(self, ctx: CommandContext):
+
+        await bot_error_utils.wrap_slash_errors(
+            ctx,
+            self.client,
+            ctx.guild.id,
+            lambda: bot_utils.de_white_list_user(ctx)
+        )
+
+    @interactions.extension_command(
+        name="renew-incomplete-patching-runs",
+        description="Tells you if you are on the user white list",
+        options=[
+            interactions.Option(
+                name="dry-run",
+                description="prints the list of missing patchings",
+                converter="dry_run",
+                type=interactions.OptionType.BOOLEAN,
+                required=False
+            )
+        ]
+    )
+    async def renew_patching_runs(self, ctx: CommandContext, dry_run: bool = True):
+
+        await bot_error_utils.wrap_slash_errors(
+            ctx,
+            self.client,
+            ctx.guild.id,
+            lambda: bot_utils.renew_patching(self.client, ctx, dry_run)
         )

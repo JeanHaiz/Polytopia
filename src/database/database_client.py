@@ -44,7 +44,7 @@ class DatabaseClient:
             return server_name[0]
         else:
             return None
-
+    
     def activate_channel(self, channel_id: int, channel_name: str, server_id: int, server_name: str) -> CursorResult:
         channel_name = re.sub(r"[^a-zA-Z0-9]", "", channel_name)[:40]
         server_name = re.sub(r"[^a-zA-Z0-9]", "", server_name)[:40]
@@ -253,7 +253,7 @@ class DatabaseClient:
                 SET discord_player_name = '{author_name}'
                 RETURNING game_player_uuid::text;""").fetchone()
         if game_player_uuid is not None and len(game_player_uuid) > 0:
-            self.execute(
+            self.execute(  # TODO this might be broken if the above fails the command maybe should be executed again
                 f"""INSERT INTO polytopia_game
                     (server_discord_id, channel_discord_id)
                     VALUES ({guild_id}, {channel_id})
@@ -497,7 +497,7 @@ class DatabaseClient:
         return self.execute(
             f"""DELETE from map_patching_input_param
                 WHERE filename::text = '{filename}';""")
-
+    
     def get_background_image_params(self, map_size: int) -> Optional[ImageParam]:
         result_proxy = self.execute(
             f"""SELECT *
@@ -527,7 +527,7 @@ class DatabaseClient:
                 inner join (
                     select channel_discord_id, max(started_on) max_started_on_done
                     from map_patching_process
-                    where status='Done'
+                    where status in ('Done', 'DONE', 'NO-IMAGE', 'ONE-IMAGE')
                     group by channel_discord_id) b
                 on a.channel_discord_id = b.channel_discord_id
                 where a.max_started_on_started > b.max_started_on_done;"""
@@ -600,7 +600,7 @@ class DatabaseClient:
             return status[0]
         else:
             return None
-
+    
     def drop_channel(self, channel_id: int):
         dropped = self.execute(
             f"""DELETE FROM message_resource_header
@@ -645,6 +645,53 @@ class DatabaseClient:
         if dropped is not None and len(dropped) > 0:
             return dropped[0]
     
+    def get_request_count(self, discord_player_id) -> Optional[int]:
+        count = self.execute(
+            f"""SELECT count(patch_uuid) from map_patching_process
+                WHERE process_author_discord_id = '{discord_player_id}'
+                AND started_on >= now() - INTERVAL '1 month'
+                AND status = 'DONE';""").fetchone()
+        if count is not None and len(count) > 0:
+            return count[0]
+        else:
+            return None
+    
+    def is_white_listed(self, discord_player_id) -> Optional[bool]:
+        white_list = self.execute(
+            f"""SELECT white_list from polytopia_player
+                WHERE discord_player_id = '{discord_player_id}';""").fetchone()
+        if white_list is not None and len(white_list) > 0:
+            print("white_list", white_list[0], type(white_list[0]))
+            return white_list[0]
+        else:
+            return None
+    
+    def white_list_user(self, discord_player_id) -> Optional[bool]:
+        game_player_uuid = self.execute(
+            f"""INSERT INTO polytopia_player
+                (discord_player_id, white_list)
+                VALUES ({discord_player_id}, true)
+                ON CONFLICT (discord_player_id) DO UPDATE
+                SET white_list = true
+                RETURNING game_player_uuid::text;""").fetchone()
+        if game_player_uuid is not None and len(game_player_uuid) > 0:
+            return game_player_uuid[0]
+        else:
+            return None
+    
+    def de_white_list_user(self, discord_player_id) -> Optional[bool]:
+        game_player_uuid = self.execute(
+            f"""INSERT INTO polytopia_player
+                (discord_player_id, white_list)
+                VALUES ({discord_player_id}, false)
+                ON CONFLICT (discord_player_id) DO UPDATE
+                SET white_list = false
+                RETURNING game_player_uuid::text;""").fetchone()
+        if game_player_uuid is not None and len(game_player_uuid) > 0:
+            return game_player_uuid[0]
+        else:
+            return None
+    
     @staticmethod
     def __format_tuple_list(s: List) -> str:
         return str(list([list(s_i) for s_i in s]))
@@ -654,12 +701,15 @@ class DatabaseClient:
         return "(%s)" % (", ".join([str(fct(s_i)) for s_i in s]))
 
 
-print("Database config", os.getenv("PGUSER"),
-        os.getenv("PGPASS"),
-        os.getenv("PGPORT"),
-        os.getenv("PGDATABASE"),
-        os.getenv("PGHOST")
-      )
+"""
+print(
+    "Database config", os.getenv("PGUSER"),
+    os.getenv("PGPASS"),
+    os.getenv("PGPORT"),
+    os.getenv("PGDATABASE"),
+    os.getenv("PGHOST")
+)
+"""
 
 
 def get_database_client() -> DatabaseClient:

@@ -4,7 +4,9 @@ from typing import List
 from typing import Tuple
 from typing import Optional
 
-from interactions import File, Channel, Client
+from interactions import File
+from interactions import Channel
+from interactions import Client
 from interactions.utils.get import get
 
 from common import image_utils
