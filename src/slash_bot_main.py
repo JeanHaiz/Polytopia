@@ -8,8 +8,12 @@ import aiohttp
 import interactions
 import nest_asyncio
 
-from slash_bot_client.bot_extension import SlashBotExtension
-from slash_bot_client import receiver_service
+from slash_bot_client.extensions.bot_extension import SlashBotExtension
+from slash_bot_client.extensions.map_extension import MapExtension
+from slash_bot_client.extensions.score_extension import ScoreExtension
+from slash_bot_client.extensions.user_extension import UserExtension
+
+from slash_bot_client.queue_services import receiver_service
 from common.logger_utils import logger
 
 """
@@ -62,12 +66,12 @@ async def create_client():
                 # print("Bot ready, getting info", flush=True)
                 client_info = await slash_bot_client._http.get_current_bot_information()
                 # print("client info", client_info is not None)
-                client_commands = await slash_bot_client._http.get_application_commands(
+                """client_commands = await slash_bot_client._http.get_application_commands(
                     slash_bot_client.me.id  # , os.getenv("DISCORD_TEST_SERVER", None)
-                )
+                )"""
                 # slash bot app id 1036220176577863680
                 # print("Client commands", slash_bot_client.me.id, len(client_commands), flush=True)
-
+                
                 # or client_info[0] is not None or isinstance(client_info[0], BaseException):
                 if client_info is None or not slash_bot_client._websocket.ready.is_set():
                     alive = False
@@ -115,7 +119,10 @@ async def create_client():
         prefix=":"
     )
     
-    extensions = SlashBotExtension(slash_bot_client)
+    bot_extensions = SlashBotExtension(slash_bot_client)
+    map_extensions = MapExtension(slash_bot_client)
+    score_extensions = ScoreExtension(slash_bot_client)
+    user_extensions = UserExtension(slash_bot_client)
     
     async def run_bot():
         

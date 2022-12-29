@@ -6,7 +6,7 @@ import asyncio
 import threading
 import nest_asyncio
 
-from slash_bot_client import bot_utils_callbacks
+from slash_bot_client.utils import bot_utils_callbacks
 
 nest_asyncio.apply()
 

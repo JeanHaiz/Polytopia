@@ -7,7 +7,7 @@ from common import receiver_utils
 
 try:
     receiver = receiver_utils.Receiver(
-        "map_analysis",
+        "score_recognition",
         map_analysis.map_analysis_request,
         analysis_callback_utils.send_error,
         AnalysisException,

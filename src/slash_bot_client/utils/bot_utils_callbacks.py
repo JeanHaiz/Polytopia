@@ -10,10 +10,10 @@ from interactions import Client
 from interactions.utils.get import get
 
 from common import image_utils
-from slash_bot_client import bot_error_utils
+from slash_bot_client.utils import bot_error_utils
 from common.image_operation import ImageOp
 from database.database_client import get_database_client
-from slash_bot_client import map_patching_interface
+from slash_bot_client.interfaces import map_patching_interface
 from common.error_utils import MapPatchingErrors
 
 DEBUG = os.getenv("DEBUG")
@@ -100,7 +100,7 @@ async def on_map_patching_complete(
         patch_uuid: str,
         channel_id: int,
         filename: str
-):
+) -> None:
     if DEBUG:
         print("Done patching, callback completed", patch_uuid, flush=True)
     
@@ -136,7 +136,7 @@ async def on_map_patching_complete(
 
 def get_patching_errors(
         patch_uuid: str
-) -> List[Tuple[str, str]]:
+) -> List[Tuple[MapPatchingErrors, Optional[str]]]:
     patching_status = database_client.get_patching_status(patch_uuid)
     
     if DEBUG:

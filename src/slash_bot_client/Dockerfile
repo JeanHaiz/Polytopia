@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Use an official Python runtime as a parent image
-FROM python:3.9-slim
+FROM localhost:5000/polyhelper-base:latest
 
 # Set the working directory to /src
 WORKDIR /app

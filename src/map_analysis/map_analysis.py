@@ -38,9 +38,6 @@ def map_analysis_request(
     if image is None:
         raise AnalysisException("IMAGE ANALYSIS - IMAGE NOT FOUND: %s, %s" % (channel_name, filename))
 
-    if DEBUG:
-        print("image", image is None, image.shape, flush=True)
-    
     filename, _ = analyse_map(
         image,
         channel_name,
@@ -58,12 +55,12 @@ def map_analysis_request(
     else:
         raise AnalysisException("IMAGE ANALYSIS - IMAGE NOT SAVED")
     
-    print("map analysis done, callback sent", flush=True)
-    
     analysis_callback_utils.send_analysis_completion(
         patch_process_id,
         map_requirement_id
     )
+    
+    print("map analysis done, callback sent", flush=True)
 
 
 def analyse_map(

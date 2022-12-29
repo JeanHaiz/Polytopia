@@ -2,7 +2,6 @@ import os
 import json
 import pika
 
-
 from pika import exceptions
 
 from common import queue_utils
@@ -21,7 +20,7 @@ connection = queue_channel.connection
 queue_channel.queue_declare(queue=queue_name)  # Declare a queue
 
 
-def send_analysis_completion(
+def send_recognition_completion(
         patch_id: str,
         map_requirement_id: str
 ):
@@ -39,22 +38,22 @@ def send_analysis_completion(
         )
     except pika.exceptions.StreamLostError:
         queue_channel = queue_utils.get_blocking_channel(params)
-        send_analysis_completion(
+        send_recognition_completion(
             patch_id,
             map_requirement_id
         )
 
 
 def send_error(
-        patch_id: str,
-        map_requirement_id: str,
+        patch_id,
+        score_requirement_id,
         error: str
 ):
     global queue_channel
     body = json.dumps({
-        "action": "MAP_ANALYSIS_ERROR",
+        "action": "SCORE_RECOGNITION_ERROR",
         "patch_id": patch_id,
-        "map_requirement_id": map_requirement_id,
+        "map_requirement_id": score_requirement_id,
         "error": error
     })
     if DEBUG:
@@ -69,6 +68,6 @@ def send_error(
         queue_channel = queue_utils.get_blocking_channel(params)
         send_error(
             patch_id,
-            map_requirement_id,
+            score_requirement_id,
             error
         )

@@ -46,8 +46,8 @@ def send_analysis_completion(
 
 
 def send_error(
-        patch_id: str,
-        map_requirement_id: str,
+        patch_id,
+        map_requirement_id,
         error: str
 ):
     global queue_channel
@@ -67,8 +67,7 @@ def send_error(
         )
     except pika.exceptions.StreamLostError:
         queue_channel = queue_utils.get_blocking_channel(params)
-        send_error(
+        send_analysis_completion(
             patch_id,
-            map_requirement_id,
-            error
+            map_requirement_id
         )

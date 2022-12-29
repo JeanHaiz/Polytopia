@@ -13,8 +13,7 @@ from interactions import Message
 from interactions import CommandContext
 
 from common import image_utils
-from common.image_operation import ImageOp  # TODO change
-
+from common.image_operation import ImageOp
 from database.database_client import DatabaseClient
 
 
@@ -28,7 +27,7 @@ async def get_scores(database_client: DatabaseClient, ctx: CommandContext) -> No
     if scores is not None and len(scores[scores['turn'] != -1]) > 0:
         scores = scores[scores['turn'] != -1]
         channel = await ctx.get_channel()
-        filepath, filename = score_visualisation.plot_scores(
+        filepath, filename = score_visualisation_interface.plot_scores(
             database_client, scores, channel.id, channel.name, ctx.author.id)
         with open(filepath, "rb") as fh:
             attachment = File(fp=fh, filename=filename + ".png")

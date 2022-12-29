@@ -5,7 +5,7 @@ from typing import Optional
 from common.image_operation import ImageOp
 from database.database_client import get_database_client
 
-from slash_bot_client import service_connector
+from slash_bot_client.queue_services import sender_service
 
 DEBUG = os.getenv("POLYTOPIA_DEBUG")
 
@@ -27,7 +27,7 @@ def send_map_patching_request(
     )
     files = [rm["filename"] for rm in resource_messages]
     
-    service_connector.send_patch_request(
+    sender_service.send_map_patch_request(
         patching_id,
         patching_info["channel_discord_id"],
         channel_info["channel_name"],

@@ -2,8 +2,8 @@ import os
 
 from common.image_operation import ImageOp
 from database.database_client import get_database_client
-from slash_bot_client import bot_utils_callbacks
-from slash_bot_client import service_connector
+from slash_bot_client.utils import bot_utils_callbacks
+from slash_bot_client.queue_services import sender_service
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
@@ -26,7 +26,8 @@ async def get_or_analyse_map(
     
     if DEBUG:
         print("get or analyse map", patch_process_id, map_requirement_id, message_id, flush=True)
-        print("processed image", operation, ImageOp.MAP_PROCESSED_IMAGE.value, operation == ImageOp.MAP_PROCESSED_IMAGE.value, flush=True)
+        print("processed image", operation, ImageOp.MAP_PROCESSED_IMAGE.value,
+              operation == ImageOp.MAP_PROCESSED_IMAGE.value, flush=True)
         print("processed image", operation, ImageOp.MAP_INPUT.value, operation == ImageOp.MAP_INPUT.value, flush=True)
     if operation == ImageOp.MAP_PROCESSED_IMAGE.value:
         bot_utils_callbacks.on_map_analysis_complete(
@@ -34,7 +35,7 @@ async def get_or_analyse_map(
             map_requirement_id
         )
     elif operation == ImageOp.MAP_INPUT.value:
-        service_connector.send_analysis_request(
+        sender_service.send_map_analysis_request(
             patch_process_id,
             map_requirement_id,
             channel_id,
@@ -46,16 +47,3 @@ async def get_or_analyse_map(
     else:
         print("operation not recognised", operation, ImageOp.MAP_INPUT,
               operation == ImageOp.MAP_PROCESSED_IMAGE.value, operation == ImageOp.MAP_INPUT.value, flush=True)
-
-
-async def force_analyse_map(
-        patch_process_id,
-        map_requirement_id,
-        message_id,
-        resource_number
-):
-    # TODO actually analyse the image
-    bot_utils_callbacks.on_map_analysis_complete(
-        patch_process_id,
-        map_requirement_id
-    )

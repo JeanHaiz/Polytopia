@@ -20,10 +20,10 @@ from interactions import get
 
 from database.database_client import get_database_client
 from slash_bot_client import command_context_store as cxs
-from slash_bot_client import bot_input_utils
-from slash_bot_client import map_analysis_interface
-from slash_bot_client import score_service_interface
-from slash_bot_client import header_footer_recognition_interface
+from slash_bot_client.utils import bot_input_utils
+from slash_bot_client.interfaces import map_analysis_interface
+from slash_bot_client.interfaces import header_footer_recognition_interface
+from slash_bot_client.interfaces import score_recognition_interface
 from common import image_utils
 from common.logger_utils import logger
 from common.image_operation import ImageOp
@@ -103,6 +103,53 @@ async def add_map_and_patch(
         
         # Patching images registered for channel
         await patch_images(ctx, bot_http_client, channel, 3)
+
+
+async def add_score_and_plot(
+        ctx: CommandContext,
+        bot_http_client: HTTPClient
+):
+    # Fulfilling precondition: Game setup
+    channel_info = database_client.get_channel_info(ctx.channel_id)
+    channel = await ctx.get_channel()
+    
+    if channel_info is None:
+        server = await ctx.get_guild()
+        
+        database_client.activate_channel(
+            ctx.channel_id,
+            channel.name,
+            ctx.guild_id,
+            server.name
+        )
+    
+    database_client.add_player_n_game(
+        ctx.channel_id,
+        ctx.guild_id,
+        ctx.author.id,
+        ctx.author.name
+    )
+    
+    # Helper variables
+    message = ctx.target
+    n_resources = len(message.attachments)
+    
+    # Registering message attachments
+    for resource_number in range(n_resources):
+        message.attachments[resource_number]._client = bot_http_client
+        
+        await bot_input_utils.get_or_register_input(
+            database_client,
+            lambda i: message.attachments[i].download(),
+            channel,
+            message.id,
+            message,
+            resource_number,
+            ImageOp.SCORE_INPUT
+        )
+    
+    # Patching images registered for channel
+    # await patch_images(ctx, bot_http_client, channel, 3) TODO update with score plot
 
 
 async def patch_images(
@@ -420,12 +467,12 @@ async def deactivate(ctx: CommandContext) -> None:
 
 async def get_channel_player_score(ctx: CommandContext, player: str):
     if player is None:
-        await score_service_interface.get_scores(
+        await score_recognition_interface.get_scores(
             database_client,
             ctx
         )
     else:
-        await score_service_interface.get_player_scores(
+        await score_recognition_interface.get_player_scores(
             database_client,
             ctx,
             player
@@ -517,7 +564,7 @@ async def has_access(client: Client, ctx: CommandContext):
         embed = interactions.Embed()
         embed.description = (
                 """Your profile was not found on the poly helper guild.\n""" +
-                """Please join the [poly helper discord server](https://discord.gg/6kk6nJnf)""")
+                """To use the bot, please join the [poly helper discord server](https://discord.gg/6kk6nJnf)""")
         await ctx.send(embeds=embed)
         return False
 
@@ -559,15 +606,6 @@ async def has_access(client: Client, ctx: CommandContext):
     else:
         # count is below limit for known user, access granted
         return True
-    
-"""
-except interactions.api.error.LibraryException as e:
-    await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
-    print("ROLE ERROR\n" + str(e))
-    logger.warning("ROLE ERROR\n" + str(e))
-    
-    return False
-"""
 
 
 async def white_list(ctx: CommandContext):

@@ -4,6 +4,9 @@ import asyncio
 import traceback
 
 from typing import Callable
+from typing import List
+from typing import Optional
+from typing import Tuple
 from typing import Coroutine
 
 from interactions import Client
@@ -22,7 +25,7 @@ async def manage_slash_patching_errors(
         database_client: DatabaseClient,
         channel: Channel,
         ctx: CommandContext,
-        patching_errors: list
+        patching_errors: List[Tuple[error_utils.MapPatchingErrors, Optional[str]]]
 ) -> None:
     if patching_errors is not None and len(patching_errors) > 0:
         error_text = []

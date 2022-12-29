@@ -17,12 +17,12 @@ params.socket_timeout = 5
 
 queue_channel = queue_utils.get_blocking_channel(params)
 
-queues = ["map_patching", "map_analysis"]
+queues = ["map_patching", "map_analysis", "score_recognition"]
 for queue_name in queues:
     queue_channel.queue_declare(queue=queue_name)  # Declare a queue
 
 
-def send_analysis_request(
+def send_map_analysis_request(
         patch_process_id: str,
         map_requirement_id: str,
         channel_id: int,
@@ -49,7 +49,7 @@ def send_analysis_request(
         )
     except pika.exceptions.StreamLostError:
         queue_channel = queue_utils.get_blocking_channel(params)
-        send_analysis_request(
+        send_map_analysis_request(
             patch_process_id,
             map_requirement_id,
             channel_id,
@@ -60,7 +60,7 @@ def send_analysis_request(
         )
 
 
-def send_patch_request(
+def send_map_patch_request(
         patching_id,
         channel_id,
         channel_name,
@@ -91,7 +91,7 @@ def send_patch_request(
         )
     except pika.exceptions.StreamLostError:
         queue_channel = queue_utils.get_blocking_channel(params)
-        send_patch_request(
+        send_map_patch_request(
             patching_id,
             channel_id,
             channel_name,
@@ -101,4 +101,24 @@ def send_patch_request(
             interaction_id,
             files,
             number_of_images
+        )
+
+
+def send_score_recognition_request(
+    # TODO complete
+):
+    global queue_channel
+    body = json.dumps({
+        # TODO complete
+    })
+    try:
+        queue_channel.basic_publish(
+            exchange='',
+            routing_key="score_recognition",
+            body=body
+        )
+    except pika.exceptions.StreamLostError:
+        queue_channel = queue_utils.get_blocking_channel(params)
+        send_map_analysis_request(
+            # TODO complete
         )

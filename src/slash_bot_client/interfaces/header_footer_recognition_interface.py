@@ -1,6 +1,4 @@
-import time
-
-from slash_bot_client import bot_utils_callbacks
+from slash_bot_client.utils import bot_utils_callbacks
 from database.database_client import get_database_client
 
 database_client = get_database_client()

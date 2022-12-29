@@ -1,6 +1,12 @@
 version: '3.3'
 
 services:
+    registry:
+        image: 'registry:latest'
+        container_name: registry
+        ports:
+            - "5000:5000"
+
     database:
         build:
             context: ../database
@@ -97,7 +103,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 1200M
+                    memory: 1800M
         networks:
             - database
 
