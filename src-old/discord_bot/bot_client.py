@@ -20,11 +20,10 @@ from common.image_operation import ImageOp
 VERSION = "0.1.10"
 
 nest_asyncio.apply()
-# TODO: refactor with https://nik.re/posts/2021-09-25/object_oriented_discord_bot
 
 DEBUG = os.getenv("POLYTOPIA_DEBUG")
 token = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
-print("token", token)
+print("TOKEN", token)
 slash_bot_client = interactions.Client(
     token=token,
     intents=interactions.Intents.DEFAULT | interactions.Intents.GUILD_MESSAGE_CONTENT,
@@ -35,7 +34,6 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot_client = commands.Bot(":", intents=intents, application_id=918189457893621760, bot=True)
 
-# guild_ids = [918195469245628446]
 
 database_client = DatabaseClient(
     user="discordBot", password="password123", port="5432", database="polytopiaHelper_dev",
@@ -137,8 +135,7 @@ async def slash_activate(ctx: CommandContext, size: int) -> None:
         if activation_result.rowcount == 1:
             await ctx.send("channel activated")
         else:
-            myid = '<@338067113639936003>'  # Jean's id
-            await ctx.send('There was an error. %s has been notified.' % myid)
+            await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
     await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
 
 
@@ -153,8 +150,7 @@ async def slash_deactivate(ctx: CommandContext) -> None:
         if deactivation_result.rowcount == 1:
             await ctx.send("channel deactivated")
         else:
-            myid = '<@338067113639936003>'  # Jean's id
-            await ctx.send('There was an error. %s has been notified.' % myid)
+            await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
     await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)
 
 
@@ -216,7 +212,8 @@ async def slash_patch_map(ctx: CommandContext, number_of_images: int = None) -> 
             turn,
             bot_client.loop,
             number_of_images,
-            action_debug)
+            action_debug
+        )
         if output_tuple is not None:
             patch_path, patch_uuid, patch_filename = output_tuple
             database_client.update_patching_process_output_filename(patch_uuid, patch_filename)
@@ -226,8 +223,7 @@ async def slash_patch_map(ctx: CommandContext, number_of_images: int = None) -> 
                     await channel.send(files=attachment, content="Map patched for turn %s" % turn)
                 elif len(patching_errors) == 0 and attachment is None:
                     patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_LOADED, None))
-                    my_id = '<@338067113639936003>'  # Jean's id
-                    await answer_message.edit('There was an error. %s has been notified.' % my_id)
+                    await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
                 fh.close()
         await bot_utils.manage_slash_patching_errors(channel, answer_message, database_client, patching_errors)
     await bot_utils.wrap_slash_errors(ctx, bot_client, ctx.guild_id, inner)

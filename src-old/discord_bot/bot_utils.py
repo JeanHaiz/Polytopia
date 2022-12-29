@@ -491,7 +491,7 @@ async def wrap_slash_errors(
         guild_id: int,
         fct: Callable[[], Coroutine]) -> None:
     try:
-        is_test_server = str(guild_id) == "918195469245628446"
+        is_test_server = str(guild_id) == "os.getenv("DISCORD_TEST_SERVER")"
         is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
         if (is_dev_env and is_test_server) or (not is_test_server and not is_dev_env):
             await asyncio.create_task(fct())
@@ -505,7 +505,7 @@ async def wrap_slash_errors(
         print("##### ERROR #####")
         print(error)
         traceback.print_exc()
-        error_channel = bot_client.get_channel(1035274340125659230)  # Polytopia Helper Testing server, Error channel
+        error_channel = bot_client.get_channel(os.getenv("DISCORD_ERROR_CHANNEL"))  # Polytopia Helper Testing server, Error channel
         channel = await ctx.get_channel()
         guild = await ctx.get_guild()
         await error_channel.send(f"""Error in channel {channel.name}, {guild.name}:\n{traceback.format_exc()}\n""")
@@ -518,9 +518,9 @@ async def wrap_errors(
         guild_id: int,
         fct: Callable[[], Coroutine]) -> None:
     try:
-        is_test_server = str(guild_id) == "918195469245628446"
+        is_test_server = str(guild_id) == "os.getenv("DISCORD_TEST_SERVER")"
         is_dev_env = os.getenv("POLYTOPIA_ENVIRONMENT", "") == "DEVELOPMENT"
-        # print("environment", is_test_server, is_dev_env, os.getenv("POLYTOPIA_TEST_SERVER", "0"),
+        # print("environment", is_test_server, is_dev_env, os.getenv("DISCORD_TEST_SERVER", "0"),
         #       os.getenv("POLYTOPIA_ENVIRONMENT", ""))
         if (is_dev_env and is_test_server) or (not is_test_server and not is_dev_env):
             await asyncio.create_task(fct())
@@ -534,7 +534,7 @@ async def wrap_errors(
         print("##### ERROR #####")
         print(error)
         traceback.print_exc()
-        error_channel = bot_client.get_channel(1035274340125659230)  # Polytopia Helper Testing server, Error channel
+        error_channel = bot_client.get_channel(os.getenv("DISCORD_ERROR_CHANNEL"))  # Polytopia Helper Testing server, Error channel
         channel = bot_client.get_channel(ctx.channel.id)
         guild = await ctx.get_guild()
         await error_channel.send(f"""Error in channel {channel.name}, {guild.name}:\n{traceback.format_exc()}\n""")

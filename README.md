@@ -70,3 +70,7 @@ To post your ideas for new functionalities, join #polytopia-helper-feedback
 
 
 https://discord.com/api/oauth2/authorize?client_id=918189457893621760&permissions=534723951680&scope=bot%20applications.commands
+https://discord.com/api/oauth2/authorize?client_id=1036220176577863680&permissions=534723951680&scope=bot%20applications.commands
+https://discord.com/api/oauth2/authorize?client_id=1036220176577863680&permissions=2416430161&scope=bot%20applications.commands
+
+https://discord.com/api/oauth2/authorize?client_id=918189457893621760&permissions=2416430161&scope=bot%20applications.commands
