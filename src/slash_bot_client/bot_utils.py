@@ -512,59 +512,62 @@ async def has_access(client: Client, ctx: CommandContext):
     try:
         member = await general_guild.get_member(ctx.author.id)
         count = database_client.get_request_count(member.id)
-        general_guild_member_roles = [(await general_guild.get_role(r)).name for r in member.roles]
-        if os.getenv("DISCORD_PATREON_FERVENT") in general_guild_member_roles:  # fervent
-            limit = 15
-        elif os.getenv("DISCORD_PATREON_HUSTLER") in general_guild_member_roles:  # hustler
-            limit = 50
-        elif member is not None:
-            limit = 3
-            if count < limit:
-                embed = interactions.Embed()
-                embed.description = (
-                        f"""You have {limit - count - 1} actions remaining this month.\n""" +
-                        """For more actions, """ +
-                        """please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper).""")
-                await ctx.send(embeds=embed)
-                return True
+    except interactions.api.error.LibraryException as e:
+        print("Unknown member")
+        embed = interactions.Embed()
+        embed.description = (
+                """Your profile was not found on the poly helper guild.\n""" +
+                """Please join the [poly helper discord server](https://discord.gg/6kk6nJnf)""")
+        await ctx.send(embeds=embed)
+        return False
+
+    general_guild_member_roles = [(await general_guild.get_role(r)).name for r in member.roles]
+    if os.getenv("DISCORD_PATREON_FERVENT") in general_guild_member_roles:  # fervent
+        limit = 15
+    elif os.getenv("DISCORD_PATREON_HUSTLER") in general_guild_member_roles:  # hustler
+        limit = 50
+    else:
+        limit = 3
+        if count < limit:
+            embed = interactions.Embed()
+            embed.description = (
+                    f"""You have {limit - count - 1} actions remaining this month.\n""" +
+                    """For more actions, """ +
+                    """please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper).""")
+            await ctx.send(embeds=embed)
+            return True
+    
+    if count >= limit:
+        if (datetime.datetime.now().year == 2023 and datetime.datetime.now().month <= 1) or \
+                datetime.datetime.now().year == 2022:  # TODO add trial period
+            time_embed = interactions.Embed()
+            time_embed.description = (
+                    """You have passed your action limit for this month. \n""" +
+                    """Here is a free trial for the poly helper bot.\n""" +
+                    """For now, we're granting you unlimited actions.\n To support, """ +
+                    """please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper)."""
+            )
+            await ctx.send(embeds=time_embed)
+            return True
         else:
             embed = interactions.Embed()
             embed.description = (
-                    """Your profile was not found on the poly helper guild.\n""" +
-                    """Please join the [poly helper discord server](https://discord.gg/6kk6nJnf)""")
+                    """You have passed your action limit for this month.\n""" +
+                    """Please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper).""")
             await ctx.send(embeds=embed)
             return False
-        # await ctx.send(str(limit) + ", " + str(count) + ", " + str(general_guild_member_roles))
-        
-        if count >= limit:
-            if (datetime.datetime.now().year == 2023 and datetime.datetime.now().month <= 1) or \
-                    datetime.datetime.now().year == 2022:  # TODO add trial period
-                time_embed = interactions.Embed()
-                time_embed.description = (
-                        """You have passed your action limit for this month. \n""" +
-                        """Here is a free trial for the poly helper bot.\n""" +
-                        """For now, we're granting you unlimited actions.\n To support, """ +
-                        """please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper)."""
-                )
-                await ctx.send(embeds=time_embed)
-                return True
-            else:
-                embed = interactions.Embed()
-                embed.description = (
-                        """You have passed your action limit for this month.\n""" +
-                        """Please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper).""")
-                await ctx.send(embeds=embed)
-                return False
-        else:
-            # count is below limit for known user, access granted
-            return True
+    else:
+        # count is below limit for known user, access granted
+        return True
     
-    except interactions.api.error.LibraryException as e:
-        await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
-        print("ROLE ERROR\n" + e)
-        logger.warning("ROLE ERROR\n" + e)
-        
-        return False
+"""
+except interactions.api.error.LibraryException as e:
+    await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
+    print("ROLE ERROR\n" + str(e))
+    logger.warning("ROLE ERROR\n" + str(e))
+    
+    return False
+"""
 
 
 async def white_list(ctx: CommandContext):
