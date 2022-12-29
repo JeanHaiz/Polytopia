@@ -559,7 +559,7 @@ async def has_access(client: Client, ctx: CommandContext):
             # count is below limit for known user, access granted
             return True
     
-    except interactions.api.error as e:
+    except interactions.api.error.LibraryException as e:
         await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
         print("ROLE ERROR\n" + e)
         logger.warning("ROLE ERROR\n" + e)
