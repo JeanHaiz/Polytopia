@@ -103,7 +103,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 1800M
+                    memory: 1200M
         networks:
             - database
 
@@ -115,6 +115,10 @@ services:
         ports:
             - "5672:5672"
             - "15672:15672"
+        deploy:
+            resources:
+                limits:
+                    memory: 250M
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/rabbitmq/rabbitmq.config:/etc/rabbitmq/rabbitmq.config:ro
             - /Users/jean/Documents/Coding/Polytopia/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
