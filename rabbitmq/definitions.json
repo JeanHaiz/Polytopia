@@ -1,0 +1,88 @@
+{
+ "rabbit_version": "3.11.4",
+ "users": [
+  {
+   "name": "slash_bot",
+   "password_hash": "th/bzUTpscpjFcjvmCY86+oFRJU8mjTRlkwazsJ5tfFabL8o",
+   "hashing_algorithm": "rabbit_password_hashing_sha256",
+   "tags": ""
+  },
+  {
+   "name": "map_patching",
+   "password_hash": "lGC0wvq5WibVTYA16Q2JeS8q4MqVzAmwyWbCjAYIVCdkIsUA",
+   "hashing_algorithm": "rabbit_password_hashing_sha256",
+   "tags": ""
+  },
+  {
+   "name": "map_analysis",
+   "password_hash": "3GJHgVFQzdg8SZqZCCimsvh1xbRdgtUuPxxNaJhZ1SaQTvf4",
+   "hashing_algorithm": "rabbit_password_hashing_sha256",
+   "tags": ""
+  },
+  {
+   "name": "score_recognition",
+   "password_hash": "BTdXZKpdRT3yXRC7uhbhKfBDlz9rac45WMH4jFzI2+0IlknK",
+   "hashing_algorithm": "rabbit_password_hashing_sha256",
+   "tags": ""
+  },
+  {
+   "name": "score_visualisation",
+   "password_hash": "tCfbzvISXATmiWXqx+tj2mBPzmh9741bjjqhIQo+VU+Jdl38",
+   "hashing_algorithm": "rabbit_password_hashing_sha256",
+   "tags": ""
+  },
+  {
+   "name": "admin",
+   "password_hash": "FbzwlQsr22qn9XZaEbkTLFlxjELvDtbHSQVqOYSYwa3yx0Zt",
+   "hashing_algorithm": "rabbit_password_hashing_sha256",
+   "tags": "administrator"
+  }
+ ],
+ "vhosts": [
+  {
+   "name": "vhost"
+  }
+ ],
+ "permissions": [
+  {
+   "user": "slash_bot",
+   "vhost": "vhost",
+   "configure": ".*",
+   "write": ".*",
+   "read": ".*"
+  },
+  {
+   "user": "map_patching",
+   "vhost": "vhost",
+   "configure": ".*",
+   "write": ".*",
+   "read": ".*"
+  },
+  {
+   "user": "map_analysis",
+   "vhost": "vhost",
+   "configure": ".*",
+   "write": ".*",
+   "read": ".*"
+  },
+  {
+   "user": "score_recognition",
+   "vhost": "vhost",
+   "configure": ".*",
+   "write": ".*",
+   "read": ".*"
+  },
+  {
+   "user": "score_visualisation",
+   "vhost": "vhost",
+   "configure": ".*",
+   "write": ".*",
+   "read": ".*"
+  }
+ ],
+ "parameters": [],
+ "policies": [],
+ "queues": [],
+ "exchanges": [],
+ "bindings": []
+}

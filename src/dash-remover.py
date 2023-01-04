@@ -23,4 +23,5 @@ def remove_dashes():
                 for file in os.listdir(source):
                     shutil.move(os.path.join(source, file), target)
 
+
 remove_dashes()

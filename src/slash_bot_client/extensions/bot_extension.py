@@ -4,8 +4,11 @@ import interactions
 from interactions import ApplicationCommandType
 from interactions import CommandContext
 
-from slash_bot_client.utils import bot_utils, bot_error_utils
+from slash_bot_client.utils import bot_error_utils
+from slash_bot_client.utils import bot_user_utils
 from common.logger_utils import logger
+
+from slash_bot_client.utils.bot_utils import BotUtils
 
 """
 Slash bot command registry
@@ -32,8 +35,9 @@ on_modal
 
 class SlashBotExtension(interactions.Extension):
     
-    def __init__(self, client: interactions.Client) -> None:
-        self.client: interactions.Client = client
+    def __init__(self, client: interactions.Client, bot_utils: BotUtils) -> None:
+        self.client = client
+        self.bot_utils = bot_utils
     
     @interactions.extension_listener()
     async def listener(self, something):
@@ -61,7 +65,7 @@ class SlashBotExtension(interactions.Extension):
     )
     async def slash_activate(self, ctx: CommandContext, size: int) -> None:
         logger.info("ACTIVATE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
-        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.activate(ctx, size))
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: self.bot_utils.activate(ctx, size))
     
     @interactions.extension_command(
         name="deactivate",
@@ -70,7 +74,7 @@ class SlashBotExtension(interactions.Extension):
     async def slash_deactivate(self, ctx: CommandContext) -> None:
         logger.info("DEACTIVATE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
-        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.deactivate(ctx))
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: self.bot_utils.deactivate(ctx))
     
     @interactions.extension_command(
         name="version",
@@ -88,7 +92,7 @@ class SlashBotExtension(interactions.Extension):
     async def slash_list_active_channels(self, ctx: CommandContext) -> None:
         logger.info("CHANNELS - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
-        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.list_active_channels(ctx))
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: self.bot_utils.list_active_channels(ctx))
     
     @interactions.extension_command(
         name="drop",
@@ -97,7 +101,7 @@ class SlashBotExtension(interactions.Extension):
     async def drop_channel(self, ctx: CommandContext) -> None:
         logger.info("DROP - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
-        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.drop_channel(ctx))
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: self.bot_utils.drop_channel(ctx))
     
     @interactions.extension_command(
         name="Remove image",
@@ -110,34 +114,10 @@ class SlashBotExtension(interactions.Extension):
             if len(ctx.target.attachments) > 0:
                 message = await ctx.send("Processing")
                 
-                await bot_utils.remove_map(ctx)
+                await bot_user_utils.remove_map(ctx)
                 await message.edit("Done")
             
             else:
                 await ctx.send("Please remove a message with an image")
-        
-        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: inner())
-    
-    @interactions.extension_command(
-        name="Renew action",
-        type=ApplicationCommandType.MESSAGE
-    )
-    async def renew_map_patching(self, ctx: CommandContext):
-        logger.info("RENEW ACTION - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
-        
-        async def inner():
-            if await bot_utils.has_access(self.client, ctx):
-                if len(ctx.target.attachments) > 0:
-                    message = await ctx.send("Loading")
-                    
-                    await bot_utils.force_analyse_map_and_patch(
-                        ctx,
-                        self.client._http
-                    )
-                    
-                    await message.edit("Analysing")
-                
-                else:
-                    await ctx.send("Please add a message with an image")
         
         await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: inner())

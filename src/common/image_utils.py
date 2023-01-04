@@ -31,7 +31,7 @@ async def get_or_fetch_image_check(
         filename: str,
         operation: ImageOp) -> bool:
     print("filepath", channel_name, filename, type(channel_name), type(filename), flush=True)
-    file_path = __get_file_path(channel_name, operation, filename)
+    file_path = get_file_path(channel_name, operation, filename)
     image = cv2.imread(file_path)
     
     if image is None:
@@ -76,7 +76,7 @@ async def get_or_fetch_image_check(
 
 
 def load_image(channel_name: str, filename: str, operation: ImageOp) -> Optional[np.ndarray]:
-    file_path = __get_file_path(channel_name, operation, filename)
+    file_path = get_file_path(channel_name, operation, filename)
     image = cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
     if image is None:
         print("None image without retry (%s): %s" % (operation, file_path), flush=True)
@@ -96,7 +96,7 @@ async def save_attachment(
     
     parent_path = __get_parent_path(channel_name, operation)
     os.makedirs(parent_path, exist_ok=True)
-    file_path = __get_file_path(channel_name, operation, filename)
+    file_path = get_file_path(channel_name, operation, filename)
     
     print("paths", parent_path, file_path)
     try:
@@ -118,7 +118,7 @@ async def save_attachment(
 def save_image(image: np.ndarray, channel_name: str, filename: str, operation: ImageOp) -> Optional[str]:
     parent_path = __get_parent_path(channel_name, operation)
     os.makedirs(parent_path, exist_ok=True)
-    file_path = __get_file_path(channel_name, operation, filename)
+    file_path = get_file_path(channel_name, operation, filename)
     logger.debug("writing image %s: %s" % (file_path, str(image.shape)))
     
     if operation == ImageOp.MAP_PATCHING_OUTPUT:
@@ -136,7 +136,7 @@ def save_image(image: np.ndarray, channel_name: str, filename: str, operation: I
 
 
 def move_input_image(channel_name: str, filename: str, target_operation: ImageOp) -> Optional[str]:
-    file_path = __get_file_path(channel_name, ImageOp.INPUT, filename)
+    file_path = get_file_path(channel_name, ImageOp.INPUT, filename)
     image = cv2.imread(file_path)
     if image is not None:
         return save_image(image, channel_name, filename, target_operation)
@@ -145,7 +145,7 @@ def move_input_image(channel_name: str, filename: str, target_operation: ImageOp
 
 
 def move_back_input_image(channel_name: str, filename: str, source_operation: ImageOp) -> Optional[str]:
-    file_path = __get_file_path(channel_name, source_operation, filename)
+    file_path = get_file_path(channel_name, source_operation, filename)
     image = cv2.imread(file_path)
     if image is not None:
         return save_image(image, channel_name, filename, ImageOp.INPUT)
@@ -157,7 +157,7 @@ def __get_parent_path(channel_name: str, operation: ImageOp) -> str:
     return os.path.join(REPO_ROOT, "resources", __clean(channel_name), operation.name)
 
 
-def __get_file_path(channel_name: str, operation: ImageOp, filename: str) -> str:
+def get_file_path(channel_name: str, operation: ImageOp, filename: str) -> str:
     return os.path.join(__get_parent_path(channel_name, operation), filename + ".png")
 
 
@@ -196,7 +196,7 @@ def set_processed_background(processed_background: np.ndarray, map_size: str) ->
 
 def get_plt_path(channel_name: str, filename: str) -> Tuple[str, str]:
     parent_path = __get_parent_path(channel_name, ImageOp.SCORE_PLT)
-    file_path = __get_file_path(channel_name, ImageOp.SCORE_PLT, filename)
+    file_path = get_file_path(channel_name, ImageOp.SCORE_PLT, filename)
     return parent_path, file_path
 
 

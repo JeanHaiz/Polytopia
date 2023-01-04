@@ -1,17 +1,52 @@
 import sys
 
-from map_analysis import map_analysis
-from map_analysis import analysis_callback_utils
-from map_analysis.map_analysis_error import AnalysisException
+from map_patching import map_patching
+from map_patching.map_patching_error import PatchingException
+
+from common import sender_utils
 from common import receiver_utils
 
 try:
-    receiver = receiver_utils.Receiver(
+    sender = sender_utils.Sender(
+        "bot_client"
+    )
+    
+    
+    def error_function(
+            patch_id: str,
+            error: str
+    ) -> None:
+        sender.send_message(
+            {
+                "action": "MAP_PATCHING_ERROR",
+                "patch_uuid": patch_id,
+                "error": error
+            }
+        )
+    
+    
+    def callback_function(
+            patch_id: str,
+            channel_id: str,
+            filename: str
+    ) -> None:
+        sender.send_message(
+            {
+                "action": "MAP_PATCHING_COMPLETE",
+                "patch_uuid": patch_id,
+                "channel_id": channel_id,
+                "filename": filename
+            }
+        )
+    
+    
+    receiver = receiver_utils.Receiver(  # TODO update
         "score_recognition",
-        map_analysis.map_analysis_request,
-        analysis_callback_utils.send_error,
-        AnalysisException,
-        ["patch_process_id", "map_requirement_id"]
+        map_patching.generate_patched_map_bis,
+        error_function,
+        callback_function,
+        PatchingException,
+        ["patch_process_id"]
     )
     receiver.run()
 except KeyboardInterrupt:

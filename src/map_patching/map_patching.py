@@ -6,6 +6,8 @@ import numpy as np
 from typing import List
 from typing import Tuple
 from typing import Optional
+from typing import Union
+from typing import Callable
 
 from database.database_client import get_database_client
 from common import image_utils
@@ -14,7 +16,6 @@ from common.image_operation import ImageOp
 from common.error_utils import MapPatchingErrors
 from common.corner_orientation import CornerOrientation
 from common.image_param import ImageParam
-from map_patching import patching_callback_utils
 from map_patching.map_patching_error import PatchingException
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
@@ -31,6 +32,7 @@ def generate_patched_map_bis(
         guild_id: int,
         interaction_id: int,
         files: List[str],
+        callback: Union[Callable[[str, str], None], Callable[[str, int, str], None]],
         n_images: Optional[int] = 4,
         action_debug: bool = False) -> None:
     map_size = database_client.get_game_map_size(channel_id)
@@ -60,7 +62,7 @@ def generate_patched_map_bis(
     database_client.update_patching_process_status(patching_process_id, "DONE")
     database_client.update_patching_process_output_filename(patching_process_id, filename)
     
-    patching_callback_utils.send_patching_completion(patching_process_id, channel_id, filename)
+    callback(patching_process_id, channel_id, filename)
 
 
 def patch_processed_images(
@@ -73,7 +75,6 @@ def patch_processed_images(
         author_id: int,
         author_name: str,
         action_debug: bool) -> Tuple[str, str]:
-    
     images_n_check = check_processed_images(image_filenames, channel_name)
     
     image_params = load_image_params(image_filenames)
@@ -87,7 +88,7 @@ def patch_processed_images(
     for filename, image_check in images_n_check:
         
         current_params = [ip for ip in image_params if ip.filename == filename]
-
+        
         if image_check and len(current_params) != 0:
             processed_params.append(current_params[0])
     

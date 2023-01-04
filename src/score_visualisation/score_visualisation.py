@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axisartist.axislines import SubplotZero
 
 from common import image_utils
-from database_interaction.database_client import DatabaseClient
+from database.database_client import DatabaseClient
 
 
 def plot_scores(

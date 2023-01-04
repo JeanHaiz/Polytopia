@@ -4,8 +4,11 @@ import interactions
 from interactions import CommandContext
 from interactions import ApplicationCommandType
 
-from slash_bot_client.utils import bot_utils, bot_error_utils
+import slash_bot_client.utils.bot_user_utils
+from slash_bot_client.utils import bot_error_utils
 from common.logger_utils import logger
+
+from slash_bot_client.utils.bot_utils import BotUtils
 
 VERSION = os.getenv("SLASH_BOT_VERSION")
 DEBUG = os.getenv("POLYTOPIA_DEBUG")
@@ -14,8 +17,9 @@ TOKEN = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
 
 class ScoreExtension(interactions.Extension):
     
-    def __init__(self, client: interactions.Client) -> None:
+    def __init__(self, client: interactions.Client, bot_utils: BotUtils) -> None:
         self.client: interactions.Client = client
+        self.bot_utils = bot_utils
 
     @interactions.extension_command(
         name="set-score",
@@ -44,7 +48,7 @@ class ScoreExtension(interactions.Extension):
     async def slash_set_player_score(self, ctx: CommandContext, player_name: str, turn: int, score: int) -> None:
         logger.info("SET SCORE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
     
-        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.set_player_score(
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: self.bot_utils.set_player_score(
             ctx,
             player_name,
             turn,
@@ -69,7 +73,7 @@ class ScoreExtension(interactions.Extension):
         await bot_error_utils.wrap_slash_errors(
             ctx,
             self.client,
-            lambda: bot_utils.get_channel_player_score(ctx, player)
+            lambda: self.bot_utils.get_channel_player_score(ctx, player)
         )
 
     @interactions.extension_command(
@@ -80,11 +84,11 @@ class ScoreExtension(interactions.Extension):
         logger.info("ADD SCORE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
 
         async def inner():
-            if await bot_utils.has_access(self.client, ctx):
+            if await slash_bot_client.utils.bot_user_utils.has_access(self.client, ctx):
                 if len(ctx.target.attachments) > 0:
                     message = await ctx.send("Loading")
             
-                    await bot_utils.add_score_and_plot(
+                    await self.bot_utils.add_score_and_plot(
                         ctx,
                         self.client._http
                     )

@@ -1,5 +1,4 @@
 import re
-import os
 import logging
 
 from logging.handlers import TimedRotatingFileHandler
@@ -25,6 +24,9 @@ def init_logging():
 
     bot_client_logger = logging.getLogger('client')
     bot_client_logger.addHandler(handler)
+
+    http_client_logger = logging.getLogger('htto')
+    http_client_logger.addHandler(handler)
 
     # handler = logging.FileHandler(filename='./discord.log', encoding='utf-8', mode='w')
     # handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))

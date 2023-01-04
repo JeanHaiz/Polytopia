@@ -2,7 +2,6 @@ import pika
 import time
 
 from pika import exceptions
-from pika.adapters.asyncio_connection import AsyncioConnection
 
 
 def get_blocking_channel(params):

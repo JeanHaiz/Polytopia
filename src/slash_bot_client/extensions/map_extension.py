@@ -4,7 +4,9 @@ import interactions
 from interactions import ApplicationCommandType
 from interactions import CommandContext
 
-from slash_bot_client.utils import bot_utils, bot_error_utils
+import slash_bot_client.utils.bot_user_utils
+from slash_bot_client.utils.bot_utils import BotUtils
+from slash_bot_client.utils import bot_error_utils
 from common.logger_utils import logger
 
 
@@ -15,8 +17,9 @@ TOKEN = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
 
 class MapExtension(interactions.Extension):
     
-    def __init__(self, client: interactions.Client) -> None:
+    def __init__(self, client: interactions.Client, bot_utils: BotUtils) -> None:
         self.client: interactions.Client = client
+        self.bot_utils = bot_utils
 
     @interactions.extension_command(
         name="trace",
@@ -25,7 +28,7 @@ class MapExtension(interactions.Extension):
     async def get_map_trace(self, ctx: CommandContext) -> None:
         logger.info("TRACE - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
         
-        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: bot_utils.trace(ctx))
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: self.bot_utils.trace(ctx))
 
     @interactions.extension_command(
         name="clear_maps",
@@ -37,7 +40,7 @@ class MapExtension(interactions.Extension):
         async def inner() -> None:
             message = await ctx.send("Processing")
             channel = await ctx.get_channel()
-            await bot_utils.clear_channel_map_reactions(channel, lambda: message.edit("Done"))
+            await self.bot_utils.clear_channel_map_reactions(channel, lambda: message.edit("Done"))
     
         await bot_error_utils.wrap_slash_errors(ctx, self.client, inner)
 
@@ -57,8 +60,9 @@ class MapExtension(interactions.Extension):
         logger.info("PATCH - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
     
         async def inner():
-            if await bot_utils.has_access(self.client, ctx):
-                await bot_utils.patch_map(
+            if await slash_bot_client.utils.bot_user_utils.has_access(self.client, ctx):
+                await ctx.send("Processing")
+                await self.bot_utils.patch_map(
                     ctx,
                     self.client._http,
                     number_of_images
@@ -74,11 +78,35 @@ class MapExtension(interactions.Extension):
         logger.info("ADD MAP - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
     
         async def inner():
-            if await bot_utils.has_access(self.client, ctx):
+            if await slash_bot_client.utils.bot_user_utils.has_access(self.client, ctx):
                 if len(ctx.target.attachments) > 0:
                     message = await ctx.send("Loading")
                 
-                    await bot_utils.add_map_and_patch(
+                    await self.bot_utils.add_map_and_patch(
+                        ctx,
+                        self.client._http
+                    )
+                
+                    await message.edit("Analysing")
+            
+                else:
+                    await ctx.send("Please add a message with an image")
+    
+        await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: inner())
+
+    @interactions.extension_command(
+        name="Renew action",
+        type=ApplicationCommandType.MESSAGE
+    )
+    async def renew_map_patching(self, ctx: CommandContext):
+        logger.info("RENEW ACTION - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+    
+        async def inner():
+            if await slash_bot_client.utils.bot_user_utils.has_access(self.client, ctx):
+                if len(ctx.target.attachments) > 0:
+                    message = await ctx.send("Loading")
+                
+                    await self.bot_utils.force_analyse_map_and_patch(
                         ctx,
                         self.client._http
                     )

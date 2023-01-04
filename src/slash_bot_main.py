@@ -3,6 +3,8 @@ import asyncio
 import socket
 import time
 import datetime
+import traceback
+
 import aiohttp
 
 import interactions
@@ -13,7 +15,9 @@ from slash_bot_client.extensions.map_extension import MapExtension
 from slash_bot_client.extensions.score_extension import ScoreExtension
 from slash_bot_client.extensions.user_extension import UserExtension
 
-from slash_bot_client.queue_services import receiver_service
+from slash_bot_client.utils.bot_utils import BotUtils
+from slash_bot_client.queue_services.queue_service import QueueService
+
 from common.logger_utils import logger
 
 """
@@ -21,6 +25,9 @@ Application start
 - starts the slash bot
 - registers logger
 """
+
+# TODO:
+# - web-socket management: https://stackoverflow.com/questions/63033275/closing-shutting-down-a-python-websocket
 
 nest_asyncio.apply()
 
@@ -43,8 +50,8 @@ async def create_client():
     loop = asyncio.get_event_loop()
     
     async def __quit_coroutine(message, sleep_time=None):
-        logger.warning(message)
-        print(message, flush=True)
+        logger.warning("QUIT COROUTINE\n" + message)
+        print("QUIT COROUTINE\n", message, flush=True)
         if sleep_time is not None:
             time.sleep(sleep_time)
         await slash_bot_client._websocket.close()
@@ -52,13 +59,16 @@ async def create_client():
         all_tasks = asyncio.all_tasks(loop)
         print("All tasks:", len(all_tasks), list(all_tasks)[0] if len(all_tasks) > 0 else None)
         
+        # loop.create_task(run_bot())
+        # loop.run_forever()
         loop.run_until_complete(run_bot())
     
     async def check_health():
         await slash_bot_client.wait_until_ready()
+        alive = True
         
-        async def inner():
-            alive = True
+        async def inner() -> bool:
+            inner_alive = True
             # print("HEALTH CHECK START", flush=True)
             try:
                 # print("Readiness before:", slash_bot_client._websocket.ready.is_set(), flush=True)
@@ -73,8 +83,11 @@ async def create_client():
                 # print("Client commands", slash_bot_client.me.id, len(client_commands), flush=True)
                 
                 # or client_info[0] is not None or isinstance(client_info[0], BaseException):
-                if client_info is None or not slash_bot_client._websocket.ready.is_set():
-                    alive = False
+                if client_info is None or \
+                        not slash_bot_client._websocket.ready.is_set() or \
+                        slash_bot_client._websocket._client is None or \
+                        slash_bot_client._websocket._client.closed:
+                    inner_alive = False
                 
                 """print("HTTP Client info", client_info, flush=True)
                 print(
@@ -82,34 +95,42 @@ async def create_client():
                     slash_bot_client._websocket.ready.is_set(),
                     not slash_bot_client._websocket._client.closed, flush=True)"""
                 
-                if not slash_bot_client._websocket.ready.is_set():  # or slash_bot_client._websocket._client.closed:
-                    alive = False
+                # if not slash_bot_client._websocket.ready.is_set():  # or slash_bot_client._websocket._client.closed:
+                #     inner_alive = False
                 # print("Ping", await slash_bot_client._websocket._client.ping(b"hello"), flush=True)
             except exceptions as e:
                 print("RECOGNISED EXCEPTION", e, flush=True)
                 logger.warning("RECOGNISED EXCEPTION" + str(e))
-                alive = False
+                inner_alive = False
             except BaseException as e:
                 print("UN-RECOGNISED EXCEPTION:", e, flush=True)
                 logger.warning("UN-RECOGNISED EXCEPTION" + str(e))
-                alive = False
+                inner_alive = False
+            except object:
+                print("BARE EXCEPTION:", traceback.format_exc(), flush=True)
+                inner_alive = False
             # print("HEALTH CHECK END", alive, flush=True)
-            if alive:
-                await asyncio.sleep(30)
-                await inner()
-            else:
-                await __quit_coroutine("BOT DEAD", 30)
+            return inner_alive
         
         # print("starting threads", flush=True)
-        await inner()
+        while alive:
+            alive = await inner()
+            if alive:
+                await asyncio.sleep(30)
+            else:
+                await __quit_coroutine("BOT DEAD", 30)
     
     async def start_bot():
         try:
+            print("STARTING BOT ACTUALLY", flush=True)
             slash_bot_client.start()
         except exceptions as e:
             await __quit_coroutine("BOT CONNECTION ERROR:\n" + str(e), 30)
         except BaseException as e:
             await __quit_coroutine("BOT FATAL FAILURE:\n" + str(e), 30)
+        except object as e:
+            print("HERE YOU ARE", flush=True)
+            raise e
     
     nest_asyncio.apply(loop)
     
@@ -119,17 +140,21 @@ async def create_client():
         prefix=":"
     )
     
-    bot_extensions = SlashBotExtension(slash_bot_client)
-    map_extensions = MapExtension(slash_bot_client)
-    score_extensions = ScoreExtension(slash_bot_client)
-    user_extensions = UserExtension(slash_bot_client)
+    queue_service = QueueService()
+    bot_utils = BotUtils(queue_service)
+    
+    bot_extensions = SlashBotExtension(slash_bot_client, bot_utils)
+    map_extensions = MapExtension(slash_bot_client, bot_utils)
+    score_extensions = ScoreExtension(slash_bot_client, bot_utils)
+    user_extensions = UserExtension(slash_bot_client, bot_utils)
     
     async def run_bot():
         
         all_tasks = asyncio.all_tasks(loop)
         print("All tasks at run bot:", len(all_tasks), list(all_tasks)[0] if len(all_tasks) > 0 else None)
         
-        task2 = loop.create_task(receiver_service.get_async_connection(
+        task2 = loop.create_task(bot_utils.get_async_connection(
+            queue_service,
             "bot_client",
             slash_bot_client,
             loop
@@ -139,8 +164,14 @@ async def create_client():
         
         tasks = [task2, task1, task3]
         
+        all_tasks = asyncio.all_tasks(loop)
+        print("Tasks created", len(all_tasks), list(all_tasks)[0] if len(all_tasks) > 0 else None, flush=True)
         try:
             results = await asyncio.gather(*tasks)
+            all_tasks = asyncio.all_tasks(loop)
+            print("Tasks gathered", len(all_tasks), list(all_tasks)[0] if len(all_tasks) > 0 else None, flush=True)
+            print(results)
+        
         finally:
             # if there are unfinished tasks, that is because one of them
             # raised - cancel the rest

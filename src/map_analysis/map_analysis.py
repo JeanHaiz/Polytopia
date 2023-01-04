@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 
 from typing import List
+from typing import Union
+from typing import Callable
 from typing import Tuple
 from typing import Optional
 from sklearn.cluster import DBSCAN
@@ -16,7 +18,6 @@ from common.image_operation import ImageOp
 from common.image_param import ImageParam
 from common.corner_orientation import CornerOrientation
 from database.database_client import get_database_client
-from map_analysis import analysis_callback_utils
 from map_analysis.map_analysis_error import AnalysisException
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
@@ -31,7 +32,8 @@ def map_analysis_request(
         channel_name: str,
         message_id: int,
         resource_number: int,
-        filename: str
+        filename: str,
+        callback: Union[Callable[[str, str], None], Callable[[str, int, str], None]]
 ) -> None:
     image = image_utils.load_image(channel_name, filename, ImageOp.MAP_INPUT)
     
@@ -55,7 +57,7 @@ def map_analysis_request(
     else:
         raise AnalysisException("IMAGE ANALYSIS - IMAGE NOT SAVED")
     
-    analysis_callback_utils.send_analysis_completion(
+    callback(
         patch_process_id,
         map_requirement_id
     )
