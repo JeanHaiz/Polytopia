@@ -25,7 +25,7 @@ jupyter_notebooks/
 # environments
 env
 .env
-.env_dev
+.env.dev
 
 # IDEA
 .idea

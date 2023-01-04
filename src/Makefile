@@ -1,5 +1,5 @@
 include .env
-include .env_dev
+include .env.dev
 export
 
 .PHONY: database

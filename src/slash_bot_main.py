@@ -151,7 +151,7 @@ async def create_client():
     async def run_bot():
         
         all_tasks = asyncio.all_tasks(loop)
-        print("All tasks at run bot:", len(all_tasks), list(all_tasks)[0] if len(all_tasks) > 0 else None)
+        print("All tasks at run bot:", len(all_tasks), "\n", "\n".join(str(task) for task in all_tasks), flush=True)
         
         task2 = loop.create_task(bot_utils.get_async_connection(
             queue_service,
@@ -165,11 +165,11 @@ async def create_client():
         tasks = [task2, task1, task3]
         
         all_tasks = asyncio.all_tasks(loop)
-        print("Tasks created", len(all_tasks), list(all_tasks)[0] if len(all_tasks) > 0 else None, flush=True)
+        print("Tasks created", len(all_tasks), "\n", "\n".join(str(task) for task in all_tasks), flush=True)
         try:
             results = await asyncio.gather(*tasks)
             all_tasks = asyncio.all_tasks(loop)
-            print("Tasks gathered", len(all_tasks), list(all_tasks)[0] if len(all_tasks) > 0 else None, flush=True)
+            print("Tasks gathered", len(all_tasks), "\n", "\n".join(str(task) for task in all_tasks), flush=True)
             print(results)
         
         finally:
@@ -178,8 +178,16 @@ async def create_client():
             for t in tasks:
                 if not t.done():
                     t.cancel()
+            logger.warning("Bot quit, maybe do something?")
+            print("Bot quit, maybe do something?", flush=True)
     
     await run_bot()
 
+    logger.warning("or here, maybe do something?")
+    print("or here, maybe do something?", flush=True)
 
+
+# while True:
 asyncio.run(create_client())
+logger.warning("stuck is an infinite loop; what now?")
+print("stuck is an infinite loop; what now?", flush=True)
