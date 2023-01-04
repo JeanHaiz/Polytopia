@@ -17,10 +17,10 @@ class HeaderFooterRecognitionInterface:
     
     async def get_or_recognise_turn(
             self,
-            patch_id: str,
+            patch_uuid: str,
             turn_requirement_uuid: str,
             message_id: int,
             resource_number: int
     ):
         filename = database_client.set_filename_header(message_id, resource_number, 0)  # TODO actually call the routine
-        self.bot_utils_callbacks.on_turn_recognition_complete(patch_id, turn_requirement_uuid)
+        self.bot_utils_callbacks.on_turn_recognition_complete(patch_uuid, turn_requirement_uuid)

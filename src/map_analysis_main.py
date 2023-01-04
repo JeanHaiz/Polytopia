@@ -15,14 +15,14 @@ try:
     
     
     def error_function(
-            patch_id: str,
+            patch_uuid: str,
             map_requirement_id: str,
             error: str
     ) -> None:
         sender.send_message(
             {
                 "action": "MAP_ANALYSIS_ERROR",
-                "patch_id": patch_id,
+                "patch_uuid": patch_uuid,
                 "map_requirement_id": map_requirement_id,
                 "error": error
             }
@@ -30,13 +30,13 @@ try:
     
     
     def callback_function(
-            patch_id: str,
+            patch_uuid: str,
             map_requirement_id: str
     ) -> None:
         sender.send_message(
             {
                 "action": "MAP_ANALYSIS_COMPLETE",
-                "patch_id": patch_id,
+                "patch_uuid": patch_uuid,
                 "map_requirement_id": map_requirement_id
             }
         )

@@ -13,27 +13,27 @@ try:
     
     
     def error_function(
-            patch_id: str,
+            patch_uuid: str,
             error: str
     ) -> None:
         sender.send_message(
             {
                 "action": "MAP_PATCHING_ERROR",
-                "patch_uuid": patch_id,
+                "patch_uuid": patch_uuid,
                 "error": error
             }
         )
     
     
     def callback_function(
-            patch_id: str,
+            patch_uuid: str,
             channel_id: str,
             filename: str
     ) -> None:
         sender.send_message(
             {
                 "action": "MAP_PATCHING_COMPLETE",
-                "patch_uuid": patch_id,
+                "patch_uuid": patch_uuid,
                 "channel_id": channel_id,
                 "filename": filename
             }

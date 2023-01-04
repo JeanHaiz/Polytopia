@@ -71,3 +71,34 @@ async def wrap_slash_errors(
             f"""Error in channel {channel.name} on server {guild.name}:\n{traceback.format_exc()}\n""")
         
         await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
+
+
+def wrap_slash_errors_bis(
+        ctx: CommandContext,
+        client: Client,
+        fct: Callable[[], None]
+) -> None:
+    try:
+        fct()
+    except:
+        error = sys.exc_info()[0]
+        logger.warning("##### ERROR #####")
+        logger.warning(error)
+        logger.warning(traceback.format_exc())
+        print("##### ERROR #####")
+        print(error)
+        traceback.print_exc()
+        
+        async def manage_error():
+            # Polytopia Helper Testing server, Error channel
+            error_channel = await get(client, Channel, object_id=int(os.getenv("DISCORD_ERROR_CHANNEL")))
+            
+            channel = await ctx.get_channel()
+            guild = await ctx.get_guild()
+            
+            await error_channel.send(
+                f"""Hey <@{os.getenv("DISCORD_ADMIN_USER")}>,\n""" +
+                f"""Error in channel {channel.name} on server {guild.name}:\n{traceback.format_exc()}\n""")
+            
+            await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
+        asyncio.get_event_loop().create_task(manage_error())

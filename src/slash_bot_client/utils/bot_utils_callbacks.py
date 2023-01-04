@@ -28,12 +28,12 @@ class BotUtilsCallbacks:
     
     async def on_analysis_error(
             self,
-            patch_id: str,
+            patch_uuid: str,
             map_requirement_id: str,
             client: Client,
             error: str
     ):
-        await self.__on_error(patch_id, map_requirement_id, client, error)
+        await self.__on_error(patch_uuid, map_requirement_id, client, error)
     
     async def on_patching_error(
             self,
@@ -45,20 +45,20 @@ class BotUtilsCallbacks:
     
     @staticmethod
     async def __on_error(
-            patch_id: str,
+            patch_uuid: str,
             requirement_id: Optional[str],
             client: Client,
             error: str
     ):
         if DEBUG:
-            print("Error message received", patch_id, requirement_id, client, error, flush=True)
+            print("Error message received", patch_uuid, requirement_id, client, error, flush=True)
         
-        database_client.update_patching_process_status(patch_id, "ERROR - %s" % error)
+        database_client.update_patching_process_status(patch_uuid, "ERROR - %s" % error)
         
         if requirement_id is not None:
-            database_client.update_patching_process_requirement(patch_id, requirement_id, "ERROR - %s" % error)
+            database_client.update_patching_process_requirement(patch_uuid, requirement_id, "ERROR - %s" % error)
         
-        patch_info = database_client.get_patching_process(patch_id)
+        patch_info = database_client.get_patching_process(patch_uuid)
         error_channel = await get(client, Channel, object_id=int(os.getenv("DISCORD_ERROR_CHANNEL")))
         
         if DEBUG:
@@ -78,11 +78,11 @@ class BotUtilsCallbacks:
             print(error, flush=True)
             await error_channel.send(
                 f"""Hey <@{os.getenv("DISCORD_ADMIN_USER")}>,\n""" +
-                f"""Error in unknown channel for\npatch {patch_id}, \nrequirement {requirement_id}""")
+                f"""Error in unknown channel for\npatch {patch_uuid}, \nrequirement {requirement_id}""")
     
     def on_map_analysis_complete(
             self,
-            patch_id: str,
+            patch_uuid: str,
             map_requirement_id: str
     ):
         database_client.complete_patching_process_requirement(
@@ -90,14 +90,14 @@ class BotUtilsCallbacks:
         )
         
         if DEBUG:
-            print("complete analysis", patch_id, map_requirement_id, flush=True)
+            print("complete analysis", patch_uuid, map_requirement_id, flush=True)
         
-        if self.__check_patching_complete(patch_id):
+        if self.__check_patching_complete(patch_uuid):
             if DEBUG:
                 print("sending patching request")
             
             self.map_patching_interface.send_map_patching_request(
-                patch_id,
+                patch_uuid,
                 number_of_images=None
             )
     
@@ -156,15 +156,15 @@ class BotUtilsCallbacks:
     
     def on_turn_recognition_complete(
             self,
-            patch_id: str,
+            patch_uuid: str,
             turn_requirement_id: str
     ):
         database_client.complete_patching_process_requirement(
             turn_requirement_id
         )
         
-        if self.__check_patching_complete(patch_id):
-            self.map_patching_interface.send_map_patching_request(patch_id, number_of_images=None)
+        if self.__check_patching_complete(patch_uuid):
+            self.map_patching_interface.send_map_patching_request(patch_uuid, number_of_images=None)
     
     @staticmethod
     def __check_patching_complete(patch_process_id: str):

@@ -1,5 +1,4 @@
 import os
-import time
 import json
 import asyncio
 import datetime
@@ -27,6 +26,7 @@ from common.image_operation import ImageOp
 from database.database_client import get_database_client
 from slash_bot_client import command_context_store as cxs
 from slash_bot_client.utils import bot_input_utils
+from slash_bot_client.utils import bot_error_utils
 from slash_bot_client.utils.bot_utils_callbacks import BotUtilsCallbacks
 from slash_bot_client.interfaces.map_analysis_interface import MapAnalysisInterface
 from slash_bot_client.interfaces.map_patching_interface import MapPatchingInterface
@@ -624,7 +624,16 @@ class BotUtils:
                 print(trace, flush=True)
                 logger.warning(trace)
         
-        rabbit_receive = RabbitmqReceive(queue_name, action_reaction_request)
+        def callback(channel, method, properties, body):
+            action_params: dict = json.loads(body)
+            ctx = cxs.get(action_params["patch_uuid"])
+            bot_error_utils.wrap_slash_errors_bis(
+                ctx,
+                client,
+                lambda: action_reaction_request(channel, method, properties, body)
+            )
+        
+        rabbit_receive = RabbitmqReceive(queue_name, callback)
         rabbit_receive.start()
         print("Slash bot message queue listener is running", flush=True)
         

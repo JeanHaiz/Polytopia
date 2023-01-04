@@ -21,13 +21,13 @@ queue_channel.queue_declare(queue=queue_name)  # Declare a queue
 
 
 def send_recognition_completion(
-        patch_id: str,
+        patch_uuid: str,
         map_requirement_id: str
 ):
     global queue_channel
     body = json.dumps({
         "action": "MAP_ANALYSIS_COMPLETE",
-        "patch_id": patch_id,
+        "patch_uuid": patch_uuid,
         "map_requirement_id": map_requirement_id
     })
     try:
@@ -39,20 +39,20 @@ def send_recognition_completion(
     except pika.exceptions.StreamLostError:
         queue_channel = queue_utils.get_blocking_channel(params)
         send_recognition_completion(
-            patch_id,
+            patch_uuid,
             map_requirement_id
         )
 
 
 def send_error(
-        patch_id,
+        patch_uuid,
         score_requirement_id,
         error: str
 ):
     global queue_channel
     body = json.dumps({
         "action": "SCORE_RECOGNITION_ERROR",
-        "patch_id": patch_id,
+        "patch_uuid": patch_uuid,
         "map_requirement_id": score_requirement_id,
         "error": error
     })
@@ -67,7 +67,7 @@ def send_error(
     except pika.exceptions.StreamLostError:
         queue_channel = queue_utils.get_blocking_channel(params)
         send_error(
-            patch_id,
+            patch_uuid,
             score_requirement_id,
             error
         )
