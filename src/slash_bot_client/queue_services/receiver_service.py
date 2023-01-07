@@ -1,13 +1,10 @@
 import os
 import threading
-import nest_asyncio
 
 from typing import Callable
 from typing import Any
 
 from slash_bot_client.queue_services.queue_service import QueueService
-
-nest_asyncio.apply()
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 

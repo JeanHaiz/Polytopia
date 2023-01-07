@@ -1,8 +1,5 @@
 import pika
 import threading
-import nest_asyncio
-
-nest_asyncio.apply()
 
 
 class QueueService(threading.Thread):

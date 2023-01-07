@@ -17,7 +17,7 @@ from database.database_client import get_database_client
 from slash_bot_client.interfaces.map_patching_interface import MapPatchingInterface
 from common.error_utils import MapPatchingErrors
 
-DEBUG = os.getenv("DEBUG", 0)
+DEBUG = os.getenv("POLYTOPIA_DEBUG", 0)
 database_client = get_database_client()
 
 
@@ -128,12 +128,14 @@ class BotUtilsCallbacks:
         
         if DEBUG:
             print("patching errors", patching_errors, flush=True)
+            print("channel", channel, flush=True)
         
         with open(patch_path, "rb") as fh:
             attachment = File(fp=fh, filename=filename + ".png")
             
             if attachment is not None:
                 await channel.send(files=attachment, content="Map patched for turn %s" % turn)
+                database_client.update_patching_process_status(patch_uuid, "DONE")
             else:
                 patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_LOADED, None))
             fh.close()
@@ -167,8 +169,8 @@ class BotUtilsCallbacks:
             self.map_patching_interface.send_map_patching_request(patch_uuid, number_of_images=None)
     
     @staticmethod
-    def __check_patching_complete(patch_process_id: str):
-        requirements = database_client.get_patching_process_requirement(patch_process_id)
+    def __check_patching_complete(patch_uuid: str):
+        requirements = database_client.get_patching_process_requirement(patch_uuid)
         all_requirement_check = all([r["complete"] for r in requirements])
         
         if DEBUG:

@@ -16,7 +16,7 @@ DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
 
 def score_recognition_request(
-        patch_process_id: str,
+        patch_uuid: str,
         score_requirement_id: str,
         channel_id: int,
         channel_name: str,
@@ -37,7 +37,7 @@ def score_recognition_request(
     image_utils.save_image(image, channel_name, filename, ImageOp.MAP_PROCESSED_IMAGE)
 
     recognition_callback_utils.send_recognition_completion(
-        patch_process_id,
+        patch_uuid,
         score_requirement_id
     )
     

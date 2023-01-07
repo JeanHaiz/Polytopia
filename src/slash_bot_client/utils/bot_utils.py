@@ -1,5 +1,6 @@
 import os
 import json
+import aiohttp
 import asyncio
 import datetime
 import traceback
@@ -173,13 +174,13 @@ class BotUtils:
             channel: Channel,
             n_images: Optional[int]
     ):
-        patch_process_id = database_client.add_patching_process(
+        patch_uuid = database_client.add_patching_process(
             ctx.channel_id,
             ctx.author.id,
             ctx.id
         )
         
-        cxs.put(patch_process_id, ctx)
+        cxs.put(patch_uuid, ctx)
         
         requirements = []
         
@@ -197,7 +198,7 @@ class BotUtils:
             
             requirements_i = await self.register_process_inputs(
                 lambda i: self.__download_attachment(channel, message_id, resource_number, bot_http_client),
-                patch_process_id,
+                patch_uuid,
                 channel,
                 message_id,
                 resource_number
@@ -213,15 +214,15 @@ class BotUtils:
             print("Patching requirements", requirements, flush=True)
         
         if len(requirements) == 0:
-            database_client.update_patching_process_status(patch_process_id, "NO-IMAGE")
+            database_client.update_patching_process_status(patch_uuid, "NO-IMAGE")
             await ctx.send("No map added. Please add maps to create a collage.")
         elif len(requirements) == 2:
-            database_client.update_patching_process_status(patch_process_id, "ONE-IMAGE")
+            database_client.update_patching_process_status(patch_uuid, "ONE-IMAGE")
             await ctx.send("Found one map only. Please add a second map to create a collage.")
         else:
             for requirement_i in requirements:
                 await self.send_map_analysis_requirement(
-                    patch_process_id,
+                    patch_uuid,
                     requirement_i[0],
                     requirement_i[1],
                     requirement_i[2],
@@ -235,13 +236,13 @@ class BotUtils:
             channel: Channel,
             n_images: Optional[int]
     ):
-        patch_process_id = database_client.add_patching_process(
+        patch_uuid = database_client.add_patching_process(
             ctx.channel_id,
             ctx.author.id,
             ctx.id
         )
         
-        cxs.put(patch_process_id, ctx)
+        cxs.put(patch_uuid, ctx)
         
         requirements = []
         
@@ -259,7 +260,7 @@ class BotUtils:
             
             requirements_i = await self.register_process_inputs(
                 lambda i: self.__download_attachment(channel, message_id, resource_number, bot_http_client),
-                patch_process_id,
+                patch_uuid,
                 channel,
                 message_id,
                 resource_number
@@ -275,15 +276,15 @@ class BotUtils:
             print("Patching requirements", requirements, flush=True)
         
         if len(requirements) == 0:
-            database_client.update_patching_process_status(patch_process_id, "NO-IMAGE")
+            database_client.update_patching_process_status(patch_uuid, "NO-IMAGE")
             await ctx.send("No map added. Please add maps to create a collage.")
         elif len(requirements) == 2:
-            database_client.update_patching_process_status(patch_process_id, "ONE-IMAGE")
+            database_client.update_patching_process_status(patch_uuid, "ONE-IMAGE")
             await ctx.send("Found one map only. Please add a second map to create a collage.")
         else:
             for requirement_i in requirements:
                 await self.send_map_analysis_requirement(
-                    patch_process_id,
+                    patch_uuid,
                     requirement_i[0],
                     requirement_i[1],
                     requirement_i[2],
@@ -293,7 +294,7 @@ class BotUtils:
     @staticmethod
     async def register_process_inputs(
             download_fct: Callable[[int], Coroutine[Any, Any, BytesIO]],
-            patch_process_id: str,
+            patch_uuid: str,
             channel: Channel,
             message_id: int,
             resource_number: int
@@ -316,14 +317,14 @@ class BotUtils:
         requirements = []
         
         turn_requirement_id = database_client.add_patching_process_requirement(
-            patch_process_id,
+            patch_uuid,
             filename,
             "TURN"
         )
         requirements.append((message_id, resource_number, turn_requirement_id, "TURN"))
         
         map_requirement_id = database_client.add_patching_process_requirement(
-            patch_process_id,
+            patch_uuid,
             filename,
             "MAP"
         )
@@ -333,7 +334,7 @@ class BotUtils:
     
     async def send_map_analysis_requirement(
             self,
-            patch_process_id: str,
+            patch_uuid: str,
             message_id: int,
             resource_number: int,
             requirement_id: str,
@@ -341,14 +342,14 @@ class BotUtils:
     ):
         if requirement_type == "TURN":
             await self.header_footer_recognition_interface.get_or_recognise_turn(
-                patch_process_id,
+                patch_uuid,
                 requirement_id,
                 message_id,
                 resource_number
             )
         elif requirement_type == "MAP":
             await self.map_analysis_interface.get_or_analyse_map(
-                patch_process_id,
+                patch_uuid,
                 requirement_id,
                 message_id,
                 resource_number
@@ -600,44 +601,55 @@ class BotUtils:
             loop: asyncio.AbstractEventLoop
     ):
         def action_reaction_request(channel, method, properties, body):
+            action_params: dict = json.loads(body)
+            action = action_params.pop("action", "")
+            print("action received", body)
+            
             try:
-                def run_async(fct, **xargs):
-                    loop.call_soon_threadsafe(
-                        lambda: loop.run_until_complete(fct(**xargs)))
-                
-                print("action received", body)
-                action_params: dict = json.loads(body)
-                action = action_params.pop("action", "")
                 if action == "MAP_ANALYSIS_COMPLETE":
                     self.bot_utils_callbacks.on_map_analysis_complete(**action_params)
                 elif action == "MAP_PATCHING_COMPLETE":
-                    run_async(self.bot_utils_callbacks.on_map_patching_complete, client=client, **action_params)
+                    asyncio.run_coroutine_threadsafe(
+                        self.bot_utils_callbacks.on_map_patching_complete(
+                            **action_params,
+                            client=client
+                        ),
+                        loop
+                    )
                 elif action == "HEADER_RECOGNITION_COMPLETE":
                     self.bot_utils_callbacks.on_turn_recognition_complete(**action_params)
                 elif action == "MAP_ANALYSIS_ERROR":
-                    run_async(self.bot_utils_callbacks.on_analysis_error, client=client, **action_params)
+                    asyncio.run_coroutine_threadsafe(
+                        self.bot_utils_callbacks.on_analysis_error(
+                            **action_params,
+                            client=client
+                        ),
+                        loop
+                    )
                 elif action == "MAP_PATCHING_ERROR":
-                    run_async(self.bot_utils_callbacks.on_patching_error, client=client, **action_params)
-            except BaseException as e:
+                    asyncio.run_coroutine_threadsafe(
+                        self.bot_utils_callbacks.on_patching_error(
+                            **action_params,
+                            client=client
+                        ),
+                        loop
+                    )
+            except (
+                    BaseException,
+                    aiohttp.client_exceptions.ClientOSError,
+                    aiohttp.ClientOSError,
+                    json.decoder.JSONDecodeError,
+            ) as e:
                 trace = ("Catching base exception ERROR:" + e.__class__.__name__ +
                          " details:\n" + str(e) + "\n\n" + traceback.format_exc())
                 print(trace, flush=True)
                 logger.warning(trace)
+                bot_error_utils.error_callback(
+                    database_client,
+                    action_params["patch_uuid"],
+                    client
+                )
         
-        def callback(channel, method, properties, body):
-            action_params: dict = json.loads(body)
-            ctx = cxs.get(action_params["patch_uuid"])
-            bot_error_utils.wrap_slash_errors_bis(
-                ctx,
-                client,
-                lambda: action_reaction_request(channel, method, properties, body)
-            )
-        
-        rabbit_receive = RabbitmqReceive(queue_name, callback)
+        rabbit_receive = RabbitmqReceive(queue_name, action_reaction_request)
         rabbit_receive.start()
         print("Slash bot message queue listener is running", flush=True)
-        
-        """while True:
-            rabbit_receive.queue_service.process_data_events()
-            time.sleep(30)
-        """

@@ -26,7 +26,7 @@ database_client = get_database_client()
 
 
 def map_analysis_request(
-        patch_process_id: str,
+        patch_uuid: str,
         map_requirement_id: str,
         channel_id: int,
         channel_name: str,
@@ -58,7 +58,7 @@ def map_analysis_request(
         raise AnalysisException("IMAGE ANALYSIS - IMAGE NOT SAVED")
     
     callback(
-        patch_process_id,
+        patch_uuid,
         map_requirement_id
     )
     

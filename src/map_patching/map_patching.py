@@ -24,7 +24,7 @@ database_client = get_database_client()
 
 
 def generate_patched_map_bis(
-        patching_process_id: str,
+        patch_uuid: str,
         channel_id: int,
         channel_name: str,
         author_id: int,
@@ -53,16 +53,15 @@ def generate_patched_map_bis(
     logger.debug("files_log %s" % str(files))
     
     for i, filename_i in enumerate(files):
-        database_client.add_patching_process_input(patching_process_id, filename_i, i)
+        database_client.add_patching_process_input(patch_uuid, filename_i, i)
     
     output_file_path, filename = patch_processed_images(
         files, map_size, guild_id, channel_id, channel_name,
         interaction_id, author_id, author_name, action_debug)
     
-    database_client.update_patching_process_status(patching_process_id, "DONE")
-    database_client.update_patching_process_output_filename(patching_process_id, filename)
+    database_client.update_patching_process_output_filename(patch_uuid, filename)
     
-    callback(patching_process_id, channel_id, filename)
+    callback(patch_uuid, channel_id, filename)
 
 
 def patch_processed_images(
@@ -352,7 +351,7 @@ def patch_image(
             ImageOp.MAP_PROCESSED_IMAGE
         )
         
-        print("should match", background.shape, cv2.merge((cropped_opacity, cropped_opacity, cropped_opacity)).shape)
+        # print("should match", background.shape, cv2.merge((cropped_opacity, cropped_opacity, cropped_opacity)).shape)
     
     opaque_bit = cv2.multiply(background, 1 - cv2.merge((cropped_opacity, cropped_opacity, cropped_opacity)))
     transparent_bit = cv2.multiply(cropped_bit, cv2.merge((cropped_opacity, cropped_opacity, cropped_opacity)))

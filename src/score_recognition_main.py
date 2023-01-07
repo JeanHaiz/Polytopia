@@ -46,7 +46,7 @@ try:
         error_function,
         callback_function,
         PatchingException,
-        ["patch_process_id"]
+        ["patch_uuid"]
     )
     receiver.run()
 except KeyboardInterrupt:

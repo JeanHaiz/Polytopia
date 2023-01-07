@@ -4,8 +4,10 @@ import asyncio
 import traceback
 
 from typing import Callable
+from typing import Iterable
 from typing import List
 from typing import Optional
+from typing import Any
 from typing import Tuple
 from typing import Coroutine
 
@@ -73,32 +75,34 @@ async def wrap_slash_errors(
         await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
 
 
-def wrap_slash_errors_bis(
-        ctx: CommandContext,
+def error_callback(
+        database_client: DatabaseClient,
+        patch_uuid: str,
         client: Client,
-        fct: Callable[[], None]
-) -> None:
-    try:
-        fct()
-    except:
-        error = sys.exc_info()[0]
-        logger.warning("##### ERROR #####")
-        logger.warning(error)
-        logger.warning(traceback.format_exc())
-        print("##### ERROR #####")
-        print(error)
-        traceback.print_exc()
+):
+    error = sys.exc_info()[0]
+    logger.warning("##### ERROR #####")
+    logger.warning(error)
+    logger.warning(traceback.format_exc())
+    print("##### ERROR #####")
+    print(error)
+    traceback.print_exc()
+    
+    async def manage_error():
+        # Polytopia Helper Testing server, Error channel
+        error_channel = await get(client, Channel, object_id=int(os.getenv("DISCORD_ERROR_CHANNEL")))
         
-        async def manage_error():
-            # Polytopia Helper Testing server, Error channel
-            error_channel = await get(client, Channel, object_id=int(os.getenv("DISCORD_ERROR_CHANNEL")))
-            
-            channel = await ctx.get_channel()
-            guild = await ctx.get_guild()
-            
-            await error_channel.send(
-                f"""Hey <@{os.getenv("DISCORD_ADMIN_USER")}>,\n""" +
-                f"""Error in channel {channel.name} on server {guild.name}:\n{traceback.format_exc()}\n""")
-            
-            await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
-        asyncio.get_event_loop().create_task(manage_error())
+        patch_info = database_client.get_patching_process(patch_uuid)
+        channel_info = database_client.get_channel_info(patch_info["channel_discord_id"])
+        server_name = database_client.get_server_name(channel_info["server_discord_id"])
+        channel_name = channel_info["channel_name"]
+        
+        channel = await get(client, Channel, object_id=int(patch_info["channel_discord_id"]))
+        
+        await error_channel.send(
+            f"""Hey <@{os.getenv("DISCORD_ADMIN_USER")}>,\n""" +
+            f"""Error in channel {channel_name} on server {server_name}:\n{traceback.format_exc()}\n""")
+        
+        await channel.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
+    
+    asyncio.get_event_loop().create_task(manage_error())

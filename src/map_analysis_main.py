@@ -50,7 +50,7 @@ try:
         error_function,
         callback_function,
         AnalysisException,
-        ["patch_process_id", "map_requirement_id"]
+        ["patch_uuid", "map_requirement_id"]
     )
     
     receiver.run()
