@@ -580,7 +580,7 @@ class BotUtils:
                             print_channel(icl["channel_discord_id"]) + " on %s at %s: %s" % (
                                 icl["max_started_on_started"].strftime('%Y.%m.%d'),
                                 icl["max_started_on_started"].strftime('%H:%M:%S'),
-                                icl["agg_status"]
+                                icl["agg_status"][:100]
                             )
                             for icl in incomplete_channel_list
                         ]
@@ -588,7 +588,7 @@ class BotUtils:
                     if len(message) < 2000:
                         await ctx.send(message)
                     else:
-                        chunk_size = 20
+                        chunk_size = 10
                         for i in range(0, len(entries), chunk_size):
                             message = "\n".join(entries[i:i + chunk_size])
                             await ctx.send(message)
