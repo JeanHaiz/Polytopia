@@ -12,7 +12,7 @@ up:
 	docker-compose up --detach slash_bot
 
 restart:
-	docker-compose restart slash_bot map_patching map_analysis
+	docker-compose restart slash_bot map_patching map_analysis header_footer_recognition
 
 bot: .docker-build-${BASE_VERSION} registry
 	docker-compose up --detach --build slash_bot

@@ -47,6 +47,7 @@ services:
             - rabbitmq
             - map_patching
             - map_analysis
+            - header_footer_recognition
             # kibana:
             #     condition: service_healthy
         build:
@@ -131,7 +132,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 1000M
+                    memory: 200M
         networks:
             - database
 
