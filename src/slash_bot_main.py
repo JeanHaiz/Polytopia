@@ -30,7 +30,7 @@ Application start
 
 nest_asyncio.apply()
 
-DEBUG = os.getenv("POLYTOPIA_DEBUG")
+DEBUG = os.getenv("POLYTOPIA_DEBUG", 0)
 token = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
 
 print(DEBUG, token, flush=True)

@@ -24,7 +24,7 @@ class DatabaseClient:
     def __init__(self, user: str, password: str, port: str, database: str, host: str) -> None:
         self.database = database
         self.database_url = f"""postgresql://{user}:{password}@{host}:{port}/{database}"""
-        self.engine = sqlalchemy.create_engine(self.database_url, echo=int(os.getenv("POLYTOPIA_DEBUG")) == 1,
+        self.engine = sqlalchemy.create_engine(self.database_url, echo=int(os.getenv("POLYTOPIA_DEBUG", 0)) == 1,
                                                poolclass=NullPool)
     
     def dispose(self) -> None:

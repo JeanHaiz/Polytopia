@@ -7,7 +7,7 @@ from logging.handlers import TimedRotatingFileHandler
 def init_logging():
     log_format = "%(asctime)s - %(levelname)s - %(message)s"
     handler = TimedRotatingFileHandler("discord_log/discord.log", when="midnight", interval=1)
-    # handler.setLevel(logging.DEBUG if os.getenv("POLYTOPIA_DEBUG") == "1" else logging.INFO)
+    # handler.setLevel(logging.DEBUG if os.getenv("POLYTOPIA_DEBUG", 0) == "1" else logging.INFO)
     handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter(log_format)
     handler.setFormatter(formatter)

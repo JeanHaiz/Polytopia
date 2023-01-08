@@ -11,7 +11,7 @@ from common.logger_utils import logger
 from slash_bot_client.utils.bot_utils import BotUtils
 
 VERSION = os.getenv("SLASH_BOT_VERSION")
-DEBUG = os.getenv("POLYTOPIA_DEBUG")
+DEBUG = os.getenv("POLYTOPIA_DEBUG", 0)
 TOKEN = os.getenv("DISCORD_TEST_TOKEN" if DEBUG else "DISCORD_TOKEN")
 
 

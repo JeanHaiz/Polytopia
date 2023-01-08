@@ -7,7 +7,7 @@ from database.database_client import get_database_client
 
 from slash_bot_client.queue_services.sender_service import SenderService
 
-DEBUG = os.getenv("POLYTOPIA_DEBUG")
+DEBUG = os.getenv("POLYTOPIA_DEBUG", 0)
 
 database_client = get_database_client()
 

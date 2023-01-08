@@ -47,7 +47,7 @@ Supports generic bot activities
 - catches process errors
 """
 
-DEBUG = os.getenv("POLYTOPIA_DEBUG")
+DEBUG = os.getenv("POLYTOPIA_DEBUG", 0)
 
 database_client = get_database_client()
 
