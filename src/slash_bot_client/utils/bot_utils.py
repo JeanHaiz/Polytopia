@@ -576,8 +576,7 @@ class BotUtils:
             
             if dry_run:
                 if len(incomplete_channel_list) > 0:
-                    message = "\n".join(
-                        [
+                    entries = [
                             print_channel(icl["channel_discord_id"]) + " on %s at %s: %s" % (
                                 icl["max_started_on_started"].strftime('%Y.%m.%d'),
                                 icl["max_started_on_started"].strftime('%H:%M:%S'),
@@ -585,10 +584,18 @@ class BotUtils:
                             )
                             for icl in incomplete_channel_list
                         ]
-                    )
+                    message = "\n".join(entries)
+                    if len(message) < 2000:
+                        await ctx.send(message)
+                    else:
+                        chunk_size = 20
+                        for i in range(0, len(entries), chunk_size):
+                            message = "\n".join(entries[i:i + chunk_size])
+                            await ctx.send(message)
+                    
                 else:
                     message = "All patching runs are complete."
-                await ctx.send(message)
+                    await ctx.send(message)
             else:
                 for incomplete_run in incomplete_channel_list:
                     print(incomplete_run["patch_uuid"], incomplete_run)
