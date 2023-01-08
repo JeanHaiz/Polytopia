@@ -66,7 +66,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 200M
+                    memory: 200m
         networks:
             - database
 
@@ -88,7 +88,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 1000M
+                    memory: 800m
         networks:
             - database
 
@@ -110,7 +110,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 1000M
+                    memory: 1000m
         networks:
             - database
 
@@ -132,7 +132,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 200M
+                    memory: 200m
         networks:
             - database
 
@@ -150,7 +150,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 250M
+                    memory: 250m
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/rabbitmq/rabbitmq.config:/etc/rabbitmq/rabbitmq.config:ro
             - /Users/jean/Documents/Coding/Polytopia/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
