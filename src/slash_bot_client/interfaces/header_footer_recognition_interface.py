@@ -37,5 +37,5 @@ class HeaderFooterRecognitionInterface:
                 channel_info["channel_name"],
                 message_id,
                 resource_number,
-                resource["filename"]
+                str(resource["filename"])
             )

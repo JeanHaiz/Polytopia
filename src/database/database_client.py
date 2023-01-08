@@ -64,7 +64,15 @@ class DatabaseClient:
                 (server_discord_id, channel_discord_id, channel_name, is_active)
                 VALUES ({server_id}, {channel_id}, '{channel_name}', true)
                 ON CONFLICT (channel_discord_id) DO UPDATE
-                SET is_active = true
+                SET is_active = true, channel_name = '{channel_name}'
+                RETURNING is_active;""")
+    
+    def update_channel(self, channel_id: int, channel_name: str) -> CursorResult:
+        channel_name = re.sub(r"[^a-zA-Z0-9]", "", channel_name)[:40]
+        return self.execute(
+            f"""UPDATE discord_channel
+                SET channel_name = '{channel_name}'
+                WHERE channel_discord_id = {channel_id}
                 RETURNING is_active;""")
     
     def deactivate_channel(self, channel_id: int) -> CursorResult:

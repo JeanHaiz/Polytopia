@@ -238,6 +238,8 @@ class BotUtils:
             channel: Channel,
             n_images: Optional[int]
     ):
+        database_client.update_channel(channel.id, channel.name)
+        
         patch_uuid = database_client.add_operation_process(
             ctx.channel_id,
             ctx.author.id,

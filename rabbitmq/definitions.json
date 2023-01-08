@@ -84,6 +84,13 @@
    "configure": ".*",
    "write": ".*",
    "read": ".*"
+  },
+  {
+   "user": "header_footer_recognition",
+   "vhost": "vhost",
+   "configure": ".*",
+   "write": ".*",
+   "read": ".*"
   }
  ],
  "parameters": [],

@@ -87,7 +87,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 1200M
+                    memory: 1000M
         networks:
             - database
 
@@ -109,7 +109,29 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 1200M
+                    memory: 1000M
+        networks:
+            - database
+
+    header_footer_recognition:
+        depends_on:
+            - database
+            - rabbitmq
+        build:
+            context: "/Users/jean/Documents/Coding/Polytopia/src/"
+            dockerfile: header_footer_recognition/Dockerfile
+        restart: "unless-stopped"
+        platform: ${PLATFORM:-linux/amd64}
+        container_name: header_footer_recognition
+        volumes:
+            - /Users/jean/Documents/Coding/Polytopia/src:/app
+        env_file:
+            - .env
+            - .env.dev
+        deploy:
+            resources:
+                limits:
+                    memory: 1000M
         networks:
             - database
 

@@ -17,6 +17,9 @@ restart:
 bot: .docker-build-${BASE_VERSION} registry
 	docker-compose up --detach --build slash_bot
 
+turn_recognition: .docker-build-${BASE_VERSION} registry
+	docker-compose up --detach --build header_footer_recognition
+
 map_patching: .docker-build-${BASE_VERSION} registry
 	docker-compose up --build --detach map_patching
 
