@@ -43,6 +43,15 @@ class BotUtilsCallbacks:
     ):
         await self.__on_error(patch_uuid, None, client, error)
     
+    async def on_turn_recognition_error(
+            self,
+            patch_uuid: str,
+            turn_requirement_id: str,
+            client: Client,
+            error: str
+    ):
+        await self.__on_error(patch_uuid, turn_requirement_id, client, error)
+    
     @staticmethod
     async def __on_error(
             patch_uuid: str,
@@ -53,12 +62,12 @@ class BotUtilsCallbacks:
         if DEBUG:
             print("Error message received", patch_uuid, requirement_id, client, error, flush=True)
         
-        database_client.update_patching_process_status(patch_uuid, "ERROR - %s" % error)
+        database_client.update_process_status(patch_uuid, "ERROR - %s" % error)
         
         if requirement_id is not None:
             database_client.update_patching_process_requirement(patch_uuid, requirement_id, "ERROR - %s" % error)
         
-        patch_info = database_client.get_patching_process(patch_uuid)
+        patch_info = database_client.get_process(patch_uuid)
         error_channel = await get(client, Channel, object_id=int(os.getenv("DISCORD_ERROR_CHANNEL")))
         
         if DEBUG:
@@ -135,7 +144,7 @@ class BotUtilsCallbacks:
             
             if attachment is not None:
                 await channel.send(files=attachment, content="Map patched for turn %s" % turn)
-                database_client.update_patching_process_status(patch_uuid, "DONE")
+                database_client.update_process_status(patch_uuid, "DONE")
             else:
                 patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_LOADED, None))
             fh.close()
@@ -146,7 +155,7 @@ class BotUtilsCallbacks:
     def get_patching_errors(
             patch_uuid: str
     ) -> List[Tuple[MapPatchingErrors, Optional[str]]]:
-        patching_status = database_client.get_patching_status(patch_uuid)
+        patching_status = database_client.get_process_status(patch_uuid)
         
         if DEBUG:
             print("patching status", patching_status, flush=True)

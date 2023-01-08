@@ -22,7 +22,7 @@ class MapPatchingInterface:
             patch_uuid: str,
             number_of_images: Optional[int],
     ):
-        patching_info = database_client.get_patching_process(patch_uuid)
+        patching_info = database_client.get_process(patch_uuid)
         author_id = patching_info["process_author_discord_id"]
         player = database_client.get_player(author_id)
         channel_info = database_client.get_channel_info(patching_info["channel_discord_id"])

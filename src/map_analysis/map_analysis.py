@@ -10,6 +10,7 @@ from typing import Union
 from typing import Callable
 from typing import Tuple
 from typing import Optional
+
 from sklearn.cluster import DBSCAN
 
 from common import image_utils

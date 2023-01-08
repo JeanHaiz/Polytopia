@@ -24,6 +24,7 @@ from interactions import get
 from common import image_utils
 from common.logger_utils import logger
 from common.image_operation import ImageOp
+from common.process_type import ProcessType
 from database.database_client import get_database_client
 from slash_bot_client import command_context_store as cxs
 from slash_bot_client.utils import bot_input_utils
@@ -174,19 +175,20 @@ class BotUtils:
             channel: Channel,
             n_images: Optional[int]
     ):
-        patch_uuid = database_client.add_patching_process(
+        process_uuid = database_client.add_operation_process(
             ctx.channel_id,
             ctx.author.id,
-            ctx.id
+            ctx.id,
+            ProcessType.SCORE_VISUALISATION
         )
         
-        cxs.put(patch_uuid, ctx)
+        cxs.put(process_uuid, ctx)
         
         requirements = []
         
         message_resources = database_client.get_channel_resource_messages(
             ctx.channel_id,
-            [ImageOp.MAP_INPUT, ImageOp.MAP_PROCESSED_IMAGE]
+            [ImageOp.SCORE_INPUT]
         )
         
         count = 0
@@ -198,7 +200,7 @@ class BotUtils:
             
             requirements_i = await self.register_process_inputs(
                 lambda i: self.__download_attachment(channel, message_id, resource_number, bot_http_client),
-                patch_uuid,
+                process_uuid,
                 channel,
                 message_id,
                 resource_number
@@ -214,15 +216,15 @@ class BotUtils:
             print("Patching requirements", requirements, flush=True)
         
         if len(requirements) == 0:
-            database_client.update_patching_process_status(patch_uuid, "NO-IMAGE")
+            database_client.update_process_status(process_uuid, "NO-IMAGE")
             await ctx.send("No map added. Please add maps to create a collage.")
         elif len(requirements) == 2:
-            database_client.update_patching_process_status(patch_uuid, "ONE-IMAGE")
+            database_client.update_process_status(process_uuid, "ONE-IMAGE")
             await ctx.send("Found one map only. Please add a second map to create a collage.")
         else:
             for requirement_i in requirements:
                 await self.send_map_analysis_requirement(
-                    patch_uuid,
+                    process_uuid,
                     requirement_i[0],
                     requirement_i[1],
                     requirement_i[2],
@@ -236,10 +238,11 @@ class BotUtils:
             channel: Channel,
             n_images: Optional[int]
     ):
-        patch_uuid = database_client.add_patching_process(
+        patch_uuid = database_client.add_operation_process(
             ctx.channel_id,
             ctx.author.id,
-            ctx.id
+            ctx.id,
+            ProcessType.MAP_PATCHING
         )
         
         cxs.put(patch_uuid, ctx)
@@ -276,10 +279,10 @@ class BotUtils:
             print("Patching requirements", requirements, flush=True)
         
         if len(requirements) == 0:
-            database_client.update_patching_process_status(patch_uuid, "NO-IMAGE")
+            database_client.update_process_status(patch_uuid, "NO-IMAGE")
             await ctx.send("No map added. Please add maps to create a collage.")
         elif len(requirements) == 2:
-            database_client.update_patching_process_status(patch_uuid, "ONE-IMAGE")
+            database_client.update_process_status(patch_uuid, "ONE-IMAGE")
             await ctx.send("Found one map only. Please add a second map to create a collage.")
         else:
             for requirement_i in requirements:
@@ -557,7 +560,7 @@ class BotUtils:
             await ctx.send("Trace empty")
         await answer_message.edit("Done")
     
-    async def renew_patching(
+    async def renew_patching(  # TODO augment with score visualisation
             self,
             client: Client,
             ctx: CommandContext,
@@ -569,15 +572,16 @@ class BotUtils:
             return server_name + " " + channel_details["channel_name"]
         
         if ctx.author.id == os.getenv("DISCORD_ADMIN_USER"):
-            incomplete_channel_list = database_client.get_incomplete_patching_run()
+            incomplete_channel_list = database_client.get_incomplete_process_runs(ProcessType.MAP_PATCHING)
             
             if dry_run:
                 if len(incomplete_channel_list) > 0:
                     message = "\n".join(
                         [
-                            print_channel(icl["channel_discord_id"]) + " on %s at %s" % (
+                            print_channel(icl["channel_discord_id"]) + " on %s at %s: %s" % (
                                 icl["max_started_on_started"].strftime('%Y.%m.%d'),
-                                icl["max_started_on_started"].strftime('%H:%M:%S')
+                                icl["max_started_on_started"].strftime('%H:%M:%S'),
+                                icl["agg_status"]
                             )
                             for icl in incomplete_channel_list
                         ]
@@ -616,11 +620,19 @@ class BotUtils:
                         ),
                         loop
                     )
-                elif action == "HEADER_RECOGNITION_COMPLETE":
+                elif action == "TURN_RECOGNITION_COMPLETE":
                     self.bot_utils_callbacks.on_turn_recognition_complete(**action_params)
                 elif action == "MAP_ANALYSIS_ERROR":
                     asyncio.run_coroutine_threadsafe(
                         self.bot_utils_callbacks.on_analysis_error(
+                            **action_params,
+                            client=client
+                        ),
+                        loop
+                    )
+                elif action == "TURN_RECOGNITION_ERROR":
+                    asyncio.run_coroutine_threadsafe(
+                        self.bot_utils_callbacks.on_turn_recognition_error(
                             **action_params,
                             client=client
                         ),
@@ -640,8 +652,10 @@ class BotUtils:
                     aiohttp.ClientOSError,
                     json.decoder.JSONDecodeError,
             ) as e:
-                trace = ("Catching base exception ERROR:" + e.__class__.__name__ +
-                         " details:\n" + str(e) + "\n\n" + traceback.format_exc())
+                trace = (
+                        "Catching base exception ERROR:" + e.__class__.__name__ +
+                        " details:\n" + str(e) + "\n\n" + traceback.format_exc()
+                )
                 print(trace, flush=True)
                 logger.warning(trace)
                 bot_error_utils.error_callback(
@@ -649,6 +663,10 @@ class BotUtils:
                     action_params["patch_uuid"],
                     client
                 )
+        
+        await client.wait_until_ready()
+        channel = await get(client, Channel, object_id=int(os.getenv("DISCORD_ERROR_CHANNEL")))
+        await channel.send("Bot started")
         
         rabbit_receive = RabbitmqReceive(queue_name, action_reaction_request)
         rabbit_receive.start()

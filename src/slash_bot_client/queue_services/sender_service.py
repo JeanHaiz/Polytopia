@@ -1,12 +1,9 @@
-import logging
 import json
 import pika
 
 from pika import exceptions
 
 from slash_bot_client.queue_services.queue_service import QueueService
-
-logging.basicConfig()
 
 url = 'amqp://slash_bot:slash_bot123@rabbitmq:5672/vhost'
 
@@ -21,7 +18,13 @@ class SenderService:
         self.__init_queues()
 
     def __init_queues(self):
-        queues = ["map_patching", "map_analysis", "score_recognition"]
+        queues = [
+            "map_patching",
+            "map_analysis",
+            "score_recognition",
+            "score_visualisation",
+            "header_footer_recognition"
+        ]
         for queue_name in queues:
             self.queue_service.declare_queue(queue_name)
     
@@ -113,6 +116,52 @@ class SenderService:
                 number_of_images
             )
     
+    def send_turn_recognition_request(
+            self,
+            patch_uuid: str,
+            turn_requirement_id: str,
+            channel_id: int,
+            channel_name: str,
+            message_id: int,
+            resource_number: int,
+            filename: str
+    ):
+        body = json.dumps({
+            "patch_uuid": patch_uuid,
+            "turn_requirement_id": turn_requirement_id,
+            "channel_id": channel_id,
+            "channel_name": channel_name,
+            "message_id": message_id,
+            "resource_number": resource_number,
+            "filename": filename
+        })
+        try:
+            if self.queue_service.is_open():
+                self.queue_service.send_message("header_footer_recognition", body)
+            else:
+                print("CONNECTION STATUS", self.queue_service.is_open())
+                self.queue_service.reset_queues()
+                self.send_map_analysis_request(
+                    patch_uuid,
+                    turn_requirement_id,
+                    channel_id,
+                    channel_name,
+                    message_id,
+                    resource_number,
+                    filename
+                )
+        except pika.exceptions.StreamLostError:
+            self.queue_service.reset_queues()
+            self.send_map_analysis_request(
+                patch_uuid,
+                turn_requirement_id,
+                channel_id,
+                channel_name,
+                message_id,
+                resource_number,
+                filename
+            )
+            
     def send_score_recognition_request(
         self,
         # TODO complete

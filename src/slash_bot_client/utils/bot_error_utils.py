@@ -4,10 +4,8 @@ import asyncio
 import traceback
 
 from typing import Callable
-from typing import Iterable
 from typing import List
 from typing import Optional
-from typing import Any
 from typing import Tuple
 from typing import Coroutine
 
@@ -92,7 +90,7 @@ def error_callback(
         # Polytopia Helper Testing server, Error channel
         error_channel = await get(client, Channel, object_id=int(os.getenv("DISCORD_ERROR_CHANNEL")))
         
-        patch_info = database_client.get_patching_process(patch_uuid)
+        patch_info = database_client.get_process(patch_uuid)
         channel_info = database_client.get_channel_info(patch_info["channel_discord_id"])
         server_name = database_client.get_server_name(channel_info["server_discord_id"])
         channel_name = channel_info["channel_name"]

@@ -59,7 +59,7 @@ def generate_patched_map_bis(
         files, map_size, guild_id, channel_id, channel_name,
         interaction_id, author_id, author_name, action_debug)
     
-    database_client.update_patching_process_output_filename(patch_uuid, filename)
+    database_client.update_process_output_filename(patch_uuid, filename)
     
     callback(patch_uuid, channel_id, filename)
 

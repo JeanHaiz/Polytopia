@@ -13,8 +13,10 @@ from typing import Tuple
 from typing import Optional
 from sqlalchemy.pool import NullPool
 from sqlalchemy.engine import CursorResult
+
 from common.image_operation import ImageOp
 from common.image_param import ImageParam
+from common.process_type import ProcessType
 
 
 class DatabaseClient:
@@ -22,7 +24,8 @@ class DatabaseClient:
     def __init__(self, user: str, password: str, port: str, database: str, host: str) -> None:
         self.database = database
         self.database_url = f"""postgresql://{user}:{password}@{host}:{port}/{database}"""
-        self.engine = sqlalchemy.create_engine(self.database_url, echo=os.getenv("DEBUG"), poolclass=NullPool)
+        self.engine = sqlalchemy.create_engine(self.database_url, echo=int(os.getenv("POLYTOPIA_DEBUG")) == 1,
+                                               poolclass=NullPool)
     
     def dispose(self) -> None:
         self.engine.dispose()
@@ -346,14 +349,20 @@ class DatabaseClient:
         else:
             return None, None
     
-    def add_patching_process(self, channel_id: int, author_id: int, interaction_id: int) -> Optional[str]:
-        patch_uuid = self.execute(
-            f"""INSERT INTO map_patching_process
-                (channel_discord_id, process_author_discord_id, status, interaction_id)
-                VALUES ('{channel_id}', '{author_id}', 'STARTED', {interaction_id})
-                RETURNING patch_uuid::text;""").fetchone()
-        if patch_uuid is not None and len(patch_uuid) > 0:
-            return patch_uuid[0]
+    def add_operation_process(
+            self,
+            channel_id: int,
+            author_id: int,
+            interaction_id: int,
+            process_type: ProcessType
+    ) -> Optional[str]:
+        process_uuid = self.execute(
+            f"""INSERT INTO operation_process
+                (channel_discord_id, process_author_discord_id, status, interaction_id, process_type)
+                VALUES ('{channel_id}', '{author_id}', 'STARTED', {interaction_id}, '{process_type.name}')
+                RETURNING process_uuid::text;""").fetchone()
+        if process_uuid is not None and len(process_uuid) > 0:
+            return process_uuid[0]
         else:
             return None
     
@@ -363,17 +372,18 @@ class DatabaseClient:
                 (patch_uuid, input_filename, input_order)
                 VALUES ('{uuid.UUID(patch_uuid)}', '{input_filename}', {order});""")
     
-    def get_patching_processes(self, channel_id: str) -> list:
+    def get_processes(self, channel_id: str, process_type: ProcessType) -> list:
         processes = self.execute(
-            f"""SELECT * FROM map_patching_process
+            f"""SELECT * FROM operation_process
                 WHERE channel_discord_id = '{channel_id}'
+                AND process_type = '{process_type.name}'
                 ORDER BY started_on DSC;""").fetchall()
         return [dict(row) for row in processes]
     
-    def get_patching_process(self, patch_uuid: str) -> Optional[dict]:
+    def get_process(self, process_uuid: str) -> Optional[dict]:
         process = self.execute(
-            f"""SELECT * FROM map_patching_process
-                WHERE patch_uuid::text = '{patch_uuid}';""").fetchall()
+            f"""SELECT * FROM operation_process
+                WHERE process_uuid::text = '{process_uuid}';""").fetchall()
         if process is not None and len(process) > 0:
             return dict(process[0])
         else:
@@ -385,21 +395,21 @@ class DatabaseClient:
                 WHERE patch_uuid::text = '{patch_uuid}';""").fetchall()
         return [dict(row) for row in process_inputs]
     
-    def update_patching_process_status(self, patch_uuid: str, status: str) -> bool:
-        patch_uuid = self.execute(
-            f"""UPDATE map_patching_process
+    def update_process_status(self, process_uuid: str, status: str) -> bool:
+        returned_process_uuid = self.execute(
+            f"""UPDATE operation_process
                 SET status = '{status}'
-                WHERE patch_uuid::text = '{patch_uuid}'
-                RETURNING patch_uuid::text;""").fetchone()
-        return patch_uuid is not None and len(patch_uuid) > 0
+                WHERE process_uuid::text = '{process_uuid}'
+                RETURNING process_uuid::text;""").fetchone()
+        return returned_process_uuid is not None and len(returned_process_uuid) > 0
     
-    def update_patching_process_output_filename(self, patch_uuid: str, filename: str) -> bool:
-        patch_uuid = self.execute(
-            f"""UPDATE map_patching_process
+    def update_process_output_filename(self, process_uuid: str, filename: str) -> bool:
+        returned_process_uuid = self.execute(
+            f"""UPDATE operation_process
                 SET output_filename = '{filename}', ended_on = now()
-                WHERE patch_uuid::text = '{patch_uuid}'
-                RETURNING patch_uuid::text;""").fetchone()
-        return patch_uuid is not None and len(patch_uuid) > 0
+                WHERE process_uuid::text = '{process_uuid}'
+                RETURNING process_uuid::text;""").fetchone()
+        return returned_process_uuid is not None and len(returned_process_uuid) > 0
     
     def update_patching_process_input_status(self, patch_uuid: str, filename: str, status: str) -> bool:
         patch_input_uuid = self.execute(
@@ -509,30 +519,50 @@ class DatabaseClient:
         else:
             return None
     
-    def get_patching_runs_for_status(self, status: str):
+    def get_process_runs(self, status: str, process_type: ProcessType):
         result = self.execute(
             f"""SELECT DISTINCT channel_discord_id
-                FROM map_patching_process
-                WHERE status='{status}';""")
+                FROM operation_process
+                WHERE status='{status}'
+                AND process_type = '{process_type.name}';""")
         return [row[0] for row in result]
     
-    def get_incomplete_patching_run(self):
-        result = self.execute(
-            """select *
-                from (
-                    select channel_discord_id, max(started_on) max_started_on_started
-                    from map_patching_process
-                    where status='STARTED'
-                    group by channel_discord_id) a
-                inner join (
-                    select channel_discord_id, max(started_on) max_started_on_done
-                    from map_patching_process
-                    where status in ('Done', 'DONE', 'NO-IMAGE', 'ONE-IMAGE')
-                    group by channel_discord_id) b
-                on a.channel_discord_id = b.channel_discord_id
-                where a.max_started_on_started > b.max_started_on_done;"""
+    def get_incomplete_process_runs(self, process_type: ProcessType):
+        result_dual = self.execute(
+            f"""SELECT *
+                FROM (
+                    SELECT channel_discord_id, max(started_on) max_started_on_started, string_agg(status, ',') as agg_status
+                    FROM operation_process
+                    WHERE (
+                        status = 'STARTED'
+                        OR starts_with(status, 'With Errors')
+                        OR starts_with(status, 'ERROR')
+                    )
+                    AND process_type = '{process_type.name}'
+                    GROUP BY channel_discord_id) a
+                INNER JOIN (
+                    SELECT channel_discord_id, max(started_on) max_started_on_done
+                    FROM operation_process
+                    WHERE status IN ('Done', 'DONE', 'NO-IMAGE', 'ONE-IMAGE')
+                    AND process_type = '{process_type.name}'
+                    GROUP BY channel_discord_id) b
+                ON a.channel_discord_id = b.channel_discord_id
+                WHERE a.max_started_on_started > b.max_started_on_done;"""
         )
-        return [dict(row) for row in result]
+        
+        result_first = self.execute(
+            f"""SELECT channel_discord_id, string_agg(status, ',') as agg_status, max(started_on) max_started_on_started, min(started_on) max_started_on_done
+                FROM operation_process
+                WHERE channel_discord_id NOT IN (
+                    SELECT distinct channel_discord_id
+                    FROM operation_process
+                    WHERE status IN ('Done', 'DONE')
+                    AND process_type = 'MAP_PATCHING'
+                    GROUP BY channel_discord_id)
+                AND process_type = 'MAP_PATCHING'
+                GROUP BY channel_discord_id;"""
+        )
+        return [dict(row) for row in result_dual] + ([dict(row) for row in result_first])
     
     def get_channel_info(self, channel_id) -> Optional[dict]:
         channel_info = self.execute(
@@ -591,10 +621,10 @@ class DatabaseClient:
         
         return None
     
-    def get_patching_status(self, patching_uuid: str) -> Optional[str]:
+    def get_process_status(self, process_uuid: str) -> Optional[str]:
         status = self.execute(
-            f"""SELECT status from map_patching_process
-                WHERE patch_uuid = '{patching_uuid}';"""
+            f"""SELECT status from operation_process
+                WHERE process_uuid = '{process_uuid}';"""
         ).fetchone()
         if status is not None and len(status) > 0:
             return status[0]
@@ -617,17 +647,17 @@ class DatabaseClient:
             
                 DELETE FROM map_patching_process_requirement
                 WHERE patch_uuid in (
-                    SELECT patch_uuid FROM map_patching_process
+                    SELECT process_uuid FROM operation_process
                     WHERE channel_discord_id = {channel_id}
                 );
                 
                 DELETE FROM map_patching_process_input
                 WHERE patch_uuid in (
-                    SELECT patch_uuid FROM map_patching_process
+                    SELECT process_uuid FROM operation_process
                     WHERE channel_discord_id = {channel_id}
                 );
                 
-                DELETE FROM map_patching_process
+                DELETE FROM operation_process
                 WHERE channel_discord_id = {channel_id};
                 
                 DELETE FROM message_resources
@@ -647,7 +677,7 @@ class DatabaseClient:
     
     def get_request_count(self, discord_player_id) -> Optional[int]:
         count = self.execute(
-            f"""SELECT count(patch_uuid) from map_patching_process
+            f"""SELECT count(process_uuid) from operation_process
                 WHERE process_author_discord_id = '{discord_player_id}'
                 AND started_on >= now() - INTERVAL '1 month'
                 AND status = 'DONE';""").fetchone()
@@ -699,17 +729,6 @@ class DatabaseClient:
     @staticmethod
     def __format_list(s: List, fct: Callable[[Any], str]) -> str:
         return "(%s)" % (", ".join([str(fct(s_i)) for s_i in s]))
-
-
-"""
-print(
-    "Database config", os.getenv("PGUSER"),
-    os.getenv("PGPASS"),
-    os.getenv("PGPORT"),
-    os.getenv("PGDATABASE"),
-    os.getenv("PGHOST")
-)
-"""
 
 
 def get_database_client() -> DatabaseClient:
