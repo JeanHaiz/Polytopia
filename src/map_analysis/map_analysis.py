@@ -27,7 +27,7 @@ database_client = get_database_client()
 
 
 def map_analysis_request(
-        patch_uuid: str,
+        process_uuid: str,
         map_requirement_id: str,
         channel_id: int,
         channel_name: str,
@@ -59,7 +59,7 @@ def map_analysis_request(
         raise AnalysisException("IMAGE ANALYSIS - IMAGE NOT SAVED")
     
     callback(
-        patch_uuid,
+        process_uuid,
         map_requirement_id
     )
     
@@ -82,6 +82,9 @@ def analyse_map(
     
     map_size = database_client.get_game_map_size(channel_id) if database_client is not None else "400"
     
+    if map_size is None:
+        raise AnalysisException("IMAGE ANALYSIS - MAP SIZE NOT SET")
+        
     alpha, scale = get_cloud_alpha_quater(
         map_image_no_alpha, channel_name, filename, map_size, action_debug=action_debug)
     if DEBUG:

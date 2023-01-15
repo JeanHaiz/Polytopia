@@ -57,24 +57,24 @@ async def create_client():
             if DEBUG:
                 print("HEALTH CHECK START", flush=True)
             try:
-                await slash_bot_client._websocket.wait_until_ready()
+                await slash_bot_client.wait_until_ready()
                 client_info = await slash_bot_client._http.get_current_bot_information()
                 if client_info is None or \
                         not slash_bot_client._websocket.ready.is_set() or \
                         slash_bot_client._websocket._client is None or \
                         slash_bot_client._websocket._client.closed:
                     inner_alive = False
-            
+            except KeyboardInterrupt:
+                print("Bot shutdown requested", flush=True)
+                logger.warning("Bot shutdown requested")
+                inner_alive = False
             except exceptions as e:
-                print("RECOGNISED EXCEPTION", e, flush=True)
-                logger.warning("RECOGNISED EXCEPTION" + str(e))
+                print("RECOGNISED EXCEPTION " + e.__class__.__name__ + ": " + str(e), flush=True)
+                logger.warning("RECOGNISED EXCEPTION " + e.__class__.__name__ + ": " + str(e))
                 inner_alive = False
             except BaseException as e:
-                print("UN-RECOGNISED EXCEPTION:", e, flush=True)
-                logger.warning("UN-RECOGNISED EXCEPTION" + str(e))
-                inner_alive = False
-            except object:
-                print("BARE EXCEPTION:", traceback.format_exc(), flush=True)
+                print("UN-RECOGNISED EXCEPTION " + e.__class__.__name__ + ": " + str(e), flush=True)
+                logger.warning("UN-RECOGNISED EXCEPTION " + e.__class__.__name__ + ": " + str(e))
                 inner_alive = False
             if DEBUG:
                 print("HEALTH CHECK END", alive, flush=True)
@@ -101,7 +101,8 @@ async def create_client():
     
     queue_service = QueueService()
     bot_utils = BotUtils(queue_service)
-    
+    # slash_bot_client.load("slash_bot_client.extensions.bot_extension", bot_utils=bot_utils)
+    # slash_bot_client.reload()
     bot_extensions = SlashBotExtension(slash_bot_client, bot_utils)
     map_extensions = MapExtension(slash_bot_client, bot_utils)
     score_extensions = ScoreExtension(slash_bot_client, bot_utils)
@@ -157,9 +158,9 @@ while True:
         print("Result", result, flush=True)
         time.sleep(10)
     except BaseException as e:
-        print("Exception elsewhere: " + str(e), flush=True)
+        print("Exception elsewhere as " + e.__class__.__name__ + ": " + str(e), flush=True)
         if DEBUG:
             print(traceback.format_exc())
-        logger.warning("Exception elsewhere" + str(e))
+        logger.warning("Exception elsewhere as " + e.__class__.__name__ + ": " + str(e))
         time.sleep(10)
         print("Restarting bot", flush=True)

@@ -21,7 +21,7 @@ database_client = get_database_client()
 
 
 def turn_recognition_request(
-        patch_uuid: str,
+        process_uuid: str,
         turn_requirement_id: str,
         channel_id: int,
         channel_name: str,
@@ -50,7 +50,7 @@ def turn_recognition_request(
         raise HeaderFooterRecognitionException("TURN RECOGNITION - TURN NOT RECOGNISED")
     
     callback(
-        patch_uuid,
+        process_uuid,
         turn_requirement_id
     )
     

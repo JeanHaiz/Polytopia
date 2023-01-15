@@ -15,14 +15,14 @@ try:
     
     
     def error_function(
-            patch_uuid: str,
+            process_uuid: str,
             turn_requirement_id: str,
             error: str
     ) -> None:
         sender.send_message(
             {
                 "action": "TURN_RECOGNITION_ERROR",
-                "patch_uuid": patch_uuid,
+                "process_uuid": process_uuid,
                 "turn_requirement_id": turn_requirement_id,
                 "error": error
             }
@@ -30,13 +30,13 @@ try:
     
     
     def callback_function(
-            patch_uuid: str,
+            process_uuid: str,
             turn_requirement_id: str
     ) -> None:
         sender.send_message(
             {
                 "action": "TURN_RECOGNITION_COMPLETE",
-                "patch_uuid": patch_uuid,
+                "process_uuid": process_uuid,
                 "turn_requirement_id": turn_requirement_id
             }
         )
@@ -50,7 +50,7 @@ try:
         error_function,
         callback_function,
         HeaderFooterRecognitionException,
-        ["patch_uuid", "turn_requirement_id"]
+        ["process_uuid", "turn_requirement_id"]
     )
     
     receiver.run()

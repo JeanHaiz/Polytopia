@@ -75,7 +75,7 @@ async def wrap_slash_errors(
 
 def error_callback(
         database_client: DatabaseClient,
-        patch_uuid: str,
+        process_uuid: str,
         client: Client,
 ):
     error = sys.exc_info()[0]
@@ -90,7 +90,7 @@ def error_callback(
         # Polytopia Helper Testing server, Error channel
         error_channel = await get(client, Channel, object_id=int(os.getenv("DISCORD_ERROR_CHANNEL")))
         
-        patch_info = database_client.get_process(patch_uuid)
+        patch_info = database_client.get_process(process_uuid)
         channel_info = database_client.get_channel_info(patch_info["channel_discord_id"])
         server_name = database_client.get_server_name(channel_info["server_discord_id"])
         channel_name = channel_info["channel_name"]

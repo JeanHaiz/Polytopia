@@ -121,3 +121,7 @@ class SlashBotExtension(interactions.Extension):
                 await ctx.send("Please remove a message with an image")
         
         await bot_error_utils.wrap_slash_errors(ctx, self.client, lambda: inner())
+
+
+def setup(client: interactions.Client, bot_utils: BotUtils):
+    SlashBotExtension(client, bot_utils)

@@ -11,6 +11,7 @@ from typing import Callable
 from typing import Union
 from typing import Tuple
 from typing import Optional
+
 from sqlalchemy.pool import NullPool
 from sqlalchemy.engine import CursorResult
 
@@ -26,7 +27,7 @@ class DatabaseClient:
     def __init__(self, user: str, password: str, port: str, database: str, host: str) -> None:
         self.database = database
         self.database_url = f"""postgresql://{user}:{password}@{host}:{port}/{database}"""
-        self.engine = sqlalchemy.create_engine(self.database_url, echo=DEBUG is not None and DEBUG == 1,
+        self.engine = sqlalchemy.create_engine(self.database_url, echo=DEBUG is not None and DEBUG == "1",
                                                poolclass=NullPool)
     
     def dispose(self) -> None:
@@ -244,7 +245,7 @@ class DatabaseClient:
                 SET latest_turn = {turn}
                 WHERE channel_discord_id = {channel_id};""")
     
-    def get_game_map_size(self, channel_id: int) -> Optional[str]:
+    def get_game_map_size(self, channel_id: int) -> Optional[int]:
         map_size = self.execute(
             f"""SELECT map_size FROM polytopia_game
                 WHERE channel_discord_id = {channel_id};""").fetchone()
@@ -376,11 +377,11 @@ class DatabaseClient:
         else:
             return None
     
-    def add_patching_process_input(self, patch_uuid: str, input_filename: str, order: int) -> CursorResult:
+    def add_patching_process_input(self, process_uuid: str, input_filename: str, order: int) -> CursorResult:
         return self.execute(
             f"""INSERT INTO map_patching_process_input
-                (patch_uuid, input_filename, input_order)
-                VALUES ('{uuid.UUID(patch_uuid)}', '{input_filename}', {order});""")
+                (process_uuid, input_filename, input_order)
+                VALUES ('{uuid.UUID(process_uuid)}', '{input_filename}', {order});""")
     
     def get_processes(self, channel_id: str, process_type: ProcessType) -> list:
         processes = self.execute(
@@ -399,16 +400,16 @@ class DatabaseClient:
         else:
             return None
     
-    def get_patching_inputs(self, patch_uuid: str) -> list:
+    def get_patching_inputs(self, process_uuid: str) -> list:
         process_inputs = self.execute(
             f"""SELECT * FROM map_patching_process_input
-                WHERE patch_uuid::text = '{patch_uuid}';""").fetchall()
+                WHERE process_uuid::text = '{process_uuid}';""").fetchall()
         return [dict(row) for row in process_inputs]
     
     def update_process_status(self, process_uuid: str, status: str) -> bool:
         returned_process_uuid = self.execute(
             f"""UPDATE operation_process
-                SET status = '{status}'
+                SET status = '{self.escape(status)}'
                 WHERE process_uuid::text = '{process_uuid}'
                 RETURNING process_uuid::text;""").fetchone()
         return returned_process_uuid is not None and len(returned_process_uuid) > 0
@@ -421,39 +422,43 @@ class DatabaseClient:
                 RETURNING process_uuid::text;""").fetchone()
         return returned_process_uuid is not None and len(returned_process_uuid) > 0
     
-    def update_patching_process_input_status(self, patch_uuid: str, filename: str, status: str) -> bool:
+    @staticmethod
+    def escape(text):
+        return text.replace("'", "\"")
+    
+    def update_patching_process_input_status(self, process_uuid: str, filename: str, status: str) -> bool:
         patch_input_uuid = self.execute(
             f"""UPDATE map_patching_process_input
-                SET status = '{status}'
-                WHERE patch_uuid::text = '{patch_uuid}'
+                SET status = '{self.escape(status)}'
+                WHERE process_uuid::text = '{process_uuid}'
                 AND input_filename = '{filename}'
                 RETURNING patch_input_uuid::text;""").fetchone()
         return patch_input_uuid is not None and len(patch_input_uuid) > 0
     
-    def update_patching_process_requirement(self, patch_uuid: str, requirement_id: str, status: str) -> bool:
+    def update_patching_process_requirement(self, process_uuid: str, requirement_id: str, status: str) -> bool:
         patch_input_uuid = self.execute(
             f"""UPDATE map_patching_process_requirement
-                SET status = '{status}'
-                WHERE patch_uuid::text = '{patch_uuid}'
+                SET status = '{self.escape(status)}'
+                WHERE process_uuid::text = '{process_uuid}'
                 AND patch_requirement_uuid::text = '{requirement_id}'
-                RETURNING patch_uuid::text;""").fetchone()
+                RETURNING process_uuid::text;""").fetchone()
         return patch_input_uuid is not None and len(patch_input_uuid) > 0
     
-    def add_patching_process_requirement(self, patch_uuid: str, filename: str, requirement_type: str) -> Optional[str]:
+    def add_patching_process_requirement(self, process_uuid: str, filename: str, requirement_type: str) -> Optional[str]:
         patch_requirement_uuid = self.execute(
             f"""INSERT INTO map_patching_process_requirement
-                (patch_uuid, filename, type)
-                VALUES ('{uuid.UUID(patch_uuid)}', '{filename}', '{requirement_type}')
+                (process_uuid, filename, type)
+                VALUES ('{uuid.UUID(process_uuid)}', '{filename}', '{requirement_type}')
                 RETURNING patch_requirement_uuid::text;""").fetchone()
         if patch_requirement_uuid is not None and len(patch_requirement_uuid) > 0:
             return patch_requirement_uuid[0]
         else:
             return None
     
-    def get_patching_process_requirement(self, patch_uuid: str):
+    def get_patching_process_requirement(self, process_uuid: str):
         process_inputs = self.execute(
             f"""SELECT * FROM map_patching_process_requirement
-                        WHERE patch_uuid::text = '{patch_uuid}';""").fetchall()
+                        WHERE process_uuid::text = '{process_uuid}';""").fetchall()
         return [dict(row) for row in process_inputs]
     
     def complete_patching_process_requirement(self, patch_requirement_uuid: str) -> bool:
@@ -533,7 +538,7 @@ class DatabaseClient:
         result = self.execute(
             f"""SELECT DISTINCT channel_discord_id
                 FROM operation_process
-                WHERE status='{status}'
+                WHERE status='{self.escape(status)}'
                 AND process_type = '{process_type.name}';""")
         return [row[0] for row in result]
     
@@ -656,13 +661,13 @@ class DatabaseClient:
                 );
             
                 DELETE FROM map_patching_process_requirement
-                WHERE patch_uuid in (
+                WHERE process_uuid in (
                     SELECT process_uuid FROM operation_process
                     WHERE channel_discord_id = {channel_id}
                 );
                 
                 DELETE FROM map_patching_process_input
-                WHERE patch_uuid in (
+                WHERE process_uuid in (
                     SELECT process_uuid FROM operation_process
                     WHERE channel_discord_id = {channel_id}
                 );

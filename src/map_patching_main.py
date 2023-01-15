@@ -15,27 +15,27 @@ try:
     
     
     def error_function(
-            patch_uuid: str,
+            process_uuid: str,
             error: str
     ) -> None:
         sender.send_message(
             {
                 "action": "MAP_PATCHING_ERROR",
-                "patch_uuid": patch_uuid,
+                "process_uuid": process_uuid,
                 "error": error
             }
         )
     
     
     def callback_function(
-            patch_uuid: str,
+            process_uuid: str,
             channel_id: str,
             filename: str
     ) -> None:
         sender.send_message(
             {
                 "action": "MAP_PATCHING_COMPLETE",
-                "patch_uuid": patch_uuid,
+                "process_uuid": process_uuid,
                 "channel_id": channel_id,
                 "filename": filename
             }
@@ -50,7 +50,7 @@ try:
         error_function,
         callback_function,
         PatchingException,
-        ["patch_uuid"]
+        ["process_uuid"]
     )
     
     receiver.run()

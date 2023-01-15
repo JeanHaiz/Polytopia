@@ -30,7 +30,7 @@ class SenderService:
     
     def send_map_analysis_request(
             self,
-            patch_uuid: str,
+            process_uuid: str,
             map_requirement_id: str,
             channel_id: int,
             channel_name: str,
@@ -39,7 +39,7 @@ class SenderService:
             filename: str
     ):
         body = json.dumps({
-            "patch_uuid": patch_uuid,
+            "process_uuid": process_uuid,
             "map_requirement_id": map_requirement_id,
             "channel_id": channel_id,
             "channel_name": channel_name,
@@ -54,7 +54,7 @@ class SenderService:
                 print("CONNECTION STATUS", self.queue_service.is_open())
                 self.queue_service.reset_queues()
                 self.send_map_analysis_request(
-                    patch_uuid,
+                    process_uuid,
                     map_requirement_id,
                     channel_id,
                     channel_name,
@@ -65,7 +65,7 @@ class SenderService:
         except pika.exceptions.StreamLostError:
             self.queue_service.reset_queues()
             self.send_map_analysis_request(
-                patch_uuid,
+                process_uuid,
                 map_requirement_id,
                 channel_id,
                 channel_name,
@@ -76,7 +76,7 @@ class SenderService:
     
     def send_map_patch_request(
             self,
-            patch_uuid,
+            process_uuid,
             channel_id,
             channel_name,
             author_id,
@@ -87,7 +87,7 @@ class SenderService:
             number_of_images
     ):
         body = json.dumps({
-            "patch_uuid": patch_uuid,
+            "process_uuid": process_uuid,
             "channel_id": channel_id,
             "channel_name": channel_name,
             "author_id": author_id,
@@ -105,7 +105,7 @@ class SenderService:
         except pika.exceptions.StreamLostError:
             self.queue_service.reset_queues()
             self.send_map_patch_request(
-                patch_uuid,
+                process_uuid,
                 channel_id,
                 channel_name,
                 author_id,
@@ -118,7 +118,7 @@ class SenderService:
     
     def send_turn_recognition_request(
             self,
-            patch_uuid: str,
+            process_uuid: str,
             turn_requirement_id: str,
             channel_id: int,
             channel_name: str,
@@ -127,7 +127,7 @@ class SenderService:
             filename: str
     ):
         body = json.dumps({
-            "patch_uuid": patch_uuid,
+            "process_uuid": process_uuid,
             "turn_requirement_id": turn_requirement_id,
             "channel_id": channel_id,
             "channel_name": channel_name,
@@ -142,7 +142,7 @@ class SenderService:
                 print("CONNECTION STATUS", self.queue_service.is_open())
                 self.queue_service.reset_queues()
                 self.send_map_analysis_request(
-                    patch_uuid,
+                    process_uuid,
                     turn_requirement_id,
                     channel_id,
                     channel_name,
@@ -153,7 +153,7 @@ class SenderService:
         except pika.exceptions.StreamLostError:
             self.queue_service.reset_queues()
             self.send_map_analysis_request(
-                patch_uuid,
+                process_uuid,
                 turn_requirement_id,
                 channel_id,
                 channel_name,

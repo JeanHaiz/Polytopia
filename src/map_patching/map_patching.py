@@ -24,7 +24,7 @@ database_client = get_database_client()
 
 
 def generate_patched_map_bis(
-        patch_uuid: str,
+        process_uuid: str,
         channel_id: int,
         channel_name: str,
         author_id: int,
@@ -53,15 +53,15 @@ def generate_patched_map_bis(
     logger.debug("files_log %s" % str(files))
     
     for i, filename_i in enumerate(files):
-        database_client.add_patching_process_input(patch_uuid, filename_i, i)
+        database_client.add_patching_process_input(process_uuid, filename_i, i)
     
     output_file_path, filename = patch_processed_images(
         files, map_size, guild_id, channel_id, channel_name,
         interaction_id, author_id, author_name, action_debug)
     
-    database_client.update_process_output_filename(patch_uuid, filename)
+    database_client.update_process_output_filename(process_uuid, filename)
     
-    callback(patch_uuid, channel_id, filename)
+    callback(process_uuid, channel_id, filename)
 
 
 def patch_processed_images(

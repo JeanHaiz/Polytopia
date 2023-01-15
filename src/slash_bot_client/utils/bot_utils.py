@@ -87,7 +87,9 @@ class BotUtils:
             bot_http_client: HTTPClient
     ):
         async def initial_condition(inner_ctx: CommandContext):
-            if database_client.get_game_map_size(inner_ctx.channel_id) is not None:
+            map_size = database_client.get_game_map_size(inner_ctx.channel_id)
+            print("MAP SIZE", map_size, type(map_size), flush=True)
+            if map_size is None or map_size == "" or map_size not in [121, 196, 256, 324, 400]:
                 await inner_ctx.send("Please set the channel map size with the 'activate' slash command")
                 return False
             else:
@@ -109,7 +111,7 @@ class BotUtils:
             operation: ImageOp,
             end_action: Callable[[CommandContext, HTTPClient, Channel, Any], Coroutine[Any, Any, None]]
     ):
-        if initial_condition:
+        if await initial_condition(ctx):
             # Fulfilling precondition: Game setup
             channel_info = database_client.get_channel_info(ctx.channel_id)
             channel = await ctx.get_channel()
@@ -240,14 +242,14 @@ class BotUtils:
     ):
         database_client.update_channel(channel.id, channel.name)
         
-        patch_uuid = database_client.add_operation_process(
+        process_uuid = database_client.add_operation_process(
             ctx.channel_id,
             ctx.author.id,
             ctx.id,
             ProcessType.MAP_PATCHING
         )
         
-        cxs.put(patch_uuid, ctx)
+        cxs.put(process_uuid, ctx)
         
         requirements = []
         
@@ -265,7 +267,7 @@ class BotUtils:
             
             requirements_i = await self.register_process_inputs(
                 lambda i: self.__download_attachment(channel, message_id, resource_number, bot_http_client),
-                patch_uuid,
+                process_uuid,
                 channel,
                 message_id,
                 resource_number
@@ -281,15 +283,15 @@ class BotUtils:
             print("Patching requirements", requirements, flush=True)
         
         if len(requirements) == 0:
-            database_client.update_process_status(patch_uuid, "NO-IMAGE")
+            database_client.update_process_status(process_uuid, "NO-IMAGE")
             await ctx.send("No map added. Please add maps to create a collage.")
         elif len(requirements) == 2:
-            database_client.update_process_status(patch_uuid, "ONE-IMAGE")
+            database_client.update_process_status(process_uuid, "ONE-IMAGE")
             await ctx.send("Found one map only. Please add a second map to create a collage.")
         else:
             for requirement_i in requirements:
                 await self.send_map_analysis_requirement(
-                    patch_uuid,
+                    process_uuid,
                     requirement_i[0],
                     requirement_i[1],
                     requirement_i[2],
@@ -299,7 +301,7 @@ class BotUtils:
     @staticmethod
     async def register_process_inputs(
             download_fct: Callable[[int], Coroutine[Any, Any, BytesIO]],
-            patch_uuid: str,
+            process_uuid: str,
             channel: Channel,
             message_id: int,
             resource_number: int
@@ -322,14 +324,14 @@ class BotUtils:
         requirements = []
         
         turn_requirement_id = database_client.add_patching_process_requirement(
-            patch_uuid,
+            process_uuid,
             filename,
             "TURN"
         )
         requirements.append((message_id, resource_number, turn_requirement_id, "TURN"))
         
         map_requirement_id = database_client.add_patching_process_requirement(
-            patch_uuid,
+            process_uuid,
             filename,
             "MAP"
         )
@@ -339,7 +341,7 @@ class BotUtils:
     
     async def send_map_analysis_requirement(
             self,
-            patch_uuid: str,
+            process_uuid: str,
             message_id: int,
             resource_number: int,
             requirement_id: str,
@@ -347,14 +349,14 @@ class BotUtils:
     ):
         if requirement_type == "TURN":
             await self.header_footer_recognition_interface.get_or_recognise_turn(
-                patch_uuid,
+                process_uuid,
                 requirement_id,
                 message_id,
                 resource_number
             )
         elif requirement_type == "MAP":
             await self.map_analysis_interface.get_or_analyse_map(
-                patch_uuid,
+                process_uuid,
                 requirement_id,
                 message_id,
                 resource_number
@@ -600,7 +602,7 @@ class BotUtils:
                     await ctx.send(message)
             else:
                 for incomplete_run in incomplete_channel_list:
-                    print(incomplete_run["patch_uuid"], incomplete_run)
+                    print(incomplete_run["process_uuid"], incomplete_run)
                     channel = await get(client, Channel, object_id=incomplete_run["channel_discord_id"])
                     await self.patch_images(ctx, client._http, channel, 3)
         else:
@@ -669,7 +671,7 @@ class BotUtils:
                 logger.warning(trace)
                 bot_error_utils.error_callback(
                     database_client,
-                    action_params["patch_uuid"],
+                    action_params["process_uuid"],
                     client
                 )
         

@@ -18,7 +18,7 @@ class MapAnalysisInterface:
     
     async def get_or_analyse_map(
             self,
-            patch_uuid: str,
+            process_uuid: str,
             map_requirement_id: str,
             message_id: int,
             resource_number: int
@@ -32,19 +32,19 @@ class MapAnalysisInterface:
         filename = str(resource["filename"])
         
         if DEBUG:
-            print("get or analyse map", patch_uuid, map_requirement_id, message_id, flush=True)
+            print("get or analyse map", process_uuid, map_requirement_id, message_id, flush=True)
             print("processed image", operation, ImageOp.MAP_PROCESSED_IMAGE.value,
                   operation == ImageOp.MAP_PROCESSED_IMAGE.value, flush=True)
             print("processed image", operation, ImageOp.MAP_INPUT.value, operation == ImageOp.MAP_INPUT.value,
                   flush=True)
         if operation == ImageOp.MAP_PROCESSED_IMAGE.value:
             self.bot_utils_callbacks.on_map_analysis_complete(
-                patch_uuid,
+                process_uuid,
                 map_requirement_id
             )
         elif operation == ImageOp.MAP_INPUT.value:
             self.sender_service.send_map_analysis_request(
-                patch_uuid,
+                process_uuid,
                 map_requirement_id,
                 channel_id,
                 channel_info["channel_name"],

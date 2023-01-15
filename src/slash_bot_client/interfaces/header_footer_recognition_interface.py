@@ -13,7 +13,7 @@ class HeaderFooterRecognitionInterface:
     
     async def get_or_recognise_turn(
             self,
-            patch_uuid: str,
+            process_uuid: str,
             turn_requirement_id: str,
             message_id: int,
             resource_number: int
@@ -23,7 +23,7 @@ class HeaderFooterRecognitionInterface:
         
         if header is None or header["turn_value"] is None:
             self.bot_utils_callbacks.on_turn_recognition_complete(
-                patch_uuid,
+                process_uuid,
                 turn_requirement_id
             )
         else:
@@ -31,7 +31,7 @@ class HeaderFooterRecognitionInterface:
             channel_info = database_client.get_channel_info(channel_id)
             
             self.sender_service.send_turn_recognition_request(
-                patch_uuid,
+                process_uuid,
                 turn_requirement_id,
                 channel_id,
                 channel_info["channel_name"],
