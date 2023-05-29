@@ -24,7 +24,11 @@ class Receiver:
             password: str,
             action_fct: Callable,
             error_fct: Union[Callable[[str, str], None], Callable[[str, str, str], None]],
-            callback_function: Union[Callable[[str, str], None], Callable[[str, str, str], None]],
+            callback_function: Union[
+                Callable[[str, str], None],
+                Callable[[str, str, str], None],
+                Callable[[str, int, str], None]
+            ],
             expected_exception: Type,
             param_keys: List[str]
     ):
@@ -107,10 +111,18 @@ class Receiver:
             thrds.append(t)
     
     def run(self):
-        url = f"""amqp://{self.username}:{self.password}@rabbitmq:5672/vhost"""
+        # url = f"""amqp://{self.username}:{self.password}@rabbitmq:5672/vhost"""
+        # params = pika.URLParameters(url)
+        # params.socket_timeout = 5
         
-        params = pika.URLParameters(url)
-        params.socket_timeout = 5
+        params = pika.ConnectionParameters(
+            host='rabbitmq',
+            virtual_host="vhost",
+            credentials=pika.credentials.PlainCredentials(self.username, self.password),
+            heartbeat=0,
+            port=5672,
+            socket_timeout=5
+        )
         
         connection = pika.BlockingConnection(params)
         

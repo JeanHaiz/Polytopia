@@ -1,7 +1,7 @@
 import sys
 
-from score_recognition import score_recognition_utils
-from score_recognition.score_recognition_error import RecognitionException
+from score_visualisation import score_visualisation
+from score_visualisation.score_visualisation_error import VisualisationException
 
 from common import sender_utils
 from common import receiver_utils
@@ -9,8 +9,8 @@ from common import receiver_utils
 try:
     sender = sender_utils.Sender(
         "bot_client",
-        "score_recognition",
-        "score_recognition123"
+        "score_visualisation",
+        "score_visualisation123"
     )
     
     
@@ -20,7 +20,7 @@ try:
     ) -> None:
         sender.send_message(
             {
-                "action": "SCORE_RECOGNITION_ERROR",
+                "action": "SCORE_VISUALISATION_ERROR",
                 "process_uuid": process_uuid,
                 "error": error
             }
@@ -29,26 +29,27 @@ try:
     
     def callback_function(
             process_uuid: str,
-            channel_id: int,
-            score_requirement_id: str
+            channel_id: str,
+            filename: str
     ) -> None:
         sender.send_message(
             {
-                "action": "SCORE_RECOGNITION_COMPLETE",
+                "action": "SCORE_VISUALISATION_COMPLETE",
                 "process_uuid": process_uuid,
                 "channel_id": channel_id,
-                "score_requirement_id": score_requirement_id
+                "filename": filename
             }
         )
     
+    
     receiver = receiver_utils.Receiver(
-        "score_recognition",
-        "score_recognition",
-        "score_recognition123",
-        score_recognition_utils.score_recognition_request,
+        "score_visualisation",
+        "score_visualisation",
+        "score_visualisation123",
+        score_visualisation.plot_scores,
         error_function,
         callback_function,
-        RecognitionException,
+        VisualisationException,
         ["process_uuid"]
     )
     receiver.run()

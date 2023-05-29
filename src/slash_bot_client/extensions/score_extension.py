@@ -77,6 +77,48 @@ class ScoreExtension(interactions.Extension):
         )
 
     @interactions.extension_command(
+        name="turn",
+        description="Set game turn for the score or map analysis",
+        options=[
+            interactions.Option(
+                name="turn",
+                description="Turn to be saved",
+                type=interactions.OptionType.INTEGER,
+                required=True,
+            ),
+        ]
+    )
+    async def set_channel_turn(self, ctx: CommandContext, turn: int) -> None:
+        logger.info("TURN - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+    
+        await bot_error_utils.wrap_slash_errors(
+            ctx,
+            self.client,
+            lambda: self.bot_utils.set_new_last_turn(ctx, turn)
+        )
+
+    @interactions.extension_command(
+        name="drop-score",
+        description="Drop score for a specific turn",
+        options=[
+            interactions.Option(
+                name="turn",
+                description="Turn for which score are drop",
+                type=interactions.OptionType.INTEGER,
+                required=True,
+            ),
+        ]
+    )
+    async def set_channel_turn(self, ctx: CommandContext, turn: int) -> None:
+        logger.info("DROP SCORES - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
+    
+        await bot_error_utils.wrap_slash_errors(
+            ctx,
+            self.client,
+            lambda: self.bot_utils.drop_scores(ctx, turn)
+        )
+
+    @interactions.extension_command(
         name="Add score",
         type=ApplicationCommandType.MESSAGE
     )

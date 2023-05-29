@@ -48,6 +48,8 @@ services:
             - map_patching
             - map_analysis
             - header_footer_recognition
+            - score_visualisation
+            - score_recognition
             # kibana:
             #     condition: service_healthy
         build:
@@ -124,6 +126,50 @@ services:
         restart: "unless-stopped"
         platform: ${PLATFORM:-linux/amd64}
         container_name: header_footer_recognition
+        volumes:
+            - /Users/jean/Documents/Coding/Polytopia/src:/app
+        env_file:
+            - .env
+            - .env.dev
+        deploy:
+            resources:
+                limits:
+                    memory: 200m
+        networks:
+            - database
+
+    score_recognition:
+        depends_on:
+            - database
+            - rabbitmq
+        build:
+            context: "/Users/jean/Documents/Coding/Polytopia/src/"
+            dockerfile: score_recognition/Dockerfile
+        restart: "unless-stopped"
+        platform: ${PLATFORM:-linux/amd64}
+        container_name: score_recognition
+        volumes:
+            - /Users/jean/Documents/Coding/Polytopia/src:/app
+        env_file:
+            - .env
+            - .env.dev
+        deploy:
+            resources:
+                limits:
+                    memory: 200m
+        networks:
+            - database
+
+    score_visualisation:
+        depends_on:
+            - database
+            - rabbitmq
+        build:
+            context: "/Users/jean/Documents/Coding/Polytopia/src/"
+            dockerfile: score_visualisation/Dockerfile
+        restart: "unless-stopped"
+        platform: ${PLATFORM:-linux/amd64}
+        container_name: score_visualisation
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/src:/app
         env_file:

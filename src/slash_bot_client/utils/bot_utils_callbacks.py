@@ -1,10 +1,14 @@
 import os
 import re
 
+import numpy as np
+import pandas as pd
+
 from typing import List
 from typing import Tuple
 from typing import Optional
 
+from interactions import Embed
 from interactions import File
 from interactions import Channel
 from interactions import Client
@@ -15,6 +19,7 @@ from slash_bot_client.utils import bot_error_utils
 from common.image_operation import ImageOp
 from database.database_client import get_database_client
 from slash_bot_client.interfaces.map_patching_interface import MapPatchingInterface
+from slash_bot_client.interfaces.score_visualisation_interface import ScoreVisualisationInterface
 from common.error_utils import MapPatchingErrors
 
 DEBUG = os.getenv("POLYTOPIA_DEBUG", 0)
@@ -23,8 +28,13 @@ database_client = get_database_client()
 
 class BotUtilsCallbacks:
     
-    def __init__(self, map_patching_interface: MapPatchingInterface):
+    def __init__(
+            self,
+            map_patching_interface: MapPatchingInterface,
+            score_visualisation_interface: ScoreVisualisationInterface
+    ):
         self.map_patching_interface = map_patching_interface
+        self.score_visualisation_interface = score_visualisation_interface
     
     async def on_analysis_error(
             self,
@@ -52,6 +62,14 @@ class BotUtilsCallbacks:
     ):
         await self.__on_error(process_uuid, turn_requirement_id, client, error)
     
+    async def on_visualisation_error(
+            self,
+            process_uuid: str,
+            client: Client,
+            error: str
+    ):
+        await self.__on_error(process_uuid, None, client, error)
+
     @staticmethod
     async def __on_error(
             process_uuid: str,
@@ -101,7 +119,7 @@ class BotUtilsCallbacks:
         if DEBUG:
             print("complete analysis", process_uuid, map_requirement_id, flush=True)
         
-        if self.__check_patching_complete(process_uuid):
+        if self.__check_process_requirements_complete(process_uuid):
             if DEBUG:
                 print("sending patching request")
             
@@ -150,7 +168,113 @@ class BotUtilsCallbacks:
             fh.close()
         
         await bot_error_utils.manage_slash_patching_errors(database_client, channel, channel, patching_errors)
+
+    def __print_scores(self, scores: pd.DataFrame):
+        scores = self.__augment_scores(scores)
+        return self.__pretty_print_scores(scores)
+        # return augment_scores(scores).to_string(index=False)
+
+    @staticmethod
+    def __pretty_print_scores(scores_raw):
+        # print(scores)
+        scores = scores_raw.drop(columns="score_uuid")
+        score_list = scores.to_numpy().tolist()
+        player_width = np.max([len(d) if type(d) == str else 0 for data in score_list for d in data])
+        print("player_width", player_width)
     
+        def width(i):
+            return player_width if i == 0 else 5
+    
+        def align(i, item):
+            if i == 0:
+                if item is None:
+                    item = "  ?"
+                return item.ljust(width(i), ' ')
+            else:
+                return str(item).rjust(width(i), ' ')
+    
+        scores.sort_values(by="turn")
+    
+        header = ['Player', 'Turn', 'Score', 'Delta']
+        s = ['   '.join([str(item).ljust(width(i), ' ') for i, item in enumerate(header)])]
+    
+        for data in score_list:
+            s.append('   '.join([align(i, item) for i, item in enumerate(data)]))
+        d = '```' + '\n'.join(s) + '```'
+        return d
+
+    def __print_player_scores(self, scores: pd.DataFrame, player):
+        scores = self.__augment_scores(scores)
+        player_scores = scores[scores['polytopia_player_name'] == player]
+        return self.__pretty_print_scores(player_scores)
+
+    @staticmethod
+    def __augment_scores(scores: pd.DataFrame):
+        for player in scores['polytopia_player_name'].drop_duplicates():
+            player_scores = scores[scores['polytopia_player_name'] == player]
+            player_scores.sort_values(by="turn", ascending=False)
+            scores.loc[scores['polytopia_player_name'] == player, "delta"] = player_scores["score"].diff()
+        # scores.delta = pd.to_numeric(scores.delta, errors='coerce')
+        return scores
+    
+    async def on_player_score_request(self, channel, player):
+        scores = database_client.get_channel_scores(channel.id)
+        if scores is not None and len(scores[scores['turn'] != -1]) > 0:
+            if player is not None and player not in scores["polytopia_player_name"].unique():
+                players = scores["polytopia_player_name"].unique()
+                await channel.send("Player %s not recognised. Available players: %s" % (str(player), str(players)))
+            else:
+                score_text = self.__print_player_scores(scores, player)
+                embed = Embed(title='%s scores' % str(player), description=score_text)
+                await channel.send(embeds=embed)
+        else:
+            await channel.send("No score found for player %s" % str(player))
+
+    async def on_score_visualisation_complete(
+            self,
+            client: Client,
+            process_uuid: str,
+            channel_id: int,
+            filename: str
+    ) -> None:
+        if DEBUG:
+            print("Done visualisation, callback completed", process_uuid, flush=True)
+
+        scores: pd.DataFrame = database_client.get_channel_scores(channel_id)
+        
+        channel = await get(client, Channel, object_id=channel_id)
+        channel_info = database_client.get_channel_info(channel_id)
+
+        patch_path = image_utils.get_file_path(
+            channel_info["channel_name"],
+            ImageOp.SCORE_PLT,
+            filename
+        )
+
+        # patching_errors = self.get_patching_errors(process_uuid)
+
+        if DEBUG:
+            # print("patching errors", patching_errors, flush=True)
+            print("channel", channel, flush=True)
+            
+        with open(patch_path, "rb") as fh:
+            attachment = File(fp=fh, filename=filename + ".png")
+    
+            if attachment is not None:
+                await channel.send(files=attachment, content="Score visualisation")
+                database_client.update_process_status(process_uuid, "DONE")
+            else:
+                # patching_errors.append((MapPatchingErrors.ATTACHMENT_NOT_LOADED, None))
+                print("attachment is none")
+            fh.close()
+
+        score_text = self.__print_scores(scores)
+        
+        print("score text", score_text)
+        # await ctx.send(score_text)
+        embed = Embed(title='Game scores', description=score_text)
+        await channel.send(embeds=embed)
+        
     @staticmethod
     def get_patching_errors(
             process_uuid: str
@@ -174,11 +298,32 @@ class BotUtilsCallbacks:
             turn_requirement_id
         )
         
-        if self.__check_patching_complete(process_uuid):
+        if self.__check_process_requirements_complete(process_uuid):
             self.map_patching_interface.send_map_patching_request(process_uuid, number_of_images=None)
+
+    def on_score_recognition_complete(
+            self,
+            process_uuid: str,
+            score_requirement_id: str,
+            channel_id: int
+    ):
+        database_client.complete_patching_process_requirement(
+            score_requirement_id
+        )
     
+        if self.__check_process_requirements_complete(process_uuid):
+            process = database_client.get_process(process_uuid)
+            channel = database_client.get_channel_info(channel_id)
+        
+            self.score_visualisation_interface.get_or_visualise_scores(
+                process_uuid,
+                process["process_author_discord_id"],
+                channel_id,
+                channel["channel_name"]
+            )
+
     @staticmethod
-    def __check_patching_complete(process_uuid: str):
+    def __check_process_requirements_complete(process_uuid: str):
         requirements = database_client.get_patching_process_requirement(process_uuid)
         all_requirement_check = all([r["complete"] for r in requirements])
         

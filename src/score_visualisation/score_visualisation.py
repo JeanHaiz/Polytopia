@@ -3,20 +3,25 @@ import os
 import numpy as np
 import pandas as pd
 
+from typing import Callable
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.axisartist.axislines import SubplotZero
 
 from common import image_utils
-from database.database_client import DatabaseClient
+from database.database_client import get_database_client
+
+database_client = get_database_client()
 
 
 def plot_scores(
-        database_client: DatabaseClient,
-        scores: pd.DataFrame,
-        channel_id: str,
+        process_uuid: str,
+        channel_id: int,
         channel_name: str,
-        author_id: str):
-
+        author_id: str,
+        callback: Callable[[str, int, str], None]
+):
+    scores: pd.DataFrame = database_client.get_channel_scores(channel_id)
     filename = database_client.add_visualisation(channel_id, author_id)
     database_client.add_visualisation_scores(filename, scores)
 
@@ -53,29 +58,14 @@ def plot_scores(
 
     plt.savefig(filepath)
     # plt.show()
-    return filepath, filename
+    # return filepath, filename
+
+    callback(
+        process_uuid,
+        channel_id,
+        filename
+    )
     # return image_utils.load_attachment(file_path, "Score visualisation")
-
-
-def augment_scores(scores: pd.DataFrame):
-    for player in scores['polytopia_player_name'].drop_duplicates():
-        player_scores = scores[scores['polytopia_player_name'] == player]
-        player_scores.sort_values(by="turn", ascending=False)
-        scores.loc[scores['polytopia_player_name'] == player, "delta"] = player_scores["score"].diff()
-    # scores.delta = pd.to_numeric(scores.delta, errors='coerce')
-    return scores
-
-
-def print_scores(scores: pd.DataFrame):
-    scores = augment_scores(scores)
-    return __print_scores(scores)
-    # return augment_scores(scores).to_string(index=False)
-
-
-def print_player_scores(scores: pd.DataFrame, player):
-    scores = augment_scores(scores)
-    player_scores = scores[scores['polytopia_player_name'] == player]
-    return __print_scores(player_scores)
 
 
 def __print_scores(scores):

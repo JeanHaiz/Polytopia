@@ -7,16 +7,16 @@ FROM localhost:5000/polyhelper-base:latest
 WORKDIR /app
 
 # Copy the current directory contents into the container at /app
-ADD ./map_analysis /app/map_analysis
+ADD ./score_visualisation /app/score_visualisation
 ADD ./database /app/database
 ADD ./common /app/common
-ADD map_analysis_main.py map_analysis_main.py
+ADD score_visualisation_main.py score_visualisation_main.py
 
 RUN apt-get update
 RUN apt-get install gcc ffmpeg libsm6 libxext6 libpq-dev python3.9-dev -y
 
 # Install any needed packages specified in requirements.txt
-COPY ./map_analysis/requirements.txt requirements.txt
+COPY ./score_visualisation/requirements.txt requirements.txt
 
 # RUN pip3 install --upgrade pip
 RUN pip3 install -r requirements.txt
@@ -25,4 +25,4 @@ RUN pip3 install -r requirements.txt
 # ENV NAME World
 
 # Run slash_bot_main.py when the container launches
-CMD ["python", "map_analysis_main.py"]
+CMD ["python", "score_visualisation_main.py"]

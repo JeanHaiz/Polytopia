@@ -33,7 +33,8 @@ from slash_bot_client.utils.bot_utils_callbacks import BotUtilsCallbacks
 from slash_bot_client.interfaces.map_analysis_interface import MapAnalysisInterface
 from slash_bot_client.interfaces.map_patching_interface import MapPatchingInterface
 from slash_bot_client.interfaces.header_footer_recognition_interface import HeaderFooterRecognitionInterface
-from slash_bot_client.interfaces import score_recognition_interface
+from slash_bot_client.interfaces.score_recognition_interface import ScoreRecognitionInterface
+from slash_bot_client.interfaces.score_visualisation_interface import ScoreVisualisationInterface
 from slash_bot_client.queue_services.queue_service import QueueService
 from slash_bot_client.queue_services.sender_service import SenderService
 from slash_bot_client.queue_services.receiver_service import RabbitmqReceive
@@ -60,9 +61,13 @@ class BotUtils:
         
         self.map_patching_interface = MapPatchingInterface(self.sender_service)
         
-        self.bot_utils_callbacks = BotUtilsCallbacks(self.map_patching_interface)
+        self.score_visualisation_interface = ScoreVisualisationInterface(self.sender_service)
+        
+        self.bot_utils_callbacks = BotUtilsCallbacks(self.map_patching_interface, self.score_visualisation_interface)
         
         self.map_analysis_interface = MapAnalysisInterface(self.sender_service, self.bot_utils_callbacks)
+        
+        self.score_recognition_interface = ScoreRecognitionInterface(self.sender_service)
         
         self.header_footer_recognition_interface = HeaderFooterRecognitionInterface(
             self.sender_service,
@@ -160,7 +165,13 @@ class BotUtils:
             bot_http_client: HTTPClient
     ):
         async def initial_condition(_: CommandContext):
-            return True
+            turn = database_client.get_last_turn(ctx.channel_id)
+            print("TURN", turn, type(turn), flush=True)
+            if turn is None or turn == -1:
+                await ctx.send("Please set the channel current with the 'turn' slash command")
+                return False
+            else:
+                return True
         
         await self.__add_image_and_run(
             ctx,
@@ -169,7 +180,7 @@ class BotUtils:
             ImageOp.SCORE_INPUT,
             self.gather_scores
         )
-    
+
     async def gather_scores(
             self,
             ctx: CommandContext,
@@ -205,7 +216,8 @@ class BotUtils:
                 process_uuid,
                 channel,
                 message_id,
-                resource_number
+                resource_number,
+                "SCORE"
             )
             
             requirements.extend(requirements_i)
@@ -215,17 +227,14 @@ class BotUtils:
                     break
         
         if DEBUG:
-            print("Patching requirements", requirements, flush=True)
+            print("Score recognition requirements", requirements, flush=True)
         
         if len(requirements) == 0:
             database_client.update_process_status(process_uuid, "NO-IMAGE")
             await ctx.send("No map added. Please add maps to create a collage.")
-        elif len(requirements) == 2:
-            database_client.update_process_status(process_uuid, "ONE-IMAGE")
-            await ctx.send("Found one map only. Please add a second map to create a collage.")
         else:
             for requirement_i in requirements:
-                await self.send_map_analysis_requirement(
+                await self.send_score_recognition_requirement(
                     process_uuid,
                     requirement_i[0],
                     requirement_i[1],
@@ -270,7 +279,8 @@ class BotUtils:
                 process_uuid,
                 channel,
                 message_id,
-                resource_number
+                resource_number,
+                "MAP"
             )
             
             requirements.extend(requirements_i)
@@ -304,7 +314,8 @@ class BotUtils:
             process_uuid: str,
             channel: Channel,
             message_id: int,
-            resource_number: int
+            resource_number: int,
+            requirement_type: str
     ) -> List[Tuple[int, int, str, str]]:
         resource = database_client.get_resource(message_id, resource_number)
         filename = str(resource["filename"])
@@ -323,19 +334,30 @@ class BotUtils:
         
         requirements = []
         
-        turn_requirement_id = database_client.add_patching_process_requirement(
-            process_uuid,
-            filename,
-            "TURN"
-        )
-        requirements.append((message_id, resource_number, turn_requirement_id, "TURN"))
+        if requirement_type == "MAP":
         
-        map_requirement_id = database_client.add_patching_process_requirement(
-            process_uuid,
-            filename,
-            "MAP"
-        )
-        requirements.append((message_id, resource_number, map_requirement_id, "MAP"))
+            turn_requirement_id = database_client.add_patching_process_requirement(
+                process_uuid,
+                filename,
+                "TURN"
+            )
+            requirements.append((message_id, resource_number, turn_requirement_id, "TURN"))
+            
+            map_requirement_id = database_client.add_patching_process_requirement(
+                process_uuid,
+                filename,
+                "MAP"
+            )
+            requirements.append((message_id, resource_number, map_requirement_id, "MAP"))
+        
+        elif requirement_type == "SCORE":
+    
+            map_requirement_id = database_client.add_patching_process_requirement(
+                process_uuid,
+                filename,
+                "SCORE"
+            )
+            requirements.append((message_id, resource_number, map_requirement_id, "SCORE"))
         
         return requirements
     
@@ -361,6 +383,22 @@ class BotUtils:
                 message_id,
                 resource_number
             )
+            
+    async def send_score_recognition_requirement(
+            self,
+            process_uuid: str,
+            message_id: int,
+            resource_number: int,
+            requirement_id: str,
+            author_name: str
+    ):
+        await self.score_recognition_interface.get_or_recognise_score(
+            process_uuid,
+            requirement_id,
+            author_name,
+            message_id,
+            resource_number
+        )
     
     async def force_analyse_map_and_patch(
             self,
@@ -509,17 +547,30 @@ class BotUtils:
         else:
             await ctx.send('There was an error. <@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
     
-    @staticmethod
-    async def get_channel_player_score(ctx: CommandContext, player: str):
+    async def get_channel_player_score(self, ctx: CommandContext, player: str):
+        message = await ctx.send("Loading")
+
+        channel = await ctx.get_channel()
+        
         if player is None:
-            await score_recognition_interface.get_scores(
-                database_client,
-                ctx
+    
+            process_uuid = database_client.add_operation_process(
+                ctx.channel_id,
+                ctx.author.id,
+                ctx.id,
+                ProcessType.SCORE_VISUALISATION
             )
+            
+            self.score_visualisation_interface.get_or_visualise_scores(
+                process_uuid,
+                int(ctx.author.id),
+                int(channel.id),
+                channel.name
+            )
+
         else:
-            await score_recognition_interface.get_player_scores(
-                database_client,
-                ctx,
+            await self.bot_utils_callbacks.on_player_score_request(
+                channel,
                 player
             )
     
@@ -633,6 +684,16 @@ class BotUtils:
                     )
                 elif action == "TURN_RECOGNITION_COMPLETE":
                     self.bot_utils_callbacks.on_turn_recognition_complete(**action_params)
+                elif action == "SCORE_RECOGNITION_COMPLETE":
+                    self.bot_utils_callbacks.on_score_recognition_complete(**action_params)
+                elif action == "SCORE_VISUALISATION_COMPLETE":
+                    asyncio.run_coroutine_threadsafe(
+                        self.bot_utils_callbacks.on_score_visualisation_complete(
+                            **action_params,
+                            client=client
+                        ),
+                        loop
+                    )
                 elif action == "MAP_ANALYSIS_ERROR":
                     asyncio.run_coroutine_threadsafe(
                         self.bot_utils_callbacks.on_analysis_error(
@@ -652,6 +713,14 @@ class BotUtils:
                 elif action == "MAP_PATCHING_ERROR":
                     asyncio.run_coroutine_threadsafe(
                         self.bot_utils_callbacks.on_patching_error(
+                            **action_params,
+                            client=client
+                        ),
+                        loop
+                    )
+                elif action == "SCORE_VISUALISATION_ERROR":
+                    asyncio.run_coroutine_threadsafe(
+                        self.bot_utils_callbacks.on_visualisation_error(
                             **action_params,
                             client=client
                         ),
@@ -682,3 +751,17 @@ class BotUtils:
         rabbit_receive = RabbitmqReceive(queue_name, action_reaction_request)
         rabbit_receive.start()
         print("Slash bot message queue listener is running", flush=True)
+
+    @staticmethod
+    async def set_new_last_turn(ctx: CommandContext, turn: int):
+        
+        database_client.add_player_n_game(ctx.channel_id, ctx.guild_id, ctx.author.id, ctx.author.name)
+        
+        database_client.set_new_last_turn(ctx.channel_id, turn)
+        
+        await ctx.send("New last turn set to %d" % turn)
+
+    @staticmethod
+    async def drop_scores(ctx, turn):
+        database_client.drop_score(ctx.channel_id, turn)
+        ctx.send("Done")

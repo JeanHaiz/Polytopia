@@ -12,8 +12,14 @@ DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 url = "amqp://guest:guest@rabbitmq/"
 queue_name = "bot_client"
 
-params = pika.URLParameters(url)
-params.socket_timeout = 5
+params = pika.ConnectionParameters(
+    host='rabbitmq',
+    virtual_host="vhost",
+    credentials=pika.credentials.PlainCredentials("guest", "guest"),
+    heartbeat=0,
+    port=5672,
+    socket_timeout=5
+)
 
 queue_channel = queue_utils.get_blocking_channel(params)
 connection = queue_channel.connection

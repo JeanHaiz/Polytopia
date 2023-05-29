@@ -5,18 +5,13 @@ from pika import exceptions
 
 from slash_bot_client.queue_services.queue_service import QueueService
 
-url = 'amqp://slash_bot:slash_bot123@rabbitmq:5672/vhost'
-
-params = pika.URLParameters(url)
-params.socket_timeout = 5
-
 
 class SenderService:
     
     def __init__(self, queue_service: QueueService):
         self.queue_service = queue_service
         self.__init_queues()
-
+    
     def __init_queues(self):
         queues = [
             "map_patching",
@@ -161,13 +156,23 @@ class SenderService:
                 resource_number,
                 filename
             )
-            
+    
     def send_score_recognition_request(
-        self,
-        # TODO complete
+            self,
+            process_uuid: str,
+            score_requirement_id: str,
+            channel_id: int,
+            channel_name: str,
+            author_name: str,
+            filename: str,
     ):
         body = json.dumps({
-            # TODO complete
+            "process_uuid": process_uuid,
+            "score_requirement_id": score_requirement_id,
+            "channel_id": channel_id,
+            "channel_name": channel_name,
+            "author_name": author_name,
+            "filename": filename
         })
         try:
             self.queue_service.send_message(
@@ -177,5 +182,37 @@ class SenderService:
         except pika.exceptions.StreamLostError:
             self.queue_service.reset_queues()
             self.send_score_recognition_request(
-                # TODO complete
+                process_uuid,
+                score_requirement_id,
+                channel_id,
+                channel_name,
+                author_name,
+                filename,
+            )
+
+    def send_score_visualisation_request(
+            self,
+            process_uuid: str,
+            channel_id: int,
+            channel_name: str,
+            author_id: int,
+    ):
+        body = json.dumps({
+            "process_uuid": process_uuid,
+            "channel_id": channel_id,
+            "channel_name": channel_name,
+            "author_id": author_id,
+        })
+        try:
+            self.queue_service.send_message(
+                queue_name="score_visualisation",
+                body=body
+            )
+        except pika.exceptions.StreamLostError:
+            self.queue_service.reset_queues()
+            self.send_score_visualisation_request(
+                process_uuid,
+                channel_id,
+                channel_name,
+                author_id,
             )

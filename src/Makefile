@@ -13,7 +13,7 @@ up:
 
 restart:
 	docker-compose up --detach rabbitmq database
-	docker-compose restart slash_bot map_patching map_analysis header_footer_recognition
+	docker-compose restart slash_bot map_patching map_analysis header_footer_recognition score_visualisation score_recognition
 
 bot: .docker-build-${BASE_VERSION} registry
 	docker-compose up --detach --build slash_bot

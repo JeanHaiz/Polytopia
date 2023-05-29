@@ -13,7 +13,7 @@ ADD ./common /app/common
 ADD score_recognition_main.py score_recognition_main.py
 
 RUN apt-get update
-RUN apt-get install gcc ffmpeg libsm6 libxext6 libpq-dev python3.9-dev -y
+RUN apt-get install gcc ffmpeg libsm6 libxext6 libpq-dev python3.9-dev tesseract-ocr -y
 
 # Install any needed packages specified in requirements.txt
 COPY ./score_recognition/requirements.txt requirements.txt

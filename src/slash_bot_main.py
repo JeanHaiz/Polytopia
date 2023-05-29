@@ -83,7 +83,7 @@ async def create_client():
         while alive:
             alive = await inner()
             if alive:
-                await asyncio.sleep(30)
+                await asyncio.sleep(60)
             else:
                 raise KeyboardInterrupt()
     

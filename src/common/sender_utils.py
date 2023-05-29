@@ -17,10 +17,19 @@ class Sender:
             username: str,
             password: str,
     ):
-        url = f"""amqp://{username}:{password}@rabbitmq/vhost"""
+        # url = f"""amqp://{username}:{password}@rabbitmq/vhost"""
         self.queue_name = queue_name
         
-        self.params = pika.URLParameters(url)
+        self.params = pika.ConnectionParameters(
+            host='rabbitmq',
+            virtual_host="vhost",
+            credentials=pika.credentials.PlainCredentials(username, password),
+            heartbeat=0,
+            port=5672,
+            socket_timeout=5
+        )
+        # pika.URLParameters(url)
+        
         self.params.socket_timeout = 5
         
         self.queue_channel = queue_utils.get_blocking_channel(self.params)
