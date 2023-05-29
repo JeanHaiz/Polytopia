@@ -83,7 +83,7 @@ services:
             dockerfile: worker/Dockerfile
         restart: "unless-stopped"
         platform: ${PLATFORM:-linux/amd64}
-        container_name: worker
+        container_name: worker-01
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/src:/app
         env_file:
@@ -105,7 +105,7 @@ services:
             dockerfile: worker/Dockerfile
         restart: "unless-stopped"
         platform: ${PLATFORM:-linux/amd64}
-        container_name: worker
+        container_name: worker-02
         volumes:
             - /Users/jean/Documents/Coding/Polytopia/src:/app
         env_file:
