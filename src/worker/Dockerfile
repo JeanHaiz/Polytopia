@@ -24,14 +24,11 @@ ADD worker_main.py worker_main.py
 # ADD map_analysis_main.py map_analysis_main.py
 # ADD turn_recognition_main.py turn_recognition_main.py
 
-RUN apt-get update
-RUN apt-get install gcc ffmpeg libsm6 libxext6 libpq-dev python3.9-dev tesseract-ocr -y
-
 # Install any needed packages specified in requirements.txt
-COPY ./worker/requirements.txt requirements.txt
+# COPY ./worker/requirements.txt requirements.txt
 
 # RUN pip3 install --upgrade pip
-RUN pip3 install -r requirements.txt
+# RUN pip3 install -r requirements.txt
 
 # Define environment variable
 # ENV NAME World
