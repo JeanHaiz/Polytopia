@@ -45,7 +45,8 @@ services:
         depends_on:
             - database
             - rabbitmq
-            - worker
+            - worker-01
+            - worker-02
             # - map_patching
             # - map_analysis
             #- header_footer_recognition
@@ -73,7 +74,29 @@ services:
         networks:
             - database
 
-    worker:
+    worker-01:
+        depends_on:
+            - database
+            - rabbitmq
+        build:
+            context: "/Users/jean/Documents/Coding/Polytopia/src/"
+            dockerfile: worker/Dockerfile
+        restart: "unless-stopped"
+        platform: ${PLATFORM:-linux/amd64}
+        container_name: worker
+        volumes:
+            - /Users/jean/Documents/Coding/Polytopia/src:/app
+        env_file:
+            - .env
+            - .env.dev
+        deploy:
+            resources:
+                limits:
+                    memory: 1G
+        networks:
+            - database
+
+    worker-02:
         depends_on:
             - database
             - rabbitmq

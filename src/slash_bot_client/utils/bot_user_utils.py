@@ -52,8 +52,7 @@ async def has_access(client: Client, ctx: CommandContext):
             return True
     
     if count >= limit:
-        if (datetime.datetime.now().year == 2023 and datetime.datetime.now().month <= 1) or \
-                datetime.datetime.now().year == 2022:  # TODO add trial period
+        if datetime.datetime.now().year == 2023 and datetime.datetime.now().month <= 7:  # TODO add trial period
             time_embed = interactions.Embed()
             time_embed.description = (
                     """You have passed your action limit for this month. \n""" +
