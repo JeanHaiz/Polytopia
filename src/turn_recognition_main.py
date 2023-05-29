@@ -14,7 +14,7 @@ try:
     )
     
     
-    def error_function(
+    def turn_recognition_error_function(
             process_uuid: str,
             turn_requirement_id: str,
             error: str
@@ -29,7 +29,7 @@ try:
         )
     
     
-    def callback_function(
+    def turn_recognition_callback_function(
             process_uuid: str,
             turn_requirement_id: str
     ) -> None:
@@ -41,14 +41,13 @@ try:
             }
         )
     
-    
     receiver = receiver_utils.Receiver(
         "header_footer_recognition",
         "header_footer_recognition",
         "header_footer_recognition123",
         header_footer_recognition.turn_recognition_request,
-        error_function,
-        callback_function,
+        turn_recognition_error_function,
+        turn_recognition_callback_function,
         HeaderFooterRecognitionException,
         ["process_uuid", "turn_requirement_id"]
     )

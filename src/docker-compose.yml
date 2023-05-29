@@ -45,11 +45,12 @@ services:
         depends_on:
             - database
             - rabbitmq
-            - map_patching
-            - map_analysis
-            - header_footer_recognition
-            - score_visualisation
-            - score_recognition
+            - worker
+            # - map_patching
+            # - map_analysis
+            #- header_footer_recognition
+            # - score_visualisation
+            # - score_recognition
             # kibana:
             #     condition: service_healthy
         build:
@@ -69,6 +70,28 @@ services:
             resources:
                 limits:
                     memory: 200m
+        networks:
+            - database
+
+    worker:
+        depends_on:
+            - database
+            - rabbitmq
+        build:
+            context: "/Users/jean/Documents/Coding/Polytopia/src/"
+            dockerfile: worker/Dockerfile
+        restart: "unless-stopped"
+        platform: ${PLATFORM:-linux/amd64}
+        container_name: worker
+        volumes:
+            - /Users/jean/Documents/Coding/Polytopia/src:/app
+        env_file:
+            - .env
+            - .env.dev
+        deploy:
+            resources:
+                limits:
+                    memory: 1G
         networks:
             - database
 

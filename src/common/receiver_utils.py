@@ -9,11 +9,27 @@ from typing import Callable
 from typing import Union
 from typing import List
 from typing import Type
+from typing import Dict
+
+from dataclasses import dataclass
 
 from common.logger_utils import logger
 
 DEBUG = int(os.getenv("POLYTOPIA_DEBUG", 0))
 
+
+@dataclass
+class ReceiverParams:
+    action_fct: Callable
+    error_fct: Union[Callable[[str, str], None], Callable[[str, str, str], None]]
+    callback_function: Union[
+        Callable[[str, str], None],
+        Callable[[str, str, str], None],
+        Callable[[str, int, str], None]
+    ]
+    expected_exception: Type
+    param_keys: List[str]
+    
 
 class Receiver:
     
@@ -22,36 +38,26 @@ class Receiver:
             queue_name: str,
             username: str,
             password: str,
-            action_fct: Callable,
-            error_fct: Union[Callable[[str, str], None], Callable[[str, str, str], None]],
-            callback_function: Union[
-                Callable[[str, str], None],
-                Callable[[str, str, str], None],
-                Callable[[str, int, str], None]
-            ],
-            expected_exception: Type,
-            param_keys: List[str]
+            receiver_params_dict: Dict[str, ReceiverParams]
     ):
         self.queue_name = queue_name
         self.username = username
         self.password = password
-        self.error_fct = error_fct
-        self.action_fct = action_fct
-        self.callback_function = callback_function
-        self.expected_exception = expected_exception
-        self.param_keys = param_keys
+        self.receiver_params_dict = receiver_params_dict
     
-    def perform_request(self, body):
+    def perform_request(self, body, action):
+        receiver_param = self.receiver_params_dict[action]
         # print("received analysis callback", flush=True)
         params = json.loads(body)
+        params.pop("action", "")
         try:
-            self.action_fct(**params, callback=self.callback_function)
-        except self.expected_exception as e:
+            receiver_param.action_fct(**params, callback=receiver_param.callback_function)
+        except receiver_param.expected_exception as e:
             if DEBUG:
                 print("Catching ERROR:", e.__class__.__name__ + ":", body)
                 logger.warning("Catching ERROR:", e.__class__.__name__ + ":", body)
             extracted_params = {
-                key: params[key] if key in params else None for key in self.param_keys
+                key: params[key] if key in params else None for key in receiver_param.param_keys
             }
             extracted_params["error"] = e.message
             if DEBUG:
@@ -60,12 +66,12 @@ class Receiver:
                 )
                 print("Detailed ERROR:", trace, flush=True)
                 logger.warning(trace)
-            self.error_fct(
+            receiver_param.error_fct(
                 **extracted_params
             )
         except BaseException as e:
             extracted_params = {
-                key: params[key] if key in params else None for key in self.param_keys
+                key: params[key] if key in params else None for key in receiver_param.param_keys
             }
             extracted_params["error"] = traceback.format_exc()
             trace = "Catching base exception ERROR:" + e.__class__.__name__ + " details:\n" + "\n".join(
@@ -73,7 +79,7 @@ class Receiver:
             )
             print(trace, flush=True)
             logger.warning(trace)
-            self.error_fct(
+            receiver_param.error_fct(
                 **extracted_params
             )
     
@@ -93,7 +99,9 @@ class Receiver:
         thread_id = threading.get_ident()
         print('Thread id: %s Delivery tag: %s Message body: %s' % (thread_id, delivery_tag, body), flush=True)
         
-        self.perform_request(body)
+        params = json.loads(body)
+        
+        self.perform_request(body, params["action"])
         
         cb = functools.partial(self.__ack_message, ch, delivery_tag)
         conn.add_callback_threadsafe(cb)

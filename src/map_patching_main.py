@@ -14,7 +14,7 @@ try:
     )
     
     
-    def error_function(
+    def map_patching_error_function(
             process_uuid: str,
             error: str
     ) -> None:
@@ -27,7 +27,7 @@ try:
         )
     
     
-    def callback_function(
+    def map_patching_callback_function(
             process_uuid: str,
             channel_id: str,
             filename: str
@@ -47,8 +47,8 @@ try:
         "map_patching",
         "map_patching123",
         map_patching.generate_patched_map_bis,
-        error_function,
-        callback_function,
+        map_patching_error_function,
+        map_patching_callback_function,
         PatchingException,
         ["process_uuid"]
     )

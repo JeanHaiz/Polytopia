@@ -14,7 +14,7 @@ try:
     )
     
     
-    def error_function(
+    def score_visualisation_error_function(
             process_uuid: str,
             error: str
     ) -> None:
@@ -27,7 +27,7 @@ try:
         )
     
     
-    def callback_function(
+    def score_visualisation_callback_function(
             process_uuid: str,
             channel_id: str,
             filename: str
@@ -47,8 +47,8 @@ try:
         "score_visualisation",
         "score_visualisation123",
         score_visualisation.plot_scores,
-        error_function,
-        callback_function,
+        score_visualisation_error_function,
+        score_visualisation_callback_function,
         VisualisationException,
         ["process_uuid"]
     )

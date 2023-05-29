@@ -14,11 +14,12 @@ class SenderService:
     
     def __init_queues(self):
         queues = [
-            "map_patching",
-            "map_analysis",
-            "score_recognition",
-            "score_visualisation",
-            "header_footer_recognition"
+            "worker"
+            # "map_patching",
+            # "map_analysis",
+            # "score_recognition",
+            # "score_visualisation",
+            # "header_footer_recognition"
         ]
         for queue_name in queues:
             self.queue_service.declare_queue(queue_name)
@@ -34,6 +35,7 @@ class SenderService:
             filename: str
     ):
         body = json.dumps({
+            "action": "MAP_ANALYSIS",
             "process_uuid": process_uuid,
             "map_requirement_id": map_requirement_id,
             "channel_id": channel_id,
@@ -44,7 +46,7 @@ class SenderService:
         })
         try:
             if self.queue_service.is_open():
-                self.queue_service.send_message("map_analysis", body)
+                self.queue_service.send_message("worker", body=body)
             else:
                 print("CONNECTION STATUS", self.queue_service.is_open())
                 self.queue_service.reset_queues()
@@ -82,6 +84,7 @@ class SenderService:
             number_of_images
     ):
         body = json.dumps({
+            "action": "MAP_PATCHING",
             "process_uuid": process_uuid,
             "channel_id": channel_id,
             "channel_name": channel_name,
@@ -93,10 +96,7 @@ class SenderService:
             "n_images": number_of_images
         })
         try:
-            self.queue_service.send_message(
-                queue_name="map_patching",
-                body=body
-            )
+            self.queue_service.send_message(queue_name="worker", body=body)
         except pika.exceptions.StreamLostError:
             self.queue_service.reset_queues()
             self.send_map_patch_request(
@@ -122,6 +122,7 @@ class SenderService:
             filename: str
     ):
         body = json.dumps({
+            "action": "TURN_RECOGNITION",
             "process_uuid": process_uuid,
             "turn_requirement_id": turn_requirement_id,
             "channel_id": channel_id,
@@ -132,7 +133,7 @@ class SenderService:
         })
         try:
             if self.queue_service.is_open():
-                self.queue_service.send_message("header_footer_recognition", body)
+                self.queue_service.send_message("worker", body=body)
             else:
                 print("CONNECTION STATUS", self.queue_service.is_open())
                 self.queue_service.reset_queues()
@@ -167,6 +168,7 @@ class SenderService:
             filename: str,
     ):
         body = json.dumps({
+            "action": "SCORE_RECOGNITION",
             "process_uuid": process_uuid,
             "score_requirement_id": score_requirement_id,
             "channel_id": channel_id,
@@ -175,10 +177,7 @@ class SenderService:
             "filename": filename
         })
         try:
-            self.queue_service.send_message(
-                queue_name="score_recognition",
-                body=body
-            )
+            self.queue_service.send_message(queue_name="worker", body=body)
         except pika.exceptions.StreamLostError:
             self.queue_service.reset_queues()
             self.send_score_recognition_request(
@@ -198,16 +197,14 @@ class SenderService:
             author_id: int,
     ):
         body = json.dumps({
+            "action": "SCORE_VISUALISATION",
             "process_uuid": process_uuid,
             "channel_id": channel_id,
             "channel_name": channel_name,
             "author_id": author_id,
         })
         try:
-            self.queue_service.send_message(
-                queue_name="score_visualisation",
-                body=body
-            )
+            self.queue_service.send_message(queue_name="worker", body=body)
         except pika.exceptions.StreamLostError:
             self.queue_service.reset_queues()
             self.send_score_visualisation_request(

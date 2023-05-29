@@ -14,7 +14,7 @@ try:
     )
     
     
-    def error_function(
+    def score_recognition_error_function(
             process_uuid: str,
             error: str
     ) -> None:
@@ -27,7 +27,7 @@ try:
         )
     
     
-    def callback_function(
+    def score_recognition_callback_function(
             process_uuid: str,
             channel_id: int,
             score_requirement_id: str
@@ -46,8 +46,8 @@ try:
         "score_recognition",
         "score_recognition123",
         score_recognition_utils.score_recognition_request,
-        error_function,
-        callback_function,
+        score_recognition_error_function,
+        score_recognition_callback_function,
         RecognitionException,
         ["process_uuid"]
     )

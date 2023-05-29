@@ -14,7 +14,7 @@ try:
     )
     
     
-    def error_function(
+    def map_analysis_error_function(
             process_uuid: str,
             map_requirement_id: str,
             error: str
@@ -29,7 +29,7 @@ try:
         )
     
     
-    def callback_function(
+    def map_analysis_callback_function(
             process_uuid: str,
             map_requirement_id: str
     ) -> None:
@@ -47,8 +47,8 @@ try:
         "map_analysis",
         "map_analysis123",
         map_analysis.map_analysis_request,
-        error_function,
-        callback_function,
+        map_analysis_error_function,
+        map_analysis_callback_function,
         AnalysisException,
         ["process_uuid", "map_requirement_id"]
     )
