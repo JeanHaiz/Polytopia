@@ -31,7 +31,7 @@ async def has_access(client: Client, ctx: CommandContext):
         embed = interactions.Embed()
         embed.description = (
                 """Your profile was not found on the poly helper guild.\n""" +
-                """To use the bot, please join the [poly helper discord server](https://discord.gg/6kk6nJnf)""")
+                """To use the bot, please join the [poly helper discord server](https://discord.gg/4TzqfZzM3f)""")
         await ctx.send(embeds=embed)
         return False
     
