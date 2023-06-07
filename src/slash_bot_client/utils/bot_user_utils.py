@@ -11,6 +11,8 @@ from common.image_operation import ImageOp
 from slash_bot_client.utils.bot_utils import DEBUG
 from slash_bot_client.utils.bot_utils import database_client
 
+admin_user_id = os.getenv("DISCORD_ADMIN_USER")
+
 
 async def has_access(client: Client, ctx: CommandContext):
     # general_channel = await get(client, Channel, object_id=int(os.getenv("DISCORD_ERROR_CHANNEL")))
@@ -37,12 +39,12 @@ async def has_access(client: Client, ctx: CommandContext):
     
     general_guild_member_roles = [(await general_guild.get_role(r)).name for r in member.roles]
     if os.getenv("DISCORD_PATREON_FERVENT") in general_guild_member_roles:  # fervent
-        limit = 15
+        limit = 80
     elif os.getenv("DISCORD_PATREON_HUSTLER") in general_guild_member_roles:  # hustler
-        limit = 50
+        limit = 1000
     else:
-        limit = 3
-        if count < limit:
+        limit = 30
+        if False:  # count < limit:
             embed = interactions.Embed()
             embed.description = (
                     f"""You have {limit - count - 1} actions remaining this month.\n""" +
@@ -52,23 +54,16 @@ async def has_access(client: Client, ctx: CommandContext):
             return True
     
     if count >= limit:
-        if datetime.datetime.now().year == 2023 and datetime.datetime.now().month <= 7:  # TODO add trial period
-            time_embed = interactions.Embed()
-            time_embed.description = (
-                    """You have passed your action limit for this month. \n""" +
-                    """Here is a free trial for the poly helper bot.\n""" +
-                    """For now, we're granting you unlimited actions.\n To support, """ +
-                    """please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper)."""
-            )
-            await ctx.send(embeds=time_embed)
-            return True
-        else:
-            embed = interactions.Embed()
-            embed.description = (
-                    """You have passed your action limit for this month.\n""" +
-                    """Please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper).""")
-            await ctx.send(embeds=embed)
-            return False
+        time_embed = interactions.Embed()
+        time_embed.description = (
+                """You have passed your action limit for this month. \n""" +
+                f"""Please send a message to <@{admin_user_id}> for more, he'll grant them :wink:""",
+                # """For now, we're granting you unlimited actions.\n To support, """ +
+                # """please visit the [Poly Helper Patreon](https://www.patreon.com/polytopiahelper)."""
+        )
+        await ctx.send(embeds=time_embed)
+        return False
+
     else:
         # count is below limit for known user, access granted
         return True
