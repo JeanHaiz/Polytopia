@@ -9,6 +9,7 @@ from typing import Optional
 from typing import Tuple
 from typing import Coroutine
 
+from interactions import AllowedMentions
 from interactions import Client
 from interactions import get
 
@@ -39,7 +40,8 @@ async def manage_slash_patching_errors(
                     if message is None:
                         error_text.append(error_utils.MAP_PATCHING_ERROR_MESSAGES[cause])
                     else:
-                        await message.reply(error_utils.MAP_PATCHING_ERROR_MESSAGES[cause])
+                        await message.reply(error_utils.MAP_PATCHING_ERROR_MESSAGES[cause],
+                                            allowed_mentions=AllowedMentions(replied_user=False))
         error_text.append('<@%s> has been notified.' % os.getenv("DISCORD_ADMIN_USER"))
         await ctx.send("\n".join(error_text))
 

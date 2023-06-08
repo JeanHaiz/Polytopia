@@ -13,6 +13,7 @@ from typing import Tuple
 from typing import Callable
 from typing import Coroutine
 
+from interactions import AllowedMentions
 from interactions import Channel
 from interactions import HTTPClient
 from interactions import Optional
@@ -607,7 +608,9 @@ class BotUtils:
         for i, m in enumerate(messages):
             try:
                 message = await channel.get_message(m['source_message_id'])
-                await message.reply("%s %d" % (ImageOp(m['operation']).name, i))
+                
+                await message.reply("%s %d" % (ImageOp(m['operation']).name, i),
+                                    allowed_mentions=AllowedMentions(replied_user=False))
             except BaseException as e:
                 print("ERROR", e, flush=True)
                 await ctx.send("Message not found: %d" % m['source_message_id'])
