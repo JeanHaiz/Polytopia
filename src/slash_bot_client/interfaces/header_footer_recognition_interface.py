@@ -21,7 +21,7 @@ class HeaderFooterRecognitionInterface:
         resource = database_client.get_resource(message_id, resource_number)
         header = database_client.get_filename_header(resource["filename"])
         
-        if header is None or header["turn_value"] is None:
+        if header is not None and header["turn_value"] is not None:
             self.bot_utils_callbacks.on_turn_recognition_complete(
                 process_uuid,
                 turn_requirement_id

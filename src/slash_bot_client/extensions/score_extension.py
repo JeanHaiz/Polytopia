@@ -109,7 +109,7 @@ class ScoreExtension(interactions.Extension):
             ),
         ]
     )
-    async def set_channel_turn(self, ctx: CommandContext, turn: int) -> None:
+    async def drop_scores(self, ctx: CommandContext, turn: int) -> None:
         logger.info("DROP SCORES - %d - %d" % (int(ctx.id), int(ctx.channel_id)))
     
         await bot_error_utils.wrap_slash_errors(
