@@ -678,7 +678,7 @@ def get_intersection(first_line: List[List[np.int32]], second_line: List[List[np
         return None
     x = int((h2 - h1) / (p1 - p2))
     y = int(p1 * x + h1)
-    if not (-2000 <= x <= 10000) or not (-2000 <= y <= 10000):
+    if not (-4000 <= x <= 14000) or not (-4000 <= y <= 14000):
         return None
     return x, y
 
