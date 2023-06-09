@@ -170,8 +170,8 @@ def match_full_clouds(
         min_val, max_val, min_loc, max_loc_raw = cv2.minMaxLoc(blur)
         
         max_loc = (
-            max_loc_raw[0] - int(hh / 2),
-            max_loc_raw[1] - int(ww / 2)
+            max_loc_raw[0] - int(ww / 2),
+            max_loc_raw[1] - int(hh / 2)
         )
         
         if max_val > threshold:
