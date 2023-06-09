@@ -91,6 +91,10 @@ def analyse_map(
         image_utils.save_image(alpha, channel_name, filename + "_mask", ImageOp.MAP_PROCESSED_IMAGE)
     if DEBUG or action_debug:
         print("image scale", scale, flush=True)
+        
+    ui_mask = remove_ui(map_image)
+
+    alpha = (alpha + ui_mask).clip(0, alpha.max())
     
     map_with_alpha = attach_alpha(map_image_no_alpha, alpha)
     scaled_image = scale_image(map_with_alpha, scale)
@@ -392,11 +396,28 @@ def match_template(template: np.ndarray, edges: np.ndarray) -> Tuple[np.ndarray,
     return masked_correlation_raw, mask, thresh
 
 
+def remove_ui(
+        image: np.ndarray
+) -> np.ndarray:
+    light_colour = (0, 0, 0)
+    dark_colour = (50, 50, 50)
+
+    mask = cv2.inRange(image, light_colour, dark_colour)
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    selected_contour = sorted([(c, cv2.contourArea(c)) for c in contours], key=lambda x: -x[1])
+    i = np.zeros_like(mask)
+    for c in selected_contour:
+        if c[1] > 1000:
+            i = cv2.drawContours(i, [c[0]], 0, (1, 1, 1), -1)
+    return i
+
+
 def get_scale(
         template: np.ndarray,
         channel_name: str,
         filename: str,
-        action_debug: bool) -> float:
+        action_debug: bool
+) -> float:
     edges = image_processing_utils.get_one_color_edges(template)
     
     correlation_raw, mask, thresh = match_template(template, edges)
