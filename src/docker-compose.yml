@@ -92,7 +92,7 @@ services:
         deploy:
             resources:
                 limits:
-                    memory: 1600M
+                    memory: 800M
         networks:
             - database
 
