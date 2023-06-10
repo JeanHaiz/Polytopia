@@ -46,7 +46,7 @@ services:
             - database
             - rabbitmq
             - worker-01
-            - worker-02
+            # - worker-02
             # - map_patching
             # - map_analysis
             #- header_footer_recognition
