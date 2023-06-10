@@ -641,9 +641,13 @@ class BotUtils:
                                 icl["agg_status"][:100]
                             )
                             for icl in incomplete_channel_list
+                            if icl["max_started_on_started"].strftime('%Y.%m.%d').startswith("2023")
                         ]
                     message = "\n".join(entries)
-                    if len(message) < 2000:
+                    if len(message) == 0:
+                        message = "All patching runs are complete."
+                        await ctx.send(message)
+                    elif len(message) < 2000:
                         await ctx.send(message)
                     else:
                         chunk_size = 10
