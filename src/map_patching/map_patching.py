@@ -204,7 +204,7 @@ def patch_processed_image_files(
 
 
 def load_background_params(map_size: str) -> ImageParam:
-    return database_client.get_background_image_params(int(map_size))
+    return database_client.get_background_image_params([int(map_size)])[0][1]
 
 
 def load_image_params(image_filenames: List[str]) -> List[ImageParam]:

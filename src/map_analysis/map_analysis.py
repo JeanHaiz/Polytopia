@@ -271,7 +271,7 @@ def match_border_clouds(
             ((0, 0), grid_blur_right[:, :border_width], right_template_alpha),
             ((0, img_shape[1] - border_width), grid_blur_left[:, -border_width:], left_template_alpha)]
     else:
-        print("top-bottom borders")
+        print("top-bottom borders", flush=True)
         
         top_template = template[:int(full_hh / 2), :]
         bottom_template = template[int(full_hh / 2):, :]
@@ -283,6 +283,9 @@ def match_border_clouds(
                                          action_debug)
         blur_bottom = pad_matching_template(map_image, bottom_template, bottom_template_alpha, channel_name,
                                             filename + "_bottom", action_debug)
+        
+        print("blur top shape", blur_top.shape)
+        print("grid image shape", grid_image.shape)
         
         grid_blur_top = cv2.bitwise_and(blur_top, grid_image[:, :, 0])
         grid_blur_bottom = cv2.bitwise_and(blur_bottom, grid_image[:, :, 0])
@@ -305,7 +308,10 @@ def match_border_clouds(
             
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(border_image)
             
-            padded_max_loc = max_loc[0] + padding[1] - int(hh / 2), max_loc[1] + padding[0] - int(ww / 2)  # y, x
+            padded_max_loc = (
+                max_loc[0] + padding[1] - int(ww / 2),
+                max_loc[1] + padding[0] - int(hh / 2)
+            )  # y, x
             
             if max_val > border_threshold:
                 
@@ -451,6 +457,9 @@ def get_cloud_alpha_quater(
     raw_scale = get_scale(map_image, channel_name, filename, action_debug)
     scale = 1.0 / (raw_scale / template.shape[0])
     
+    if DEBUG:
+        print("cloud scale", scale)
+
     resized_template, resized_template_alpha, resized_template_alpha_layer = resize_template(template, scale)
     
     k_size = int(resized_template.shape[0] * 0.3)
@@ -466,11 +475,13 @@ def get_cloud_alpha_quater(
     grid_blur = cv2.bitwise_and(blur, grid_image[:, :, 0])
     
     if DEBUG or action_debug:
+        print("grid image shape", grid_image.shape)
         maximum = np.max(grid_blur)
     
     img_alpha = np.ones((map_image.shape[0:2]))
     
     img_alpha = match_full_clouds(grid_blur, img_alpha, resized_template_alpha_layer)
+    img_alpha = match_border_clouds(map_image, img_alpha, resized_template, resized_template_alpha_layer, grid_image, channel_name, filename, action_debug)
     
     cloud_less_map_image = cv2.bitwise_and(map_image, map_image, mask=img_alpha.astype(np.uint8))
     
@@ -728,10 +739,13 @@ def get_line_slope(line: List[np.int32]) -> float:
     return dy / dx if dx != 0 else 100
 
 
-for map_size_i in [121, 196, 256, 324, 400]:  # TODO add missing 900 map
+map_sizes = [121, 196, 256, 324, 400]   # TODO add missing 900 map
+background_params_list = database_client.get_background_image_params(map_sizes)
+for map_size_i in map_sizes:
     if DEBUG:
         print("checking map size", map_size_i)
-    background_params = database_client.get_background_image_params(map_size_i)
+
+    background_params = [i for i in background_params_list if i[0] == map_size_i]
     background_image = image_utils.get_processed_background_template(str(map_size_i))
     if DEBUG:
         print("existing values", background_image is None, background_params, flush=True)

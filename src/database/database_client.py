@@ -523,14 +523,17 @@ class DatabaseClient:
             f"""DELETE from map_patching_input_param
                 WHERE filename::text = '{filename}';""")
     
-    def get_background_image_params(self, map_size: int) -> Optional[ImageParam]:
+    def get_background_image_params(self, map_sizes: List[int]) -> Optional[List[Tuple[str, ImageParam]]]:
         result_proxy = self.execute(
             f"""SELECT *
                 FROM map_patching_background_param
-                WHERE map_size = {map_size};""").fetchall()
+                WHERE map_size in {self.__format_list(map_sizes, lambda x: x)};""").fetchall()
         rows = [dict(row) for row in result_proxy]
-        if len(rows) == 1:
-            return ImageParam("processed_background_template_%s" % map_size, rows[0]["cloud_scale"], rows[0]["corners"])
+        if len(rows) > 0:
+            return [
+                (r["map_size"], ImageParam("processed_background_template_%s" % r["map_size"], r["cloud_scale"], r["corners"]))
+                for r in rows
+            ]
         else:
             return None
     
