@@ -640,7 +640,7 @@ class BotUtils:
                                 icl["max_started_on_started"].strftime('%H:%M:%S'),
                                 icl["agg_status"][:100]
                             )
-                            for icl in incomplete_channel_list
+                            for icl in sorted(incomplete_channel_list, key= lambda x: x["max_started_on_started"])
                             if icl["max_started_on_started"].strftime('%Y.%m.%d').startswith("2023")
                         ]
                     message = "\n".join(entries)
@@ -733,6 +733,8 @@ class BotUtils:
                         ),
                         loop
                     )
+                else:
+                    raise ValueError("Unsupported operation: %s" % action)
             except (
                     BaseException,
                     aiohttp.client_exceptions.ClientOSError,
